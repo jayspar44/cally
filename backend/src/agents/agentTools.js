@@ -3,9 +3,16 @@ const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const logger = require('../logger');
 
-/**
- * Tool declarations for Gemini function calling
- */
+const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
+
+const getTodayDate = (userTimezone) => {
+    if (userTimezone) {
+        return new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
+    }
+    return new Date().toISOString().split('T')[0];
+};
+
 const toolDeclarations = [
     {
         name: 'logFood',
@@ -144,9 +151,6 @@ const toolDeclarations = [
     }
 ];
 
-/**
- * Execute a tool by name with given arguments
- */
 const executeTool = async (toolName, args, userId, userTimezone) => {
     try {
         switch (toolName) {
@@ -171,43 +175,28 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
     }
 };
 
-/**
- * Log food to Firestore
- */
 const logFood = async (args, userId, userTimezone) => {
-    let { date, meal, description, items, originalMessage, nutritionSource } = args;
+    let { date, meal, items, originalMessage, nutritionSource } = args;
 
-    // Compatibility layer for malformed AI arguments (Model sometimes sends flat fields instead of specific schema)
     if (!meal && args.mealType) meal = args.mealType;
 
-    // Normalize meal to lowercase and valid enum
     if (meal) {
         meal = meal.toLowerCase();
-        if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(meal)) {
-            // Default to snack if invalid, or try to infer? 
-            // Better to default to snack to avoid crash
+        if (!VALID_MEALS.includes(meal)) {
             logger.warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
             meal = 'snack';
         }
     } else {
-        // Fallback if strictly missing
         meal = 'snack';
     }
 
-    // Default to user's local today if date not provided
     if (!date) {
-        if (userTimezone) {
-            // Get YYYY-MM-DD in user's timezone
-            date = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
-        } else {
-            date = new Date().toISOString().split('T')[0];
-        }
+        date = getTodayDate(userTimezone);
     }
 
     const batch = db.batch();
     const createdIds = [];
 
-    // Check if AI sent flat item details instead of items array
     if ((!items || items.length === 0) && args.foodName) {
         logger.info('Detected flat food arguments, converting to items array');
         items = [{
@@ -222,7 +211,6 @@ const logFood = async (args, userId, userTimezone) => {
         }];
     }
 
-    // Safety check for items
     if (!items || !Array.isArray(items)) {
         logger.warn({ args }, 'logFood called without valid items array');
         items = [];
@@ -243,7 +231,7 @@ const logFood = async (args, userId, userTimezone) => {
             fat: item.fat || 0,
             originalMessage: originalMessage || '',
             source: 'chat',
-            nutritionSource: nutritionSource || 'ai_estimate', // distinct from 'source' which tracks how the log was created
+            nutritionSource: nutritionSource || 'ai_estimate',
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp()
@@ -253,7 +241,6 @@ const logFood = async (args, userId, userTimezone) => {
         createdIds.push({ id: docRef.id, ...foodLogItem });
     }
 
-    // Calculate totals for the response
     const totals = items.reduce((acc, item) => ({
         calories: acc.calories + (item.calories || 0),
         protein: acc.protein + (item.protein || 0),
@@ -266,7 +253,6 @@ const logFood = async (args, userId, userTimezone) => {
     return {
         success: true,
         data: {
-            // Return summary of what was logged
             date,
             meal,
             items: createdIds.map(item => ({
@@ -290,13 +276,9 @@ const logFood = async (args, userId, userTimezone) => {
     };
 };
 
-/**
- * Look up nutrition from USDA or common foods database
- */
 const lookupNutrition = async (args) => {
     const { foodName } = args;
 
-    // Try quick lookup first
     const quickResult = quickLookup(foodName);
     if (quickResult) {
         return {
@@ -306,7 +288,6 @@ const lookupNutrition = async (args) => {
         };
     }
 
-    // Fall back to USDA API
     const usdaResults = await searchFoods(foodName, 3);
     if (usdaResults.length > 0) {
         return {
@@ -323,18 +304,11 @@ const lookupNutrition = async (args) => {
     };
 };
 
-/**
- * Search food logs
- */
 const searchFoodLogs = async (args, userId, userTimezone) => {
     let { query, date } = args;
 
     if (!date) {
-        if (userTimezone) {
-            date = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
-        } else {
-            date = new Date().toISOString().split('T')[0];
-        }
+        date = getTodayDate(userTimezone);
     }
 
     try {
@@ -350,7 +324,6 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         const lowerQuery = query.toLowerCase();
 
-        // Simple client-side fuzzy match
         const matches = logs.filter(log => {
             const nameMatch = log.name?.toLowerCase().includes(lowerQuery);
             const msgMatch = log.originalMessage?.toLowerCase().includes(lowerQuery);
@@ -380,9 +353,6 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
     }
 };
 
-/**
- * Update an existing food log
- */
 const updateFoodLog = async (args, userId) => {
     const { logId, updates } = args;
 
@@ -393,22 +363,16 @@ const updateFoodLog = async (args, userId) => {
         return { success: false, error: 'Food log item not found. Please use searchFoodLogs to find the correct ID first.' };
     }
 
-    // Flatten updates? If Gemini sends `updates: { items: [...] }` that's bad.
-    // We need to assume `updates` contains { calories: 123, name: '...' } etc.
-    // I will sanitize keys.
-    const allowedKeys = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
     const cleanUpdates = {};
 
-    // If updates is nested (e.g. from old schema), try to extract
     if (updates.items && Array.isArray(updates.items) && updates.items.length > 0) {
-        // Assume they want to update THIS item with the first item in the list
         const item = updates.items[0];
         Object.keys(item).forEach(k => {
-            if (allowedKeys.includes(k)) cleanUpdates[k] = item[k];
+            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = item[k];
         });
     } else {
         Object.keys(updates).forEach(k => {
-            if (allowedKeys.includes(k)) cleanUpdates[k] = updates[k];
+            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = updates[k];
         });
     }
 
@@ -427,18 +391,11 @@ const updateFoodLog = async (args, userId) => {
     };
 };
 
-/**
- * Get daily summary for a date
- */
 const getDailySummaryTool = async (args, userId, userTimezone) => {
     let { date } = args;
 
     if (!date) {
-        if (userTimezone) {
-            date = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
-        } else {
-            date = new Date().toISOString().split('T')[0];
-        }
+        date = getTodayDate(userTimezone);
     }
 
     const snapshot = await db.collection('users').doc(userId)
@@ -448,7 +405,6 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
 
     const logs = snapshot.docs.map(doc => doc.data());
 
-    // Aggregate totals
     const summary = logs.reduce((acc, log) => ({
         calories: acc.calories + (log.calories || 0),
         protein: acc.protein + (log.protein || 0),
@@ -456,7 +412,6 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
         fat: acc.fat + (log.fat || 0)
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-    // Group items by meal for the "meals" list
     const mealsMap = logs.reduce((acc, log) => {
         const mealName = log.meal || 'snack';
         if (!acc[mealName]) {
@@ -473,7 +428,6 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
         return acc;
     }, {});
 
-    // Transform map to array and format descriptions
     const meals = Object.values(mealsMap).map(m => ({
         ...m,
         description: m.description.join(', ')
@@ -496,9 +450,6 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
     };
 };
 
-/**
- * Get user's nutrition goals
- */
 const getUserGoals = async (userId) => {
     const userDoc = await db.collection('users').doc(userId).get();
     const settings = userDoc.exists ? userDoc.data().settings : {};

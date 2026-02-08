@@ -20,14 +20,12 @@ import { setupKeyboardListeners } from './utils/keyboard';
 function AppContent() {
   const { setApiConnectionStatus } = useConnection();
 
-  // Set dynamic page title based on environment
   useEffect(() => {
     const env = getEnvironment();
     const envSuffix = env === 'prod' ? '' : ` (${env})`;
     document.title = `Cally${envSuffix}`;
   }, []);
 
-  // Set up API connection status callback
   useEffect(() => {
     setConnectionStatusCallback(setApiConnectionStatus);
   }, [setApiConnectionStatus]);
@@ -54,10 +52,8 @@ function AppContent() {
 }
 
 function App() {
-  // Setup keyboard listeners for native platforms
   useEffect(() => {
-    const cleanup = setupKeyboardListeners();
-    return cleanup;
+    return setupKeyboardListeners();
   }, []);
 
   return (

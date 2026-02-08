@@ -5,7 +5,6 @@ export default function ProtectedRoute({ children }) {
     const { user, loading } = useAuth();
 
     if (loading) {
-        // minimal loading state or spinner
         return <div className="min-h-screen flex items-center justify-center text-slate-400">Loading...</div>;
     }
 

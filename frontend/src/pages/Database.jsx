@@ -99,16 +99,16 @@ export default function Database() {
                 <input
                     type="text"
                     placeholder="Search logs..."
-                    className="w-full bg-white rounded-xl pl-10 pr-4 py-3 font-sans text-sm text-primary placeholder:text-primary/30 shadow-sm border border-transparent focus:border-border focus:ring-0 outline-none transition-all"
+                    className="w-full bg-surface rounded-xl pl-10 pr-4 py-3 font-sans text-sm text-primary placeholder:text-primary/30 shadow-sm border border-transparent focus:border-border focus:ring-0 outline-none transition-all"
                 />
             </div>
 
-            <div className="bg-white rounded-[2.5rem] shadow-card overflow-hidden border border-border/50">
+            <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden border border-border/50">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-primary/5">
                             <tr>
-                                {['Date', 'Time', 'Meal', 'Item', 'Qty', 'Cals', 'P', 'C', 'F'].map((header, i) => (
+                                {['Date', 'Time', 'Meal', 'Item', 'Qty', 'Cals', 'P', 'C', 'F'].map((header) => (
                                     <th
                                         key={header}
                                         className={cn(
@@ -174,7 +174,7 @@ export default function Database() {
                                                 </button>
                                                 <button
                                                     onClick={() => handleDelete(log)}
-                                                    className="p-1.5 text-primary/40 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                                    className="p-1.5 text-primary/40 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                                                     title="Delete"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />

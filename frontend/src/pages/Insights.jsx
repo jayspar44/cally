@@ -85,7 +85,7 @@ export default function Insights() {
     return (
         <div className="space-y-6 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Weekly Overview Card */}
-            <section className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-8 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 relative overflow-hidden group">
+            <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-8 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30 relative overflow-hidden group">
                 {/* Decorative background gradient */}
                 <div className="absolute -top-20 -right-20 w-64 h-64 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-colors duration-1000" />
 
@@ -165,7 +165,7 @@ export default function Insights() {
             </section>
 
             {/* Placeholder for Future Charts */}
-            <section className="bg-white/50 border border-white/40 rounded-[2.5rem] p-8 flex items-center justify-center min-h-[120px] mb-8">
+            <section className="bg-white/50 dark:bg-surface/50 border border-white/40 dark:border-border/30 rounded-[2.5rem] p-8 flex items-center justify-center min-h-[120px] mb-8">
                 <div className="text-center">
                     <span className="font-serif text-lg text-primary/40 block mb-1">More Insights Coming Soon</span>
                     <span className="font-sans text-xs text-primary/30">Detailed macro analysis in next update</span>
@@ -178,7 +178,7 @@ export default function Insights() {
                     <h3 className="font-serif font-bold text-2xl text-primary">Daily Log</h3>
 
                     {/* Date Navigation */}
-                    <div className="flex items-center bg-white rounded-full p-1 shadow-sm border border-border">
+                    <div className="flex items-center bg-surface rounded-full p-1 shadow-sm border border-border">
                         <button
                             onClick={handlePrevDay}
                             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/5 text-primary/60 transition-colors"
@@ -213,13 +213,13 @@ export default function Insights() {
                         <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
                     </div>
                 ) : dailySummary?.meals && dailySummary.meals.length > 0 ? (
-                    <div className="bg-white rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
+                    <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
                         {dailySummary.meals.map((meal, index) => (
                             <MealItem key={index} meal={meal} />
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-12 bg-white/50 rounded-[2.5rem] border border-dashed border-primary/10">
+                    <div className="text-center py-12 bg-white/50 dark:bg-surface/50 rounded-[2.5rem] border border-dashed border-primary/10">
                         <p className="font-sans text-primary/40">No meals logged for this day.</p>
                     </div>
                 )}

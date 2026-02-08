@@ -1,11 +1,14 @@
 const { db } = require('../services/firebase');
 
-/**
- * Get daily nutrition summary for a specific date
- */
-/**
- * Get daily nutrition summary for a specific date
- */
+const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
+
+const aggregateMacros = (logs) => logs.reduce((acc, log) => ({
+    calories: acc.calories + (log.calories || 0),
+    protein: acc.protein + (log.protein || 0),
+    carbs: acc.carbs + (log.carbs || 0),
+    fat: acc.fat + (log.fat || 0)
+}), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
 const getDailySummary = async (req, res) => {
     try {
         const userId = req.user.uid;
@@ -23,16 +26,15 @@ const getDailySummary = async (req, res) => {
             ...doc.data()
         }));
 
-        // Aggregate totals (New Schema: logs are items)
-        const summary = logs.reduce((acc, log) => ({
-            totalCalories: acc.totalCalories + (log.calories || 0), // Changed from totalCalories
-            totalProtein: acc.totalProtein + (log.protein || 0),
-            totalCarbs: acc.totalCarbs + (log.carbs || 0),
-            totalFat: acc.totalFat + (log.fat || 0),
-            mealCount: acc.mealCount // Count logic handled below in grouping
-        }), { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0, mealCount: 0 });
+        const macros = aggregateMacros(logs);
+        const summary = {
+            totalCalories: macros.calories,
+            totalProtein: macros.protein,
+            totalCarbs: macros.carbs,
+            totalFat: macros.fat,
+            mealCount: 0
+        };
 
-        // Group by meal for "Today's Meals" list
         const mealsMap = {};
         logs.forEach(log => {
             const mealType = log.meal;
@@ -55,20 +57,17 @@ const getDailySummary = async (req, res) => {
             });
         });
 
-        // Convert map to array and format description
-        const mealOrder = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
         const meals = Object.values(mealsMap)
             .map(m => ({
                 meal: m.meal,
                 totalCalories: m.totalCalories,
-                description: m.items.map(i => i.name).filter(n => n?.trim()).join(', '), // Filter empty names
+                description: m.items.map(i => i.name).filter(n => n?.trim()).join(', '),
                 items: m.items
             }))
-            .sort((a, b) => (mealOrder[a.meal] || 99) - (mealOrder[b.meal] || 99));
+            .sort((a, b) => (MEAL_ORDER[a.meal] || 99) - (MEAL_ORDER[b.meal] || 99));
 
         summary.mealCount = meals.length;
 
-        // Get user goals
         const userDoc = await db.collection('users').doc(userId).get();
         const settings = userDoc.exists ? userDoc.data().settings : {};
 
@@ -79,7 +78,6 @@ const getDailySummary = async (req, res) => {
             targetFat: settings.targetFat || 65
         };
 
-        // Calculate remaining
         const remaining = {
             calories: goals.targetCalories - summary.totalCalories,
             protein: goals.targetProtein - summary.totalProtein,
@@ -87,7 +85,6 @@ const getDailySummary = async (req, res) => {
             fat: goals.targetFat - summary.totalFat
         };
 
-        // Calculate percentages
         const progress = {
             calories: Math.min(100, (summary.totalCalories / goals.targetCalories) * 100),
             protein: Math.min(100, (summary.totalProtein / goals.targetProtein) * 100),
@@ -101,7 +98,7 @@ const getDailySummary = async (req, res) => {
             goals,
             remaining,
             progress,
-            meals // Now grouped by meal type
+            meals
         });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get daily summary');
@@ -109,17 +106,13 @@ const getDailySummary = async (req, res) => {
     }
 };
 
-/**
- * Get weekly trends (last 7 days)
- */
 const getWeeklyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        // Calculate date range
         const endDate = new Date();
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 6); // Last 7 days including today
+        startDate.setDate(startDate.getDate() - 6);
 
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
@@ -132,7 +125,6 @@ const getWeeklyTrends = async (req, res) => {
 
         const logs = snapshot.docs.map(doc => doc.data());
 
-        // Group by date
         const byDate = {};
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const dateStr = d.toISOString().split('T')[0];
@@ -141,7 +133,7 @@ const getWeeklyTrends = async (req, res) => {
 
         logs.forEach(log => {
             if (byDate[log.date]) {
-                byDate[log.date].calories += log.calories || 0; // Fixed: calories
+                byDate[log.date].calories += log.calories || 0;
                 byDate[log.date].protein += log.protein || 0;
                 byDate[log.date].carbs += log.carbs || 0;
                 byDate[log.date].fat += log.fat || 0;
@@ -149,23 +141,16 @@ const getWeeklyTrends = async (req, res) => {
             }
         });
 
-        // Convert to array sorted by date
         const days = Object.entries(byDate)
             .map(([date, data]) => ({
                 date,
                 ...data,
-                meals: data.meals.size // Count unique meals (e.g. Breakfast, Lunch)
+                meals: data.meals.size
             }))
             .sort((a, b) => a.date.localeCompare(b.date));
 
-        // Calculate averages
         const daysWithData = days.filter(d => d.meals > 0).length || 1;
-        const totals = days.reduce((acc, d) => ({
-            calories: acc.calories + d.calories,
-            protein: acc.protein + d.protein,
-            carbs: acc.carbs + d.carbs,
-            fat: acc.fat + d.fat
-        }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+        const totals = aggregateMacros(days);
 
         const averages = {
             calories: Math.round(totals.calories / daysWithData),
@@ -188,17 +173,13 @@ const getWeeklyTrends = async (req, res) => {
     }
 };
 
-/**
- * Get monthly trends (last 30 days)
- */
 const getMonthlyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        // Calculate date range
         const endDate = new Date();
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 29); // Last 30 days including today
+        startDate.setDate(startDate.getDate() - 29);
 
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
@@ -211,8 +192,7 @@ const getMonthlyTrends = async (req, res) => {
 
         const logs = snapshot.docs.map(doc => doc.data());
 
-        // Group by week
-        const weeks = [{}, {}, {}, {}, {}]; // Up to 5 weeks
+        const weeks = [{}, {}, {}, {}, {}];
         logs.forEach(log => {
             const logDate = new Date(log.date);
             const daysSinceStart = Math.floor((logDate - startDate) / (1000 * 60 * 60 * 24));
@@ -221,14 +201,13 @@ const getMonthlyTrends = async (req, res) => {
             if (!weeks[weekIndex].calories) {
                 weeks[weekIndex] = { calories: 0, protein: 0, carbs: 0, fat: 0, daysSet: new Set() };
             }
-            weeks[weekIndex].calories += log.calories || 0; // Fixed: calories
+            weeks[weekIndex].calories += log.calories || 0;
             weeks[weekIndex].protein += log.protein || 0;
             weeks[weekIndex].carbs += log.carbs || 0;
             weeks[weekIndex].fat += log.fat || 0;
             weeks[weekIndex].daysSet.add(log.date);
         });
 
-        // Calculate daily averages per week
         const weeklyData = weeks
             .map((w, i) => {
                 const days = w.daysSet ? w.daysSet.size : 0;
@@ -243,14 +222,8 @@ const getMonthlyTrends = async (req, res) => {
             })
             .filter(w => w.daysTracked > 0);
 
-        // Overall averages
         const daysWithData = logs.length > 0 ? new Set(logs.map(l => l.date)).size : 1;
-        const totals = logs.reduce((acc, log) => ({
-            calories: acc.calories + (log.calories || 0), // Fixed: calories
-            protein: acc.protein + (log.protein || 0),
-            carbs: acc.carbs + (log.carbs || 0),
-            fat: acc.fat + (log.fat || 0)
-        }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+        const totals = aggregateMacros(logs);
 
         const averages = {
             calories: Math.round(totals.calories / daysWithData),

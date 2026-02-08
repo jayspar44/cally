@@ -19,8 +19,8 @@ AI-powered calorie tracking app with chat-first interface, photo recognition, an
 cally/
 ├── frontend/                 # React + Vite web app
 │   ├── src/
-│   │   ├── pages/           # Chat, Insights, Settings, Login
-│   │   ├── components/      # UI components (layout/, common/, chat/, insights/)
+│   │   ├── pages/           # Home, Chat, Database, Insights, Settings, Login
+│   │   ├── components/      # UI components (layout/, common/, chat/, ui/)
 │   │   ├── contexts/        # AuthContext, UserPreferencesContext, ConnectionContext, ThemeContext, ChatContext
 │   │   ├── api/             # Axios client and API services
 │   │   └── utils/           # Helper functions, nutrition calculations
@@ -28,12 +28,15 @@ cally/
 ├── backend/                  # Express API server
 │   ├── src/
 │   │   ├── index.js         # Server entry point
+│   │   ├── logger.js        # Pino logger configuration
 │   │   ├── routes/api.js    # Route definitions
 │   │   ├── controllers/     # auth, user, chat, food, insights controllers
 │   │   ├── services/        # firebase, gemini, nutrition services
 │   │   └── agents/          # AI agent definitions and tools
 │   └── Dockerfile           # Cloud Run container config
-├── .claude/commands/         # Claude Code slash commands
+├── .claude/
+│   ├── commands/             # Claude Code slash commands
+│   └── settings.local.json   # Local permission overrides
 ├── .github/workflows/        # GitHub Actions
 ├── scripts/                  # Dev tooling
 ├── cloudbuild.yaml          # CI/CD pipeline (dev/prod)
@@ -46,7 +49,7 @@ cally/
 
 | Environment | Branch/Trigger | Backend URL | Frontend |
 |-------------|----------------|-------------|----------|
-| Local       | any            | http://localhost:4001 | http://localhost:4000 |
+| Local       | any            | http://localhost:3501 | http://localhost:3500 |
 | Dev (GCP)   | develop        | Cloud Run dev service | Firebase Hosting dev |
 | Prod (GCP)  | main           | Cloud Run prod service | Firebase Hosting prod |
 | PR Preview  | PR to develop  | Cloud Run tagged revision | Firebase preview channel |
@@ -62,7 +65,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.local.template frontend/.env.local
 # Edit both files with your credentials
 
-# Run (http://localhost:4000 frontend, :4001 backend)
+# Run (http://localhost:3500 frontend, :3501 backend)
 npm run dev:local          # Both servers
 npm run dev:frontend       # Frontend only
 npm run dev:backend        # Backend only
@@ -74,11 +77,12 @@ npm run dev:backend        # Backend only
 
 | Variable | Description |
 |----------|-------------|
-| `PORT` | Server port (default: 4001) |
+| `PORT` | Server port (default: 4001, dev script uses 3501) |
 | `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK service account JSON |
 | `GEMINI_API_KEY` | Google Gemini API key (required) |
 | `NODE_ENV` | Environment (development/production) |
 | `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) |
+| `USDA_API_KEY` | USDA FoodData Central API key (default: DEMO_KEY) |
 
 ### Frontend (`frontend/.env.local`)
 
@@ -118,6 +122,8 @@ All endpoints (except health) require Firebase Auth token in `Authorization: Bea
 | GET | `/api/user/profile` | Get user profile |
 | POST | `/api/chat/message` | Send message to Cally (supports text + images) |
 | GET | `/api/chat/history` | Get conversation history |
+| DELETE | `/api/chat/message/:id` | Delete specific chat message (dev mode) |
+| DELETE | `/api/chat/history` | Clear all chat history (dev mode) |
 | GET | `/api/food/logs` | Get food logs (with date range) |
 | POST | `/api/food/logs` | Manually add/correct food log |
 | PUT | `/api/food/logs/:id` | Update food log entry |
@@ -148,29 +154,24 @@ All endpoints (except health) require Firebase Auth token in `Authorization: Bea
 ```
 
 ### Food Logs Subcollection (`users/{userId}/foodLogs/{logId}`)
+
+Flat schema — one document per food item (not nested items array):
+
 ```js
 {
   date: string,                  // YYYY-MM-DD
   meal: 'breakfast' | 'lunch' | 'dinner' | 'snack',
-  description: string,           // Original user input
-  items: [{
-    name: string,
-    quantity: number,
-    unit: string,
-    calories: number,
-    protein: number,
-    carbs: number,
-    fat: number,
-    fiber: number | null,
-    confidence: number           // AI confidence 0-1
-  }],
-  totalCalories: number,
-  totalProtein: number,
-  totalCarbs: number,
-  totalFat: number,
+  name: string,                  // Food item name
+  quantity: number,
+  unit: string,
+  calories: number,
+  protein: number,
+  carbs: number,
+  fat: number,
+  originalMessage: string,       // User's original chat text
   source: 'chat' | 'photo' | 'manual',
-  imageUrl: string | null,       // If photo uploaded
-  corrected: boolean,            // User made corrections
+  nutritionSource: 'ai_estimate' | 'usda' | 'common_foods' | 'user_input' | 'nutrition_label',
+  corrected: boolean,
   createdAt: timestamp,
   updatedAt: timestamp
 }
@@ -201,6 +202,7 @@ Cally uses Gemini function calling for:
 | `logFood` | Create food log entry in Firestore |
 | `updateFoodLog` | Correct/update existing entry |
 | `getDailySummary` | Get user's current day nutrition |
+| `searchFoodLogs` | Search past food logs by name/meal/date |
 | `getUserGoals` | Retrieve user's target macros |
 
 ## Mobile (Android/iOS)
@@ -265,7 +267,15 @@ git status && git diff --cached   # Review staged changes
 
 **Use `/commit-push` instead of `git commit`** - runs lint and security checks automatically.
 
-## Claude Code Slash Commands
+## MCP Plugins
+
+- **Context7**: Look up docs for React 19, Tailwind v4, Capacitor 8, Express 5, Gemini API. Always call `resolve-library-id` first, then `query-docs`.
+- **Playwright**: Verify UI changes at http://localhost:3500. Prefer `browser_snapshot` over screenshots for interaction.
+- **Firebase**: Project ID `cally-658`. Requires `firebase_login` first. Use `use_emulator: true` for local Firestore/Storage/RTDB.
+
+## Claude Code Skills
+
+### Slash Commands
 
 Custom commands in `.claude/commands/`:
 
@@ -279,7 +289,6 @@ Custom commands in `.claude/commands/`:
 | `/pr-flow` | `/pr-flow [--no-fix] [--auto-merge]` - Autonomous PR workflow |
 | `/pr-merge` | `/pr-merge <pr-number> [--no-sync] [--delete-branch]` - Squash merge |
 | `/release` | `/release [--patch\|--minor\|--major]` - Auto-bump version |
-| `/build-app` | `/build-app [local\|dev\|prod]` - Build APK |
 
 ### Typical Workflow
 
@@ -290,10 +299,22 @@ Custom commands in `.claude/commands/`:
 /release                               # Auto-bump version based on commits
 ```
 
+### Other Skills
+
+Auto-invoked skills (brainstorming, TDD, debugging, verification, etc.) activate contextually — see system prompt. Additional user-invocable skills: `frontend-design`, `revise-claude-md`, `claude-md-improver`, `keybindings-help`.
+
+## Gotchas
+
+- **Scroll container**: `#layout-container` in Layout.jsx (NOT window — html/body have `overflow:hidden`). Use `document.getElementById('layout-container')?.scrollBy()`, not `window.scrollBy()`.
+- **Tailwind CSS v4**: Uses `@theme` directive in `index.css` — no `tailwind.config.js`. Theme tokens defined as CSS variables.
+- **Dark mode**: Class strategy via `@custom-variant dark (&:is(.dark *))` with `.dark` on `<html>`. Color overrides in `html.dark {}` block in `index.css`. Semi-transparent whites (e.g., `bg-white/10`) need explicit `dark:bg-surface/10` since CSS variable swap doesn't handle opacity-based colors.
+- **Chat page spacer**: 200px base + ResizeObserver delta from input container height. Observer depends on `[initialized]` dep — must re-run after loading spinner replaced by full UI.
+- **React 19**: No `import React` needed — JSX transform handles it automatically.
+
 ## Coding Conventions
 
 ### Naming
-- **Files**: kebab-case (e.g., `food-controller.js`, `chat-service.js`)
+- **Files**: camelCase (e.g., `foodController.js`, `chatController.js`)
 - **React Components**: PascalCase (e.g., `ChatMessage.jsx`, `InsightsDashboard.jsx`)
 - **Variables/Functions**: camelCase
 - **Directories**: kebab-case
@@ -310,7 +331,7 @@ Custom commands in `.claude/commands/`:
   - `controllers/`: Request handling logic
   - `services/`: Business logic, Firebase calls, Gemini AI
   - `agents/`: AI agent definitions with tools
-- **Logging**: Use `req.log` (Pino) instead of `console.log`
+- **Logging**: Controllers use `req.log` (Pino), services use `require('../logger')`. Never `console.log`.
 
 ### Git Commits (Conventional Commits)
 

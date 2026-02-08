@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '../api/services';
 import { useAuth } from './AuthContext';
 import { logger } from '../utils/logger';
@@ -10,23 +10,18 @@ export const useUserPreferences = () => useContext(UserPreferencesContext);
 export const UserPreferencesProvider = ({ children }) => {
     const { user } = useAuth();
 
-    // -- Local Preferences --
-    // Developer Mode Master Switch
     const [developerMode, setDeveloperMode] = useState(() => {
         return localStorage.getItem('app_pref_devMode') === 'true';
     });
 
-    // -- Backend User Profile --
     const [firstName, setFirstName] = useState('');
     const [registeredDate, setRegisteredDate] = useState(null);
     const [profileLoading, setProfileLoading] = useState(false);
 
-    // Persistence Effects
     useEffect(() => {
         localStorage.setItem('app_pref_devMode', developerMode);
     }, [developerMode]);
 
-    // Fetch Profile on Load / Auth Change
     useEffect(() => {
         const fetchProfile = async () => {
             if (user) {

@@ -1,7 +1,7 @@
 {
-  "name": "{{PROJECT_NAME}}-backend",
+  "name": "cally-backend",
   "version": "0.1.0",
-  "description": "Backend for {{PROJECT_TITLE}}",
+  "description": "Backend for Cally - AI Calorie Counting Companion",
   "main": "src/index.js",
   "private": true,
   "scripts": {
@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@google/genai": "^1.35.0",
-    "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { cn } from '../../utils/cn';
 
 export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initialData }) {
     const [formData, setFormData] = useState({
@@ -54,10 +53,10 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Food Log</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-4 border-b border-border flex justify-between items-center">
+                    <h2 className="text-lg font-semibold text-primary">Edit Food Log</h2>
+                    <button onClick={onClose} className="text-primary/50 hover:text-primary/80">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -67,13 +66,13 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                     {/* Name */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Food Name</label>
+                        <label className="block text-sm font-medium text-primary/80 mb-1">Food Name</label>
                         <input
                             type="text"
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                            className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent"
                             required
                         />
                     </div>
@@ -81,25 +80,25 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Quantity & Unit */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quantity</label>
+                            <label className="block text-sm font-medium text-primary/80 mb-1">Quantity</label>
                             <input
                                 type="number"
                                 step="0.1"
                                 name="quantity"
                                 value={formData.quantity}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Unit</label>
+                            <label className="block text-sm font-medium text-primary/80 mb-1">Unit</label>
                             <input
                                 type="text"
                                 name="unit"
                                 value={formData.unit}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent"
                                 required
                             />
                         </div>
@@ -108,13 +107,13 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Macros */}
                     <div className="grid grid-cols-4 gap-2">
                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Cals</label>
+                            <label className="block text-xs font-medium text-primary/50 mb-1">Cals</label>
                             <input
                                 type="number"
                                 name="calories"
                                 value={formData.calories}
                                 onChange={handleChange}
-                                className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 text-sm"
+                                className="w-full px-2 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent text-sm"
                             />
                         </div>
                         <div>
@@ -124,7 +123,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                                 name="protein"
                                 value={formData.protein}
                                 onChange={handleChange}
-                                className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 text-sm"
+                                className="w-full px-2 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent text-sm"
                             />
                         </div>
                         <div>
@@ -134,7 +133,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                                 name="carbs"
                                 value={formData.carbs}
                                 onChange={handleChange}
-                                className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 text-sm"
+                                className="w-full px-2 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent text-sm"
                             />
                         </div>
                         <div>
@@ -144,7 +143,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                                 name="fat"
                                 value={formData.fat}
                                 onChange={handleChange}
-                                className="w-full px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-pink-500 text-sm"
+                                className="w-full px-2 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent text-sm"
                             />
                         </div>
                     </div>
@@ -152,12 +151,12 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Meta */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Meal</label>
+                            <label className="block text-sm font-medium text-primary/80 mb-1">Meal</label>
                             <select
                                 name="meal"
                                 value={formData.meal}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 capitalize"
+                                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent capitalize"
                             >
                                 <option value="breakfast">Breakfast</option>
                                 <option value="lunch">Lunch</option>
@@ -166,13 +165,13 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                            <label className="block text-sm font-medium text-primary/80 mb-1">Date</label>
                             <input
                                 type="date"
                                 name="date"
                                 value={formData.date}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-primary focus:ring-2 focus:ring-accent"
                             />
                         </div>
                     </div>
@@ -182,13 +181,13 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                         <button
                             type="button"
                             onClick={onDelete}
-                            className="flex-1 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 rounded-xl font-medium transition-colors"
+                            className="flex-1 px-4 py-2 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 rounded-xl font-medium transition-colors border border-red-200 dark:border-red-500/20"
                         >
                             Delete
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2 bg-green-500 text-white hover:bg-green-600 rounded-xl font-medium transition-colors shadow-lg shadow-green-500/20"
+                            className="flex-1 px-4 py-2 bg-accent text-white hover:bg-accent/90 rounded-xl font-medium transition-colors shadow-lg shadow-accent/20"
                         >
                             Save Changes
                         </button>

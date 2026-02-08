@@ -37,8 +37,8 @@ const configPath = join(frontendDir, 'capacitor.config.json');
 const APK_OUTPUT_PATH = process.env.APK_OUTPUT_PATH || join(homedir(), 'apks');
 
 // App configuration - UPDATE THESE VALUES
-const APP_ID_BASE = '{{APP_ID_BASE}}';
-const APP_NAME = '{{PROJECT_NAME}}';
+const APP_ID_BASE = 'com.cally.app';
+const APP_NAME = 'Cally';
 
 // ANSI color codes
 const colors = {

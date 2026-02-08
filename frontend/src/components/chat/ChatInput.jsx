@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 import { isNative, takePhoto } from '../../utils/camera';
 import { Send, Image, X, Loader2 } from 'lucide-react';
 
-export default function ChatInput({ onSend, sending, disabled }) {
+export default function ChatInput({ onSend, sending, disabled, onImageChange }) {
     const [message, setMessage] = useState('');
     const [imagePreview, setImagePreview] = useState(null);
     const [imageBase64, setImageBase64] = useState(null);
@@ -17,9 +17,10 @@ export default function ChatInput({ onSend, sending, disabled }) {
                 if (base64) {
                     setImageBase64(base64);
                     setImagePreview(`data:image/jpeg;base64,${base64}`);
+                    onImageChange?.(true);
                 }
-            } catch (error) {
-                console.error('Failed to take photo', error);
+            } catch {
+                // Camera error handled by camera util
             }
         } else {
             fileInputRef.current?.click();
@@ -41,8 +42,9 @@ export default function ChatInput({ onSend, sending, disabled }) {
                 setImageBase64(null);
                 if (textAreaRef.current) textAreaRef.current.style.height = 'auto';
                 if (fileInputRef.current) fileInputRef.current.value = '';
+                onImageChange?.(false);
             });
-        } catch (err) {
+        } catch {
             // Error handled by context
         }
     };
@@ -63,8 +65,6 @@ export default function ChatInput({ onSend, sending, disabled }) {
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0];
-        console.log('File selected:', file); // Debug
-
         if (!file) return;
 
         if (!file.type.startsWith('image/')) {
@@ -72,19 +72,18 @@ export default function ChatInput({ onSend, sending, disabled }) {
             return;
         }
 
-        if (file.size > 50 * 1024 * 1024) { // Updated to 50MB to match backend
+        if (file.size > 50 * 1024 * 1024) {
             alert('Image must be less than 50MB');
             return;
         }
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            console.log('File read success'); // Debug
             setImagePreview(e.target.result);
             const base64 = e.target.result.split(',')[1];
             setImageBase64(base64);
+            onImageChange?.(true);
         };
-        reader.onerror = (err) => console.error('File read error:', err);
         reader.readAsDataURL(file);
     };
 
@@ -92,6 +91,7 @@ export default function ChatInput({ onSend, sending, disabled }) {
         setImagePreview(null);
         setImageBase64(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
+        onImageChange?.(false);
     };
 
     return (
@@ -153,7 +153,7 @@ export default function ChatInput({ onSend, sending, disabled }) {
                         rows={1}
                         className={cn(
                             'w-full px-4 py-3 rounded-xl resize-none font-sans text-sm',
-                            'bg-white text-primary placeholder-primary/40 shadow-sm',
+                            'bg-surface text-primary placeholder-primary/40 shadow-sm',
                             'border-transparent focus:ring-2 focus:ring-primary/10 transition-all duration-200',
                             (sending || disabled) && 'opacity-50 cursor-not-allowed'
                         )}

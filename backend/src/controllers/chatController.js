@@ -1,10 +1,6 @@
 const { db } = require('../services/firebase');
 const { processMessage, processImageMessage } = require('../services/geminiService');
 
-/**
- * Send a message to Cally
- * Supports text and optional image attachments
- */
 const sendMessage = async (req, res) => {
     try {
         const userId = req.user.uid;
@@ -17,17 +13,15 @@ const sendMessage = async (req, res) => {
         const userRef = db.collection('users').doc(userId);
         const chatHistoryRef = userRef.collection('chatHistory');
 
-        // Store user message
         const userMessage = {
             role: 'user',
             content: message || '',
-            imageData: imageBase64 ? true : false, // Flag that image was sent (not storing the image)
+            imageData: !!imageBase64,
             timestamp: new Date(),
             metadata: {}
         };
         const userMsgDoc = await chatHistoryRef.add(userMessage);
 
-        // Get recent chat history for context (last 20 messages)
         const historySnapshot = await chatHistoryRef
             .orderBy('timestamp', 'desc')
             .limit(20)
@@ -37,24 +31,18 @@ const sendMessage = async (req, res) => {
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .reverse();
 
-        // Get user profile for goals context
         const userDoc = await userRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
 
-        // Process with Gemini
-        let response;
-        if (imageBase64) {
-            response = await processImageMessage(message, imageBase64, chatHistory, userProfile, userId, req.body.userTimezone);
-        } else {
-            response = await processMessage(message, chatHistory, userProfile, userId, req.body.userTimezone);
-        }
+        const response = imageBase64
+            ? await processImageMessage(message, imageBase64, chatHistory, userProfile, userId, req.body.userTimezone)
+            : await processMessage(message, chatHistory, userProfile, userId, req.body.userTimezone);
 
-        // Store assistant response
         const assistantMessage = {
             role: 'assistant',
             content: response.text,
             timestamp: new Date(),
-            foodLog: response.foodLog || null, // Store food log data for UI card persistence
+            foodLog: response.foodLog || null,
             metadata: {
                 model: response.model,
                 tokensUsed: response.tokensUsed || null,
@@ -76,9 +64,6 @@ const sendMessage = async (req, res) => {
     }
 };
 
-/**
- * Get chat history with pagination
- */
 const getHistory = async (req, res) => {
     try {
         const userId = req.user.uid;
@@ -109,9 +94,6 @@ const getHistory = async (req, res) => {
     }
 };
 
-/**
- * Clear all chat history for user
- */
 const clearHistory = async (req, res) => {
     try {
         const userId = req.user.uid;
@@ -133,9 +115,6 @@ const clearHistory = async (req, res) => {
     }
 };
 
-/**
- * Delete a specific message
- */
 const deleteMessage = async (req, res) => {
     try {
         const userId = req.user.uid;

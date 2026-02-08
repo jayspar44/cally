@@ -2,31 +2,25 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useChat } from '../contexts/ChatContext';
 import ChatMessage from '../components/chat/ChatMessage';
 import ChatInput from '../components/chat/ChatInput';
-import FoodEditModal from '../components/common/FoodEditModal'; // Correct import path
+import FoodEditModal from '../components/common/FoodEditModal';
 import { api } from '../api/services';
+import { logger } from '../utils/logger';
 
 export default function Chat() {
     const { messages, setMessages, loading, sending, error, initialized, loadHistory, sendMessage } = useChat();
     const messagesEndRef = useRef(null);
-    const containerRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
 
-    // Initial load
     useEffect(() => {
         if (!initialized) loadHistory();
     }, [initialized, loadHistory]);
 
     const isInitialLoad = useRef(true);
 
-    // Auto-scroll
     const scrollToBottom = (behavior = 'smooth') => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
-        }
+        messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
     };
 
-    // Use layout effect for instant scroll before paint
-    // This prevents the "jump" on initial load
     useLayoutEffect(() => {
         if (messages.length === 0) return;
 
@@ -43,78 +37,72 @@ export default function Chat() {
         }
     }, [messages]);
 
-    // Dynamic Sizing State
     const [spacerHeight, setSpacerHeight] = useState(200);
     const inputContainerRef = useRef(null);
     const initialHeightRef = useRef(null);
     const prevSpacerHeightRef = useRef(200);
 
-    // 1. Separate Layout Effect for SCROLLING (Behavioral)
-    // Triggers ONLY when spacerHeight updates (after render)
     useLayoutEffect(() => {
         const delta = spacerHeight - prevSpacerHeightRef.current;
-
-        // If the spacer grew (e.g. image added), scroll DOWN by that amount
-        // This effectively neutralizes the "push up" caused by the spacer expanding
         if (delta > 5) {
-            console.log(`[Chat] Spacer Grew by ${delta}px. Scrolling down...`);
-            window.scrollBy({ top: delta, behavior: 'smooth' });
+            document.getElementById('layout-container')?.scrollBy({ top: delta, behavior: 'smooth' });
         }
-
         prevSpacerHeightRef.current = spacerHeight;
     }, [spacerHeight]);
 
-    // 2. Separate Layout Effect for OBSERVING (Sizing)
     useLayoutEffect(() => {
         if (!inputContainerRef.current) return;
 
         let observer;
+        let rafId = null;
 
-        // Stabilize observation
         const setupObserver = () => {
             if (!inputContainerRef.current) return;
 
             observer = new ResizeObserver(entries => {
-                for (const entry of entries) {
-                    const currentHeight = entry.contentRect.height;
+                const currentHeight = entries[0]?.contentRect.height;
+                if (currentHeight == null) return;
 
-                    // Capture initial 'stable' height once
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(() => {
                     if (initialHeightRef.current === null) {
                         initialHeightRef.current = currentHeight;
-                        console.log('[Chat] Initial Input Height Locked:', currentHeight);
                     }
 
-                    // Calculate Target Spacer Height
-                    // Base: 200px + (Current - Initial)
                     const delta = currentHeight - initialHeightRef.current;
                     const newSpacer = 200 + delta;
 
-                    // Only update state if changed significantly (avoids loops)
                     setSpacerHeight(prev => {
-                        if (Math.abs(prev - newSpacer) < 1) return prev;
+                        if (Math.abs(prev - newSpacer) < 5) return prev;
                         return newSpacer;
                     });
-                }
+                });
             });
 
             observer.observe(inputContainerRef.current);
         };
 
-        // Small delay to ensure layout is settled on mount (fonts, css)
         const timer = setTimeout(setupObserver, 50);
 
         return () => {
             clearTimeout(timer);
+            if (rafId) cancelAnimationFrame(rafId);
             if (observer) observer.disconnect();
         };
-    }, []);
+    }, [initialized]);
+
+    const handleImageChange = (hasImage) => {
+        if (hasImage) {
+            setTimeout(() => scrollToBottom('smooth'), 350);
+        }
+    };
 
     const handleUpdateLog = async (itemId, updates) => {
         try {
             await api.updateFoodLog(itemId, updates);
             // Ideally notify user or optimistic update
         } catch (err) {
-            console.error('Failed to update log:', err);
+            logger.error('Failed to update log:', err);
         }
     };
 
@@ -122,7 +110,7 @@ export default function Chat() {
         try {
             await api.deleteFoodLog(itemId);
         } catch (err) {
-            console.error('Failed to delete log:', err);
+            logger.error('Failed to delete log:', err);
         }
     };
 
@@ -133,7 +121,7 @@ export default function Chat() {
             // Optimistic update
             setMessages(prev => prev.filter(m => m.id !== messageId));
         } catch (err) {
-            console.error('Failed to delete message:', err);
+            logger.error('Failed to delete message:', err);
         }
     };
 
@@ -147,12 +135,7 @@ export default function Chat() {
 
     return (
         <div className="flex flex-col relative min-h-full">
-            {/* Messages Area - No internal scroll, uses Layout scroll */}
-            <div
-                ref={containerRef}
-                className="flex-1 px-2 py-4"
-            >
-                {/* Empty State / Welcome - Centered if no messages */}
+            <div className="flex-1 px-2 py-4">
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center px-4 animate-in fade-in duration-700">
                         <div className="w-16 h-16 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6">
@@ -180,7 +163,6 @@ export default function Chat() {
                     </div>
                 )}
 
-                {/* Messages */}
                 {messages.map((message) => (
                     <ChatMessage
                         key={message.id}
@@ -190,7 +172,6 @@ export default function Chat() {
                     />
                 ))}
 
-                {/* Typing Indicator */}
                 {sending && (
                     <div className="flex justify-start mb-6 px-4">
                         <span className="font-mono text-xs text-primary/40 animate-pulse">
@@ -199,30 +180,21 @@ export default function Chat() {
                     </div>
                 )}
 
-                {/* Error Bubble */}
                 {error && (
-                    <div className="mx-auto max-w-sm bg-red-50 text-red-600 text-xs px-4 py-2 rounded-full text-center mb-4 border border-red-100">
+                    <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-xs px-4 py-2 rounded-full text-center mb-4 border border-red-100 dark:border-red-500/20">
                         {error}
                     </div>
                 )}
 
-                {/* VISIBLE SPACER for Input Clearance */}
-                {/* Robust Solution: Delta Approach
-                    Base Spacer: 200px (Proven robust)
-                    Adjusted by: (Current Input Height - Initial Input Height)
-                */}
                 <div
                     style={{ height: `${spacerHeight}px` }}
-                    className="w-full transition-all duration-300 ease-out"
+                    className="w-full"
                     aria-hidden="true"
                 />
 
-                {/* Scroll Target */}
                 <div ref={messagesEndRef} className="h-1" />
             </div>
 
-            {/* Input Area - Floating Capsule */}
-            {/* MATCH LAYOUT WIDTH: max-w-xl and px-4 to match Layout.jsx constraints */}
             <div
                 ref={inputContainerRef}
                 className="fixed left-1/2 -translate-x-1/2 w-full max-w-xl z-40 px-4 transition-all duration-300 pointer-events-auto"
@@ -232,15 +204,13 @@ export default function Chat() {
                     onSend={sendMessage}
                     sending={sending}
                     disabled={loading}
+                    onImageChange={handleImageChange}
                 />
             </div>
 
-            {/* Edit Modal (Reused Common Modal) */}
             <FoodEditModal
                 isOpen={!!editingFoodLog}
                 onClose={() => setEditingFoodLog(null)}
-                // Map props: FoodEditModal expects `initialData` but chat might pass `foodLog`
-                // Wait, FoodEditModal uses `initialData`. Let's assume it maps correctly or fix here.
                 initialData={editingFoodLog}
                 onSave={(data) => {
                     handleUpdateLog(editingFoodLog.realId || editingFoodLog.id, data);
@@ -260,7 +230,7 @@ function Suggestion({ text, onClick, disabled }) {
         <button
             onClick={onClick}
             disabled={disabled}
-            className="w-full px-5 py-3 text-sm text-left font-medium text-primary/70 bg-white border border-border rounded-xl shadow-sm hover:bg-primary/5 hover:border-primary/20 transition-all active:scale-95 disabled:opacity-50"
+            className="w-full px-5 py-3 text-sm text-left font-medium text-primary/70 bg-surface border border-border rounded-xl shadow-sm hover:bg-primary/5 hover:border-primary/20 transition-all active:scale-95 disabled:opacity-50"
         >
             {text}
         </button>

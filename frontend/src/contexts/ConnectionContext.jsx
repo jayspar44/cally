@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const ConnectionContext = createContext();
 
@@ -14,7 +14,6 @@ export const ConnectionProvider = ({ children }) => {
     const [isOnline, setIsOnline] = useState(true);
     const [isApiConnected, setIsApiConnected] = useState(true);
 
-    // Monitor browser online/offline status
     useEffect(() => {
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);

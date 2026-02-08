@@ -1,4 +1,4 @@
-export default function MacroCard({ label, current, target, progress, color }) {
+export default function MacroCard({ label, current, progress, color }) {
     // Map colors to the new design system
     // We use arbitrary values for now to match the specific palette if needed, 
     // or map to variables defined in index.css
@@ -15,8 +15,8 @@ export default function MacroCard({ label, current, target, progress, color }) {
             bg: 'text-accent/10'
         },
         fat: {
-            ring: 'stroke-amber-600',
-            text: 'text-amber-700',
+            ring: 'stroke-amber-600 dark:stroke-[#D9A05B]',
+            text: 'text-amber-700 dark:text-[#D9A05B]',
             bg: 'text-amber-600/10'
         }
     };

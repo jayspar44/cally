@@ -41,8 +41,8 @@ const colors = {
 };
 
 // Environment configurations - UPDATE APP_ID_BASE with your app ID
-const APP_ID_BASE = '{{APP_ID_BASE}}';
-const APP_NAME = '{{PROJECT_TITLE}}';
+const APP_ID_BASE = 'com.cally.app';
+const APP_NAME = 'Cally';
 
 const configs = {
   local: {

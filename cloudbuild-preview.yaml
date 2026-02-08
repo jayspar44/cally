@@ -6,12 +6,11 @@
 #   _PR_NUMBER: Pull request number (provided by trigger)
 #
 # Preview URLs:
-#   Backend:  https://pr-{N}---{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app
-#   Frontend: https://{{FIREBASE_PROJECT_ID}}--pr-{N}-{hash}.web.app
+#   Backend:  https://pr-{N}---cally-backend-dev-{hash}.a.run.app
+#   Frontend: https://cally-658--pr-{N}-{hash}.web.app
 
 substitutions:
   _PR_NUMBER: ''
-  _REGION: {{GCP_REGION}}
 
 steps:
   # Step 1: Build and deploy backend to Cloud Run with PR tag (no traffic)
@@ -22,17 +21,22 @@ steps:
       - |
         cd backend
         echo "Deploying backend for PR #${_PR_NUMBER}..."
-        gcloud run deploy {{BACKEND_SERVICE}}-dev \
+        gcloud run deploy cally-backend-dev \
           --source . \
-          --region ${_REGION} \
+          --region us-central1 \
           --allow-unauthenticated \
           --tag pr-${_PR_NUMBER} \
           --no-traffic \
           --set-secrets="FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
           --set-env-vars="NODE_ENV=dev" \
-          --set-env-vars="^@^ALLOWED_ORIGINS=https://{{FIREBASE_SITE_DEV}}.web.app,https://{{FIREBASE_SITE_PROD}}.web.app,capacitor://localhost,https://localhost"
+          --set-env-vars="^@^ALLOWED_ORIGINS=https://cally-658-dev.web.app,https://cally-658.web.app,capacitor://localhost,https://localhost"
 
-        PREVIEW_URL="https://pr-${_PR_NUMBER}---{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app"
+        # Get the tagged revision URL dynamically
+        PREVIEW_URL=$$(gcloud run services describe cally-backend-dev \
+          --region us-central1 \
+          --format='value(status.traffic.url)' \
+          --flatten='status.traffic' \
+          --filter="status.traffic.tag=pr-${_PR_NUMBER}")
         echo "Backend preview URL: $${PREVIEW_URL}"
         echo "$${PREVIEW_URL}" > /workspace/backend-preview-url.txt
 
@@ -70,7 +74,7 @@ steps:
         # Use --only dev to target dev site (defined in .firebaserc)
         firebase hosting:channel:deploy pr-${_PR_NUMBER} \
           --only dev \
-          --project {{FIREBASE_PROJECT_ID}} \
+          --project cally-658 \
           --expires 7d \
           --json > /workspace/firebase-deploy.json
 
@@ -93,18 +97,19 @@ steps:
       - '-c'
       - |
         FRONTEND_URL=$$(cat /workspace/frontend-preview-url.txt)
+        BACKEND_URL=$$(cat /workspace/backend-preview-url.txt)
         echo "Updating backend CORS to allow: $${FRONTEND_URL}"
-        gcloud run services update {{BACKEND_SERVICE}}-dev \
-          --region ${_REGION} \
+        gcloud run services update cally-backend-dev \
+          --region us-central1 \
           --tag pr-${_PR_NUMBER} \
-          --update-env-vars="^@^ALLOWED_ORIGINS=https://{{FIREBASE_SITE_DEV}}.web.app,https://{{FIREBASE_SITE_PROD}}.web.app,capacitor://localhost,https://localhost,$${FRONTEND_URL}"
+          --update-env-vars="^@^ALLOWED_ORIGINS=https://cally-658-dev.web.app,https://cally-658.web.app,capacitor://localhost,https://localhost,$${FRONTEND_URL}"
 
         echo ""
         echo "=========================================="
         echo "PR #${_PR_NUMBER} Preview Environment Ready!"
         echo "=========================================="
         echo "Frontend: $${FRONTEND_URL}"
-        echo "Backend:  https://pr-${_PR_NUMBER}---{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app"
+        echo "Backend:  $${BACKEND_URL}"
         echo "=========================================="
 
   # Step 6: Post preview URLs to GitHub PR as comment
@@ -114,10 +119,10 @@ steps:
       - '-c'
       - |
         FRONTEND_URL=$$(cat /workspace/frontend-preview-url.txt)
-        BACKEND_URL="https://pr-${_PR_NUMBER}---{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app"
+        BACKEND_URL=$$(cat /workspace/backend-preview-url.txt)
 
         # Get GitHub token from Secret Manager
-        GITHUB_TOKEN=$$(gcloud secrets versions access latest --secret=GITHUB_TOKEN --project={{FIREBASE_PROJECT_ID}} 2>/dev/null || echo "")
+        GITHUB_TOKEN=$$(gcloud secrets versions access latest --secret=GITHUB_TOKEN --project=cally-658 2>/dev/null || echo "")
 
         if [ -n "$$GITHUB_TOKEN" ]; then
           echo "Posting preview URLs to GitHub PR #${_PR_NUMBER}..."
@@ -135,7 +140,7 @@ steps:
         data = json.dumps({'body': body}).encode('utf-8')
 
         req = urllib.request.Request(
-            'https://api.github.com/repos/{{GITHUB_REPO}}/issues/${_PR_NUMBER}/comments',
+            'https://api.github.com/repos/jayspar44/cally/issues/${_PR_NUMBER}/comments',
             data=data,
             headers={
                 'Authorization': 'token $${GITHUB_TOKEN}',
@@ -147,12 +152,12 @@ steps:
 
         try:
             with urllib.request.urlopen(req) as response:
-                print('✅ Preview URLs posted to GitHub PR #${_PR_NUMBER}')
+                print('Preview URLs posted to GitHub PR #${_PR_NUMBER}')
         except Exception as e:
-            print(f'❌ Failed to post comment: {e}')
+            print(f'Failed to post comment: {e}')
         "
         else
-          echo "⚠️  GITHUB_TOKEN secret not found - skipping GitHub comment"
+          echo "GITHUB_TOKEN secret not found - skipping GitHub comment"
           echo "   To enable automatic PR comments, create a GitHub token with 'repo' scope"
           echo "   and store it in Secret Manager as 'GITHUB_TOKEN'"
         fi

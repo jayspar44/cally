@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
-import { ArrowRight, Moon, Sun, Sparkles } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { logger } from '../utils/logger';
 import { getVersionString } from '../utils/appConfig';
 import { MobileContainer } from '../components/layout/MobileContainer';
@@ -10,7 +9,6 @@ import { cn } from '../utils/cn';
 
 const Login = () => {
     const { loginEmail, signup, user } = useAuth();
-    const { isDark, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
     const [isSignup, setIsSignup] = useState(false);
@@ -64,16 +62,6 @@ const Login = () => {
                     <p className="text-primary/30 font-mono text-[10px] tracking-widest uppercase">{getVersionString()}</p>
                 </div>
 
-                {/* Dark Mode Toggle (Hidden for now as design system dictates specific colors, but keeping logic if needed later) */}
-                {/* 
-                <button
-                    onClick={toggleTheme}
-                    className="absolute top-6 right-6 p-3 rounded-full bg-white/50 backdrop-blur-sm border border-primary/10 text-primary/60 hover:bg-white active:scale-95 transition-all shadow-sm"
-                >
-                    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button> 
-                */}
-
                 <div className="w-full max-w-sm z-10">
                     {/* Header */}
                     <div className="text-center mb-12 space-y-4">
@@ -91,9 +79,9 @@ const Login = () => {
                     </div>
 
                     {/* Card */}
-                    <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-card border border-white/50">
+                    <div className="bg-white/80 dark:bg-surface/80 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-card border border-white/50 dark:border-border/50">
                         {error && (
-                            <div className="mb-6 p-4 bg-red-50/80 border border-red-100 rounded-2xl text-red-600 text-sm font-medium text-center">
+                            <div className="mb-6 p-4 bg-red-50/80 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 rounded-2xl text-red-600 dark:text-red-400 text-sm font-medium text-center">
                                 {error}
                             </div>
                         )}

@@ -24,8 +24,8 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
                 <div className={cn(
                     'px-4 py-3 shadow-sm backdrop-blur-sm relative', // Added relative for delete button positioning if needed
                     isUser
-                        ? 'bg-primary text-primary-foreground rounded-[1.25rem] rounded-tr-sm'
-                        : 'bg-white border border-border/60 rounded-[1.25rem] rounded-tl-sm',
+                        ? 'bg-primary text-primary-foreground dark:bg-[#232525] dark:text-[#E2E5E1] rounded-[1.25rem] rounded-tr-sm'
+                        : 'bg-surface border border-border/60 rounded-[1.25rem] rounded-tl-sm',
                     isPending && 'opacity-80'
                 )}>
                     {/* Content */}

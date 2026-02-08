@@ -44,7 +44,7 @@ export default function FoodLogCard({ foodLog, onEdit, onDelete }) {
                 <div className="flex justify-between text-[10px] font-mono tracking-tight">
                     <MacroStat label="PRO" value={totalProtein} color="text-primary" />
                     <MacroStat label="CARB" value={totalCarbs} color="text-accent" />
-                    <MacroStat label="FAT" value={totalFat} color="text-amber-700" />
+                    <MacroStat label="FAT" value={totalFat} color="text-amber-700 dark:text-[#D9A05B]" />
                 </div>
             </div>
 

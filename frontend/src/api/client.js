@@ -3,15 +3,21 @@ import { getAuth } from 'firebase/auth';
 
 const client = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
-    timeout: 60000, // 60 second timeout
+    timeout: 60000,
 });
 
-// Store connection status callback
 let connectionStatusCallback = null;
 
 export const setConnectionStatusCallback = (callback) => {
     connectionStatusCallback = callback;
 };
+
+const isNetworkError = (error) =>
+    error.code === 'ECONNREFUSED' ||
+    error.code === 'ERR_NETWORK' ||
+    error.code === 'ECONNABORTED' ||
+    error.message === 'Network Error' ||
+    !error.response;
 
 client.interceptors.request.use(async (config) => {
     const auth = getAuth();
@@ -22,33 +28,13 @@ client.interceptors.request.use(async (config) => {
     return config;
 });
 
-// Response interceptor to handle connection errors
 client.interceptors.response.use(
     (response) => {
-        // Request succeeded, mark API as connected
-        if (connectionStatusCallback) {
-            connectionStatusCallback(true);
-        }
+        connectionStatusCallback?.(true);
         return response;
     },
     (error) => {
-        // Check for network/connection errors
-        if (error.code === 'ECONNREFUSED' ||
-            error.code === 'ERR_NETWORK' ||
-            error.code === 'ECONNABORTED' ||
-            error.message === 'Network Error' ||
-            !error.response) {
-            // API is unreachable
-            if (connectionStatusCallback) {
-                connectionStatusCallback(false);
-            }
-        } else if (error.response) {
-            // Got a response, so API is connected (even if error status)
-            if (connectionStatusCallback) {
-                connectionStatusCallback(true);
-            }
-        }
-
+        connectionStatusCallback?.(!isNetworkError(error));
         return Promise.reject(error);
     }
 );

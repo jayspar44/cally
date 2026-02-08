@@ -1,34 +1,32 @@
 {
-  "projectId": "{{FIREBASE_PROJECT_ID}}",
-  "region": "{{GCP_REGION}}",
+  "projectId": "cally-658",
+  "region": "us-central1",
   "services": {
     "backend": {
       "dev": {
-        "name": "{{BACKEND_SERVICE}}-dev",
-        "hash": "{{CLOUD_RUN_HASH}}",
-        "url": "https://{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app"
+        "name": "cally-backend-dev",
+        "url": "https://cally-backend-dev-<hash>.a.run.app"
       },
       "prod": {
-        "name": "{{BACKEND_SERVICE}}-prod",
-        "hash": "{{CLOUD_RUN_HASH}}",
-        "url": "https://{{BACKEND_SERVICE}}-prod-{{CLOUD_RUN_HASH}}.a.run.app"
+        "name": "cally-backend-prod",
+        "url": "https://cally-backend-prod-<hash>.a.run.app"
       }
     }
   },
   "firebase": {
     "hosting": {
-      "dev": "{{FIREBASE_SITE_DEV}}",
-      "prod": "{{FIREBASE_SITE_PROD}}"
+      "dev": "cally-658-dev",
+      "prod": "cally-658"
     }
   },
   "preview": {
     "backend": {
-      "urlPattern": "https://pr-{{PR_NUMBER}}---{{BACKEND_SERVICE}}-dev-{{CLOUD_RUN_HASH}}.a.run.app",
-      "tagPattern": "pr-{{PR_NUMBER}}"
+      "urlPattern": "https://pr-<N>---cally-backend-dev-<hash>.a.run.app",
+      "tagPattern": "pr-<N>"
     },
     "frontend": {
-      "urlPattern": "https://{{FIREBASE_PROJECT_ID}}--pr-{{PR_NUMBER}}-{{HASH}}.web.app",
-      "channelPattern": "pr-{{PR_NUMBER}}"
+      "urlPattern": "https://cally-658--pr-<N>-<hash>.web.app",
+      "channelPattern": "pr-<N>"
     }
   }
 }

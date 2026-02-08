@@ -1,33 +1,31 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 
-/**
- * Get food logs with date range filtering
- */
+const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
+
+const serializeTimestamps = (data) => ({
+    createdAt: data.createdAt?.toDate?.() || data.createdAt,
+    updatedAt: data.updatedAt?.toDate?.() || data.updatedAt
+});
+
+const foodLogsRef = (userId) => db.collection('users').doc(userId).collection('foodLogs');
+
 const getLogs = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { startDate, endDate, meal } = req.query;
 
-        const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
-        let query = foodLogsRef.orderBy('date', 'desc');
+        let query = foodLogsRef(userId).orderBy('date', 'desc');
 
-        if (startDate) {
-            query = query.where('date', '>=', startDate);
-        }
-        if (endDate) {
-            query = query.where('date', '<=', endDate);
-        }
-        if (meal) {
-            query = query.where('meal', '==', meal);
-        }
+        if (startDate) query = query.where('date', '>=', startDate);
+        if (endDate) query = query.where('date', '<=', endDate);
+        if (meal) query = query.where('meal', '==', meal);
 
         const snapshot = await query.limit(100).get();
         const logs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-            updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt
+            ...serializeTimestamps(doc.data())
         }));
 
         res.json({ logs });
@@ -37,16 +35,12 @@ const getLogs = async (req, res) => {
     }
 };
 
-/**
- * Get a single food log by ID
- */
 const getLog = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { id } = req.params;
 
-        const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(id);
-        const doc = await docRef.get();
+        const doc = await foodLogsRef(userId).doc(id).get();
 
         if (!doc.exists) {
             return res.status(404).json({ error: 'Food log not found' });
@@ -55,8 +49,7 @@ const getLog = async (req, res) => {
         res.json({
             id: doc.id,
             ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate?.() || doc.data().createdAt,
-            updatedAt: doc.data().updatedAt?.toDate?.() || doc.data().updatedAt
+            ...serializeTimestamps(doc.data())
         });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get food log');
@@ -64,13 +57,10 @@ const getLog = async (req, res) => {
     }
 };
 
-/**
- * Create a new food log entry (or multiple entries)
- */
 const createLog = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { date, meal, description, items, source = 'manual', originalMessage } = req.body;
+        const { date, meal, items, source = 'manual', originalMessage } = req.body;
 
         if (!date || !meal || !items || !Array.isArray(items)) {
             return res.status(400).json({ error: 'date, meal, and items array required' });
@@ -80,7 +70,7 @@ const createLog = async (req, res) => {
         const createdLogs = [];
 
         for (const item of items) {
-            const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
+            const docRef = foodLogsRef(userId).doc();
             const foodLogItem = {
                 date,
                 meal,
@@ -103,38 +93,29 @@ const createLog = async (req, res) => {
 
         await batch.commit();
 
-        res.status(201).json({
-            success: true,
-            logs: createdLogs // Return array of created logs
-        });
+        res.status(201).json({ success: true, logs: createdLogs });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to create food log');
         res.status(500).json({ error: 'Failed to create food log' });
     }
 };
 
-/**
- * Update an existing food log item
- */
 const updateLog = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { id } = req.params;
         const updates = req.body;
 
-        const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(id);
+        const docRef = foodLogsRef(userId).doc(id);
         const doc = await docRef.get();
 
         if (!doc.exists) {
             return res.status(404).json({ error: 'Food log not found' });
         }
 
-        // We only allow updating specific fields
-        const allowedKeys = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
         const cleanUpdates = {};
-
         Object.keys(updates).forEach(k => {
-            if (allowedKeys.includes(k)) cleanUpdates[k] = updates[k];
+            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = updates[k];
         });
 
         if (Object.keys(cleanUpdates).length === 0) {
@@ -150,7 +131,7 @@ const updateLog = async (req, res) => {
         res.json({
             id: updated.id,
             ...updated.data(),
-            createdAt: updated.data().createdAt?.toDate?.() || updated.data().createdAt,
+            ...serializeTimestamps(updated.data()),
             updatedAt: new Date()
         });
     } catch (error) {
@@ -159,15 +140,12 @@ const updateLog = async (req, res) => {
     }
 };
 
-/**
- * Delete a food log
- */
 const deleteLog = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { id } = req.params;
 
-        const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(id);
+        const docRef = foodLogsRef(userId).doc(id);
         const doc = await docRef.get();
 
         if (!doc.exists) {

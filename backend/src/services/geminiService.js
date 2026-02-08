@@ -2,16 +2,13 @@ const { GoogleGenAI } = require('@google/genai');
 const logger = require('../logger');
 const { executeTool, toolDeclarations } = require('../agents/agentTools');
 
-// Initialize Gemini with @google/genai SDK
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-// Model configuration - Using Gemini 3 for latest features
 const MODELS = {
     flash: 'gemini-3-flash-preview',
     pro: 'gemini-3-pro-preview'
 };
 
-// Cally's system prompt
 const SYSTEM_PROMPT = `You are Cally, an expert AI nutrition companion. You help users track their calorie and macronutrient intake through natural conversation.
 
 ## Your Expertise
@@ -72,9 +69,6 @@ const SYSTEM_PROMPT = `You are Cally, an expert AI nutrition companion. You help
     3.  Once you have the specific \`logId\`, use the \`updateFoodLog\` tool to make the changes.
 - **NEVER** guess the \`logId\`. Always search first.`;
 
-/**
- * Build chat history for Gemini API format
- */
 const buildChatHistory = (messages) => {
     return messages.map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
@@ -82,33 +76,6 @@ const buildChatHistory = (messages) => {
     }));
 };
 
-/**
- * Determine which model to use based on content
- * Uses Pro for: images, complex analysis requests
- * Uses Flash for: simple chat, logging requests
- */
-const selectModel = (message, hasImage) => {
-    if (hasImage) {
-        return MODELS.pro;
-    }
-
-    // Complex analysis keywords
-    const complexKeywords = [
-        'analyze', 'breakdown', 'detailed', 'explain', 'compare',
-        'weekly', 'monthly', 'trend', 'pattern', 'recommendation'
-    ];
-
-    const lowerMessage = (message || '').toLowerCase();
-    if (complexKeywords.some(keyword => lowerMessage.includes(keyword))) {
-        return MODELS.pro;
-    }
-
-    return MODELS.flash;
-};
-
-/**
- * Process a text message with Gemini
- */
 const processMessage = async (message, chatHistory, userProfile, userId, userTimezone) => {
     try {
         const modelName = MODELS.flash;
@@ -117,7 +84,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             ? new Date().toLocaleDateString('en-CA', { timeZone: userTimezone })
             : new Date().toISOString().split('T')[0];
 
-        // Construct prompt with context
         const contents = [
             { role: 'user', parts: [{ text: 'Current Date: ' + today + '\nUser Timezone: ' + (userTimezone || 'UTC') + '\n\n' + SYSTEM_PROMPT }] },
             ...chatHistory.map(msg => ({
@@ -157,18 +123,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             }
         };
 
-        // DEBUG: Sanitize payload for logging (deep clone)
-        const logPayload = JSON.parse(JSON.stringify(payload));
-        // Remove huge base64 strings if any (though unlikely in text flow)
-        if (logPayload.contents) {
-            logPayload.contents.forEach(c => {
-                if (c.parts) c.parts.forEach(p => {
-                    if (p.inlineData) p.inlineData.data = '[BASE64_IMAGE_TRUNCATED]';
-                });
-            });
-        }
-        logger.info({ payload: JSON.stringify(logPayload, null, 2) }, 'Sending Gemini Request (DEBUG)');
-
         let result = await genAI.models.generateContent(payload);
 
         let toolsUsed = [];
@@ -176,7 +130,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         let responseText = getResponseText(result);
         let functionCalls = getFunctionCalls(result);
 
-        // Handle function calls (tool use)
         while (functionCalls.length > 0) {
             const functionResponses = [];
 
@@ -196,7 +149,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 });
             }
 
-            // Continue conversation with tool results
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
@@ -240,15 +192,11 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
     }
 };
 
-/**
- * Process an image message and return AI response
- */
 const processImageMessage = async (message, imageBase64, chatHistory, userProfile, userId, userTimezone) => {
-    const modelName = MODELS.pro; // Always use Pro for images
+    const modelName = MODELS.pro;
     logger.info({ modelName, hasMessage: !!message }, 'Processing image message');
 
     try {
-        // Build message with image
         const parts = [];
 
         const contextText = message
@@ -257,7 +205,6 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
 
         parts.push({ text: contextText });
 
-        // Add image as inline data
         parts.push({
             inlineData: {
                 mimeType: 'image/jpeg',
@@ -265,24 +212,18 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             }
         });
 
-        // Add contents for image message
         const contents = [
             ...buildChatHistory(chatHistory.slice(0, -1)),
             { role: 'user', parts }
         ];
 
-        // Helpers
-        const getResponseText = (response) => {
-            const candidate = response.candidates?.[0];
-            return candidate?.content?.parts?.find(p => p.text)?.text || '';
-        };
+        const getImgResponseText = (response) =>
+            response.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || '';
 
-        const getFunctionCalls = (response) => {
-            const candidate = response.candidates?.[0];
-            return candidate?.content?.parts
+        const getImgFunctionCalls = (response) =>
+            response.candidates?.[0]?.content?.parts
                 ?.filter(p => p.functionCall)
                 .map(p => p.functionCall) || [];
-        };
 
         const payload = {
             model: modelName,
@@ -299,10 +240,9 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
 
         let toolsUsed = [];
         let foodLog = null;
-        let responseText = getResponseText(result);
-        let functionCalls = getFunctionCalls(result);
+        let responseText = getImgResponseText(result);
+        let functionCalls = getImgFunctionCalls(result);
 
-        // Handle function calls
         while (functionCalls.length > 0) {
             const functionResponses = [];
 
@@ -322,7 +262,6 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
                 });
             }
 
-            // Continue the conversation with tool results
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
@@ -344,8 +283,8 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
                 }
             });
 
-            responseText = getResponseText(result);
-            functionCalls = getFunctionCalls(result);
+            responseText = getImgResponseText(result);
+            functionCalls = getImgFunctionCalls(result);
         }
 
         return {
@@ -366,9 +305,6 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
     }
 };
 
-/**
- * Build context-enhanced message with user profile info
- */
 const buildContextMessage = (message, userProfile) => {
     const settings = userProfile?.settings || {};
     const today = userProfile?.timezone
@@ -392,7 +328,5 @@ const buildContextMessage = (message, userProfile) => {
 
 module.exports = {
     processMessage,
-    processImageMessage,
-    selectModel,
-    MODELS
+    processImageMessage
 };

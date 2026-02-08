@@ -1,20 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Environment Setup Script
- * Creates .env files for local development
- *
- * Usage:
- *   npm run setup:env
- *   or
- *   node scripts/setup-env.js
- *
- * Modes:
- *   - GCP: Automatically fetch secrets from Google Cloud Secret Manager
- *   - Interactive: Manual entry with prompts
- *   - Templates: Copy templates for manual editing
- */
-
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -57,9 +42,6 @@ function isValidJSON(str) {
     }
 }
 
-/**
- * Check if gcloud CLI is installed and authenticated
- */
 async function checkGcloudAvailable() {
     try {
         await execAsync('gcloud --version');
@@ -69,9 +51,6 @@ async function checkGcloudAvailable() {
     }
 }
 
-/**
- * Check if user is authenticated with gcloud
- */
 async function checkGcloudAuth() {
     try {
         const { stdout } = await execAsync('gcloud auth list --filter=status:ACTIVE --format="value(account)"');
@@ -81,9 +60,6 @@ async function checkGcloudAuth() {
     }
 }
 
-/**
- * Fetch a secret from GCP Secret Manager
- */
 async function getGCPSecret(secretName) {
     try {
         const command = `gcloud secrets versions access latest --secret="${secretName}" --project="${GCP_PROJECT_ID}"`;
@@ -94,14 +70,10 @@ async function getGCPSecret(secretName) {
     }
 }
 
-/**
- * Setup environment files from GCP Secret Manager
- */
 async function setupFromGCP() {
     console.log('\n☁️  GCP Secret Manager Setup');
     console.log('================================\n');
 
-    // Check gcloud availability
     console.log('Checking gcloud CLI...');
     const gcloudAvailable = await checkGcloudAvailable();
 
@@ -117,7 +89,6 @@ async function setupFromGCP() {
 
     console.log('✅ gcloud CLI found');
 
-    // Check authentication
     console.log('Checking gcloud authentication...');
     const isAuthenticated = await checkGcloudAuth();
 
@@ -132,7 +103,6 @@ async function setupFromGCP() {
     console.log('✅ Authenticated with gcloud');
     console.log(`✅ Using project: ${GCP_PROJECT_ID}\n`);
 
-    // Check if files exist
     if (fs.existsSync(backendEnvPath)) {
         const overwrite = await question('⚠️  backend/.env already exists. Overwrite? (y/N): ');
         if (overwrite.toLowerCase() !== 'y') {
@@ -152,16 +122,15 @@ async function setupFromGCP() {
     console.log('Fetching secrets from GCP Secret Manager...\n');
 
     try {
-        // Fetch backend secrets
         console.log(`📥 Fetching ${SECRETS.FIREBASE_SERVICE_ACCOUNT}...`);
         const firebaseServiceAccount = await getGCPSecret(SECRETS.FIREBASE_SERVICE_ACCOUNT);
 
         console.log(`📥 Fetching ${SECRETS.GEMINI_API_KEY}...`);
         const geminiApiKey = await getGCPSecret(SECRETS.GEMINI_API_KEY);
 
-        // Create backend .env
+        const compactServiceAccount = JSON.stringify(JSON.parse(firebaseServiceAccount));
         const backendEnvContent = `PORT=3501
-FIREBASE_SERVICE_ACCOUNT=${firebaseServiceAccount}
+FIREBASE_SERVICE_ACCOUNT='${compactServiceAccount}'
 GEMINI_API_KEY=${geminiApiKey}
 NODE_ENV=development
 # Comma-separated list of allowed origins for CORS
@@ -172,14 +141,12 @@ NODE_ENV=development
         fs.writeFileSync(backendEnvPath, backendEnvContent);
         console.log('✅ Created backend/.env');
 
-        // Fetch frontend secrets
         let firebaseClientConfig = '';
 
         try {
             console.log(`\n📥 Fetching ${SECRETS.FIREBASE_CLIENT_CONFIG}...`);
             firebaseClientConfig = await getGCPSecret(SECRETS.FIREBASE_CLIENT_CONFIG);
 
-            // Validate it's valid JSON
             if (!isValidJSON(firebaseClientConfig)) {
                 throw new Error('Invalid JSON in Firebase client config');
             }
@@ -204,9 +171,9 @@ NODE_ENV=development
             }
         }
 
-        // Create frontend .env.local
+        const compactFirebaseConfig = JSON.stringify(JSON.parse(firebaseClientConfig));
         const frontendEnvContent = `VITE_API_URL=/api
-VITE_FIREBASE_CONFIG=${firebaseClientConfig}
+VITE_FIREBASE_CONFIG='${compactFirebaseConfig}'
 VITE_APP_TITLE=Cally
 `;
 
@@ -239,7 +206,6 @@ async function setupBackendEnv() {
     let port = '3501';
     let nodeEnv = 'development';
 
-    // Check if file already exists
     if (fs.existsSync(backendEnvPath)) {
         const overwrite = await question('⚠️  backend/.env already exists. Overwrite? (y/N): ');
         if (overwrite.toLowerCase() !== 'y') {
@@ -277,21 +243,19 @@ async function setupBackendEnv() {
         geminiApiKey = input.trim();
     }
 
-    // Optional: Port
     const portInput = await question(`\n3. Backend port (default: 3501): `);
     if (portInput.trim()) {
         port = portInput.trim();
     }
 
-    // Optional: Node env
     const envInput = await question(`4. Node environment (default: development): `);
     if (envInput.trim()) {
         nodeEnv = envInput.trim();
     }
 
-    // Create .env file
+    const compactServiceAccount = JSON.stringify(JSON.parse(firebaseServiceAccount));
     const envContent = `PORT=${port}
-FIREBASE_SERVICE_ACCOUNT=${firebaseServiceAccount}
+FIREBASE_SERVICE_ACCOUNT='${compactServiceAccount}'
 GEMINI_API_KEY=${geminiApiKey}
 NODE_ENV=${nodeEnv}
 # Comma-separated list of allowed origins for CORS
@@ -310,7 +274,6 @@ async function setupFrontendEnv() {
     let firebaseConfig = '';
     let apiUrl = '/api';
 
-    // Check if file already exists
     if (fs.existsSync(frontendEnvPath)) {
         const overwrite = await question('⚠️  frontend/.env.local already exists. Overwrite? (y/N): ');
         if (overwrite.toLowerCase() !== 'y') {
@@ -336,15 +299,14 @@ async function setupFrontendEnv() {
         firebaseConfig = input.trim();
     }
 
-    // Optional: API URL
     const apiUrlInput = await question(`\n2. Backend API URL (default: /api for local proxy): `);
     if (apiUrlInput.trim()) {
         apiUrl = apiUrlInput.trim();
     }
 
-    // Create .env.local file
+    const compactFirebaseConfig = JSON.stringify(JSON.parse(firebaseConfig));
     const envContent = `VITE_API_URL=${apiUrl}
-VITE_FIREBASE_CONFIG=${firebaseConfig}
+VITE_FIREBASE_CONFIG='${compactFirebaseConfig}'
 VITE_APP_TITLE=Cally
 `;
 
@@ -352,53 +314,27 @@ VITE_APP_TITLE=Cally
     console.log('\n✅ Created frontend/.env.local');
 }
 
+async function copyTemplate(targetPath, templatePath, label) {
+    if (fs.existsSync(targetPath)) {
+        const overwrite = await question(`⚠️  ${label} already exists. Overwrite? (y/N): `);
+        if (overwrite.toLowerCase() !== 'y') {
+            console.log(`Skipping ${label}`);
+            return;
+        }
+    }
+    if (fs.existsSync(templatePath)) {
+        fs.copyFileSync(templatePath, targetPath);
+        console.log(`✅ Created ${label} from template`);
+        console.log(`   ⚠️  Edit ${label} and add your credentials!`);
+    }
+}
+
 async function setupFromTemplates() {
     console.log('\n📋 Quick Setup from Templates');
     console.log('================================\n');
 
-    // Backend
-    if (fs.existsSync(backendEnvPath)) {
-        const overwrite = await question('⚠️  backend/.env already exists. Overwrite? (y/N): ');
-        if (overwrite.toLowerCase() !== 'y') {
-            console.log('Skipping backend/.env');
-        } else {
-            const backendTemplate = path.join(rootDir, 'backend', '.env.example');
-            if (fs.existsSync(backendTemplate)) {
-                fs.copyFileSync(backendTemplate, backendEnvPath);
-                console.log('✅ Created backend/.env from template');
-                console.log('   ⚠️  Edit backend/.env and add your credentials!');
-            }
-        }
-    } else {
-        const backendTemplate = path.join(rootDir, 'backend', '.env.example');
-        if (fs.existsSync(backendTemplate)) {
-            fs.copyFileSync(backendTemplate, backendEnvPath);
-            console.log('✅ Created backend/.env from template');
-            console.log('   ⚠️  Edit backend/.env and add your credentials!');
-        }
-    }
-
-    // Frontend
-    if (fs.existsSync(frontendEnvPath)) {
-        const overwrite = await question('⚠️  frontend/.env.local already exists. Overwrite? (y/N): ');
-        if (overwrite.toLowerCase() !== 'y') {
-            console.log('Skipping frontend/.env.local');
-        } else {
-            const frontendTemplate = path.join(rootDir, 'frontend', '.env.local.template');
-            if (fs.existsSync(frontendTemplate)) {
-                fs.copyFileSync(frontendTemplate, frontendEnvPath);
-                console.log('✅ Created frontend/.env.local from template');
-                console.log('   ⚠️  Edit frontend/.env.local and add your Firebase config!');
-            }
-        }
-    } else {
-        const frontendTemplate = path.join(rootDir, 'frontend', '.env.local.template');
-        if (fs.existsSync(frontendTemplate)) {
-            fs.copyFileSync(frontendTemplate, frontendEnvPath);
-            console.log('✅ Created frontend/.env.local from template');
-            console.log('   ⚠️  Edit frontend/.env.local and add your Firebase config!');
-        }
-    }
+    await copyTemplate(backendEnvPath, path.join(rootDir, 'backend', '.env.example'), 'backend/.env');
+    await copyTemplate(frontendEnvPath, path.join(rootDir, 'frontend', '.env.local.template'), 'frontend/.env.local');
 }
 
 async function main() {
@@ -450,7 +386,6 @@ async function main() {
     rl.close();
 }
 
-// Verify .env files are in .gitignore
 const gitignorePath = path.join(rootDir, '.gitignore');
 if (fs.existsSync(gitignorePath)) {
     const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');

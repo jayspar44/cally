@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/services';
+import { logger } from '../utils/logger';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
-import { ChevronDown, Utensils } from 'lucide-react';
-import { cn } from '../utils/cn';
 
 export default function Home() {
   const [dailySummary, setDailySummary] = useState(null);
@@ -20,7 +19,7 @@ export default function Home() {
         const data = await api.getDailySummary(today);
         setDailySummary(data);
       } catch (error) {
-        console.error('Failed to fetch daily summary:', error);
+        logger.error('Failed to fetch daily summary:', error);
       } finally {
         setLoading(false);
       }
@@ -46,7 +45,7 @@ export default function Home() {
     <div className="space-y-8 pb-8">
 
       {/* Daily Summary Card */}
-      <section className="bg-white rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
+      <section className="bg-surface rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-end mb-8">
           <div>
@@ -115,7 +114,7 @@ export default function Home() {
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
         <section className="space-y-4">
           <h3 className="font-serif font-bold text-xl text-primary px-4">Recent Meals</h3>
-          <div className="bg-white rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
+          <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
             {dailySummary.meals.map((meal, index) => (
               <MealItem key={index} meal={meal} />
             ))}

@@ -10,27 +10,21 @@ const app = express();
 
 const apiRoutes = require('./routes/api');
 
-// Trust proxy configuration (environment-specific)
-// Production/Dev: Trust exactly 1 proxy hop (Cloud Run load balancer)
-// Local: No proxy, use direct IP addresses
 if (process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'production') {
     app.set('trust proxy', 1);
 }
 
-// Security Middleware
 app.use(helmet());
 
-// Global Rate Limiting (DDoS protection)
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // 1000 requests per IP per window (Relaxed from 100 for dev/single-user usage)
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
 });
 app.use('/api', limiter);
 
-// CORS Configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
     : [
@@ -42,15 +36,12 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        // Allow all origins in development to facilitate mobile testing via IP
         if (process.env.NODE_ENV === 'development') {
             return callback(null, true);
         }
 
-        // Check if origin is in allowed list or is a Tailscale domain
         if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('.ts.net')) {
             callback(null, true);
         } else {
@@ -65,29 +56,24 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// HTTP request logging middleware (attaches req.log to all requests)
 app.use(pinoHttp({
     logger,
-    autoLogging: false, // Disable automatic request/response logging
+    autoLogging: false,
     quietReqLogger: true,
-    // Only include minimal request info when we do log
     serializers: {
         req: (req) => ({ method: req.method, url: req.url }),
         res: (res) => ({ statusCode: res.statusCode })
     }
 }));
 
-// Routes
 app.use('/api', apiRoutes);
 
-// Basic route
 app.get('/', (req, res) => {
     res.send('Backend Running');
 });
 
-// Start server
 const PORT = process.env.PORT || 4001;
-const HOST = '0.0.0.0'; // Bind to all interfaces for Android emulator access
+const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
     logger.info(`Server running on ${HOST}:${PORT}`);
 });

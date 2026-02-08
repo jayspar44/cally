@@ -169,10 +169,10 @@ export default function Settings() {
             <Section title="Data Operations">
                 <button
                     onClick={handleClearChat}
-                    className="w-full flex items-center justify-between py-2 group text-red-600 hover:text-red-700 transition-colors"
+                    className="w-full flex items-center justify-between py-2 group text-red-600 dark:text-red-400 hover:text-red-700 transition-colors"
                 >
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
                             <Trash2 className="w-5 h-5" />
                         </div>
                         <div className="flex flex-col items-start">
@@ -186,7 +186,7 @@ export default function Settings() {
 
             {/* System Info */}
             <div className="text-center space-y-2 py-8">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-sm border border-border mb-2">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface shadow-sm border border-border mb-2">
                     <Database className="w-5 h-5 text-primary/40" />
                 </div>
                 <div className="font-serif font-bold text-primary text-lg">Cally System</div>
@@ -201,7 +201,7 @@ export default function Settings() {
 
                 <button
                     onClick={handleLogout}
-                    className="mt-6 px-6 py-2 rounded-full border border-red-200 text-red-500 font-sans text-sm hover:bg-red-50 transition-colors"
+                    className="mt-6 px-6 py-2 rounded-full border border-red-200 dark:border-red-500/20 text-red-500 dark:text-red-400 font-sans text-sm hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                 >
                     <span className="flex items-center gap-2">
                         <LogOut className="w-3 h-3" />
@@ -219,7 +219,7 @@ function Section({ title, children }) {
             <h3 className="px-4 font-sans text-[10px] uppercase tracking-[0.2em] font-bold text-primary/40">
                 {title}
             </h3>
-            <div className="bg-white rounded-[2.5rem] p-6 shadow-card border border-border/40">
+            <div className="bg-surface rounded-[2.5rem] p-6 shadow-card border border-border/40">
                 {children}
             </div>
         </div>

@@ -5,5 +5,4 @@ export const logger = {
     info: (...args) => isDev && console.info('[INFO]', ...args),
     warn: (...args) => console.warn('[WARN]', ...args),
     error: (...args) => console.error('[ERROR]', ...args),
-    spoof: (...args) => isDev && console.log('[SPOOF]', ...args),
 };

@@ -1,15 +1,8 @@
 const logger = require('../logger');
 
-// USDA FoodData Central API
 const USDA_API_BASE = 'https://api.nal.usda.gov/fdc/v1';
 const USDA_API_KEY = process.env.USDA_API_KEY || 'DEMO_KEY';
 
-/**
- * Search for foods in USDA database
- * @param {string} query - Food search term
- * @param {number} limit - Max results to return
- * @returns {Promise<Array>} Matching foods with nutrition info
- */
 const searchFoods = async (query, limit = 5) => {
     try {
         const url = `${USDA_API_BASE}/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(query)}&pageSize=${limit}&dataType=Survey%20(FNDDS),Foundation,SR%20Legacy`;
@@ -36,11 +29,6 @@ const searchFoods = async (query, limit = 5) => {
     }
 };
 
-/**
- * Get detailed nutrition for a specific food by FDC ID
- * @param {number} fdcId - USDA FDC ID
- * @returns {Promise<Object|null>} Food with detailed nutrition
- */
 const getFoodDetails = async (fdcId) => {
     try {
         const url = `${USDA_API_BASE}/food/${fdcId}?api_key=${USDA_API_KEY}`;
@@ -67,9 +55,6 @@ const getFoodDetails = async (fdcId) => {
     }
 };
 
-/**
- * Extract standard nutrients from USDA nutrients array
- */
 const extractNutrients = (nutrients) => {
     const nutrientMap = {
         1008: 'calories',    // Energy (kcal)
@@ -101,10 +86,6 @@ const extractNutrients = (nutrients) => {
     return result;
 };
 
-/**
- * Common food database for quick lookups (fallback when USDA is slow)
- * Values per standard serving
- */
 const COMMON_FOODS = {
     'banana': { name: 'Banana, medium', quantity: 1, unit: 'medium', calories: 105, protein: 1.3, carbs: 27, fat: 0.4 },
     'apple': { name: 'Apple, medium', quantity: 1, unit: 'medium', calories: 95, protein: 0.5, carbs: 25, fat: 0.3 },
@@ -123,11 +104,6 @@ const COMMON_FOODS = {
     'avocado': { name: 'Avocado', quantity: 0.5, unit: 'whole', calories: 160, protein: 2, carbs: 9, fat: 15 },
 };
 
-/**
- * Quick lookup in common foods database
- * @param {string} query - Food name to search
- * @returns {Object|null} Food info or null if not found
- */
 const quickLookup = (query) => {
     const lowerQuery = query.toLowerCase().trim();
 
@@ -146,12 +122,6 @@ const quickLookup = (query) => {
     return null;
 };
 
-/**
- * Calculate nutrition for a given quantity
- * @param {Object} baseNutrition - Nutrition per serving
- * @param {number} servings - Number of servings
- * @returns {Object} Scaled nutrition values
- */
 const scaleNutrition = (baseNutrition, servings) => {
     return {
         calories: Math.round(baseNutrition.calories * servings),
