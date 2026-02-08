@@ -1,7 +1,7 @@
 {
-    "appId": "{{APP_ID_BASE}}.dev",
+    "appId": "com.jayspar.cally.dev",
     "webDir": "dist",
-    "appName": "{{PROJECT_TITLE}} (Dev)",
+    "appName": "Cally (Dev)",
     "server": {
         "androidScheme": "https"
     },

@@ -6,10 +6,10 @@
  * Usage: npm run dev:local [-- [port] [--browser]]
  *
  * Examples:
- *   npm run dev:local                    # Default ports (3000/3001), no browser
- *   npm run dev:local -- 3010            # Custom ports (3010/3011), no browser
+ *   npm run dev:local                    # Default ports (3500/3501), no browser
+ *   npm run dev:local -- 3510            # Custom ports (3510/3511), no browser
  *   npm run dev:local -- --browser       # Default ports, open browser
- *   npm run dev:local -- 3010 --browser  # Custom ports, open browser
+ *   npm run dev:local -- 3510 --browser  # Custom ports, open browser
  *
  * Arguments:
  *   port         Optional frontend port number (backend will be port+1)
@@ -23,7 +23,7 @@ const path = require('path');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-let frontendPort = '4000'; // Default port
+let frontendPort = '3500'; // Default port for Cally
 let openBrowser = false;
 
 // Show help if requested
@@ -33,10 +33,10 @@ if (args.includes('--help') || args.includes('-h')) {
 Usage: npm run dev:local [-- [port] [--browser]]
 
 Examples:
-  npm run dev:local                    # Default ports (4000/4001), no browser
-  npm run dev:local -- 4010            # Custom ports (4010/4011), no browser
+  npm run dev:local                    # Default ports (3500/3501), no browser
+  npm run dev:local -- 3510            # Custom ports (3510/3511), no browser
   npm run dev:local -- --browser       # Default ports, open browser
-  npm run dev:local -- 4010 --browser  # Custom ports, open browser
+  npm run dev:local -- 3510 --browser  # Custom ports, open browser
 
 Arguments:
   port         Optional frontend port number (backend will be port+1)
@@ -59,12 +59,12 @@ args.forEach(arg => {
     }
 });
 
-// Validate port (must be 4000-4008 to keep backend within CORS range 4001-4009)
+// Validate port (must be 3500+ to keep backend within range)
+// Allowing a wider range, e.g., 3000-4000
 const frontendPortNum = parseInt(frontendPort, 10);
-if (isNaN(frontendPortNum) || frontendPortNum < 4000 || frontendPortNum > 4008) {
+if (isNaN(frontendPortNum) || frontendPortNum < 3000 || frontendPortNum > 4000) {
     console.error(`Error: Invalid port number "${frontendPort}"`);
-    console.error('Port must be between 4000 and 4008 (backend will be port+1, max 4009)');
-    console.error('Supports 5 concurrent instances (e.g., 4000/4001, 4002/4003, ..., 4008/4009)');
+    console.error('Port must be between 3000 and 4000');
     console.error('\nRun "npm run dev:local -- --help" for usage information');
     process.exit(1);
 }
@@ -73,7 +73,7 @@ if (isNaN(frontendPortNum) || frontendPortNum < 4000 || frontendPortNum > 4008) 
 const backendPort = frontendPortNum + 1;
 
 console.log('='.repeat(60));
-console.log('Starting development servers with custom ports:');
+console.log('Starting Cally development servers:');
 console.log(`  Frontend: http://localhost:${frontendPort}`);
 console.log(`  Backend:  http://localhost:${backendPort}`);
 console.log('='.repeat(60));
@@ -86,77 +86,10 @@ const chalk = {
     yellow: (text) => `\x1b[33m${text}\x1b[0m`
 };
 
-// Check and copy .env files if needed (for worktree support)
+// Check for node_modules
 const fs = require('fs');
 const { execSync } = require('child_process');
-const currentDir = path.basename(path.resolve(__dirname, '..'));
-const backendEnvPath = path.join(__dirname, '..', 'backend', '.env');
-const frontendEnvPath = path.join(__dirname, '..', 'frontend', '.env.local');
 
-// Only attempt to copy if we're NOT in the main 'ai-home-helper' directory
-if (currentDir !== 'ai-home-helper') {
-    console.log(chalk.yellow('Worktree detected. Checking for .env files...\n'));
-
-    // Function to find base ai-home-helper directory
-    const findBaseDirectory = () => {
-        const currentPath = path.resolve(__dirname, '..');
-
-        // Try to find ai-home-helper directory by going up the tree
-        for (let i = 0; i < 4; i++) {
-            const testPath = path.resolve(currentPath, '../'.repeat(i), 'ai-home-helper');
-            if (fs.existsSync(testPath)) {
-                const testBackendEnv = path.join(testPath, 'backend', '.env');
-                if (fs.existsSync(testBackendEnv)) {
-                    return testPath;
-                }
-            }
-        }
-        return null;
-    };
-
-    const baseDir = findBaseDirectory();
-
-    if (baseDir) {
-        console.log(`Found base directory: ${baseDir}\n`);
-
-        // Copy backend .env if missing
-        if (!fs.existsSync(backendEnvPath)) {
-            const sourceBackendEnv = path.join(baseDir, 'backend', '.env');
-            if (fs.existsSync(sourceBackendEnv)) {
-                try {
-                    fs.copyFileSync(sourceBackendEnv, backendEnvPath);
-                    console.log(chalk.green('✓ Copied backend/.env from base directory'));
-                } catch (error) {
-                    console.log(chalk.yellow(`⚠ Could not copy backend/.env: ${error.message}`));
-                }
-            }
-        } else {
-            console.log(chalk.green('✓ backend/.env already exists'));
-        }
-
-        // Copy frontend .env.local if missing
-        if (!fs.existsSync(frontendEnvPath)) {
-            const sourceFrontendEnv = path.join(baseDir, 'frontend', '.env.local');
-            if (fs.existsSync(sourceFrontendEnv)) {
-                try {
-                    fs.copyFileSync(sourceFrontendEnv, frontendEnvPath);
-                    console.log(chalk.green('✓ Copied frontend/.env.local from base directory'));
-                } catch (error) {
-                    console.log(chalk.yellow(`⚠ Could not copy frontend/.env.local: ${error.message}`));
-                }
-            }
-        } else {
-            console.log(chalk.green('✓ frontend/.env.local already exists'));
-        }
-
-        console.log();
-    } else {
-        console.log(chalk.yellow('⚠ Could not find base ai-home-helper directory'));
-        console.log(chalk.yellow('  If you need .env files, copy them manually from the main directory\n'));
-    }
-}
-
-// Check if node_modules exist in backend and frontend
 const backendNodeModules = path.join(__dirname, '..', 'backend', 'node_modules');
 const frontendNodeModules = path.join(__dirname, '..', 'frontend', 'node_modules');
 
@@ -207,13 +140,17 @@ const backendProcess = spawn('npm', ['run', 'dev'], {
 // Spawn frontend process
 const frontendEnv = {
     ...process.env,
-    PORT: frontendPort.toString(),
-    BACKEND_PORT: backendPort.toString(),
+    PORT: frontendPort.toString(), // Vite uses VITE_PORT or --port flag, but we pass it as env too
+    // Note: Vite config in Cally likely reads env vars or defaults. 
+    // We will use the --port flag to be sure.
+    VITE_API_URL: `http://localhost:${backendPort}/api`, // Override API URL for custom ports
     FORCE_COLOR: '1'
 };
 
-// Use vite directly with --open flag for browser control
-const frontendArgs = openBrowser ? ['vite', '--open'] : ['vite'];
+// Use vite directly with --port and optional --open flag
+const frontendArgs = openBrowser
+    ? ['vite', '--port', frontendPort, '--open']
+    : ['vite', '--port', frontendPort];
 const frontendProcess = spawn('npx', frontendArgs, {
     cwd: path.join(__dirname, '..', 'frontend'),
     env: frontendEnv,

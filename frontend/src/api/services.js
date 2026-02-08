@@ -33,34 +33,78 @@ export const api = {
         return response.data;
     },
 
-    // Notes CRUD (example domain)
-    getNotes: async () => {
-        logger.debug('Fetching notes');
-        const response = await client.get('/notes');
+    // Chat
+    sendMessage: async (message, imageBase64 = null, userTimezone = null) => {
+        logger.debug('Sending message to Cally');
+        const response = await client.post('/chat/message', { message, imageBase64, userTimezone });
         return response.data;
     },
 
-    getNote: async (id) => {
-        logger.debug(`Fetching note ${id}`);
-        const response = await client.get(`/notes/${id}`);
+    getChatHistory: async (limit = 50, before = null) => {
+        logger.debug('Fetching chat history');
+        const params = { limit };
+        if (before) params.before = before;
+        const response = await client.get('/chat/history', { params });
         return response.data;
     },
 
-    createNote: async (data) => {
-        logger.debug('Creating note', data);
-        const response = await client.post('/notes', data);
+    clearChatHistory: async () => {
+        logger.debug('Clearing chat history');
+        const response = await client.delete('/chat/history');
         return response.data;
     },
 
-    updateNote: async (id, data) => {
-        logger.debug(`Updating note ${id}`, data);
-        const response = await client.put(`/notes/${id}`, data);
+    // Food Logs
+    getFoodLogs: async (startDate = null, endDate = null, meal = null) => {
+        logger.debug('Fetching food logs');
+        const params = {};
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        if (meal) params.meal = meal;
+        const response = await client.get('/food/logs', { params });
         return response.data;
     },
 
-    deleteNote: async (id) => {
-        logger.debug(`Deleting note ${id}`);
-        const response = await client.delete(`/notes/${id}`);
+    getFoodLog: async (id) => {
+        logger.debug(`Fetching food log ${id}`);
+        const response = await client.get(`/food/logs/${id}`);
+        return response.data;
+    },
+
+    createFoodLog: async (data) => {
+        logger.debug('Creating food log', data);
+        const response = await client.post('/food/logs', data);
+        return response.data;
+    },
+
+    updateFoodLog: async (id, data) => {
+        logger.debug(`Updating food log ${id}`, data);
+        const response = await client.put(`/food/logs/${id}`, data);
+        return response.data;
+    },
+
+    deleteFoodLog: async (id) => {
+        logger.debug(`Deleting food log ${id}`);
+        const response = await client.delete(`/food/logs/${id}`);
+        return response.data;
+    },
+
+    // Insights
+    getDailySummary: async (date) => {
+        logger.debug(`Fetching daily summary for ${date}`);
+        const response = await client.get(`/insights/daily/${date}`);
+        return response.data;
+    },
+
+    getWeeklyTrends: async () => {
+        logger.debug('Fetching weekly trends');
+        const response = await client.get('/insights/weekly');
+        return response.data;
+    },
+
+    getMonthlyTrends: async () => {
+        logger.debug('Fetching monthly trends');
+        const response = await client.get('/insights/monthly');
         return response.data;
     },
 };

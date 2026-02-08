@@ -5,12 +5,22 @@ import { Capacitor } from '@capacitor/core'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { SafeArea } from '@capacitor-community/safe-area'
 import './index.css'
+// Typography - Gourmet Functional System
+import '@fontsource/fraunces/700.css';
+import '@fontsource/fraunces/900.css';
+import '@fontsource/plus-jakarta-sans/400.css';
+import '@fontsource/plus-jakarta-sans/500.css';
+import '@fontsource/plus-jakarta-sans/600.css';
+import '@fontsource/plus-jakarta-sans/700.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '@fontsource/jetbrains-mono/700.css';
 import App from './App.jsx'
 import { logger } from './utils/logger'
 import { fetchBackendInfo } from './utils/appConfig'
 
 // Fetch backend info early (before render) for version display
-fetchBackendInfo().catch(() => {});
+fetchBackendInfo().catch(() => { });
 
 // Global error handlers (silent in production)
 window.onerror = function (msg, url, line, col, error) {

@@ -21,12 +21,24 @@ const { updateProfile, getProfile } = require('../controllers/userController');
 router.post('/user/profile', updateProfile);
 router.get('/user/profile', getProfile);
 
-// Notes (example domain)
-const { getNotes, getNote, createNote, updateNote, deleteNote } = require('../controllers/notesController');
-router.get('/notes', getNotes);
-router.get('/notes/:id', getNote);
-router.post('/notes', createNote);
-router.put('/notes/:id', updateNote);
-router.delete('/notes/:id', deleteNote);
+// Chat
+const { sendMessage, getHistory, clearHistory } = require('../controllers/chatController');
+router.post('/chat/message', sendMessage);
+router.get('/chat/history', getHistory);
+router.delete('/chat/history', clearHistory);
+
+// Food Logs
+const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
+router.get('/food/logs', getLogs);
+router.get('/food/logs/:id', getLog);
+router.post('/food/logs', createLog);
+router.put('/food/logs/:id', updateLog);
+router.delete('/food/logs/:id', deleteLog);
+
+// Insights
+const { getDailySummary, getWeeklyTrends, getMonthlyTrends } = require('../controllers/insightsController');
+router.get('/insights/daily/:date', getDailySummary);
+router.get('/insights/weekly', getWeeklyTrends);
+router.get('/insights/monthly', getMonthlyTrends);
 
 module.exports = router;

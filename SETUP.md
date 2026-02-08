@@ -279,7 +279,8 @@ After setup, verify:
 
 - [ ] `npm run dev:local` starts both servers
 - [ ] Can create account and login
-- [ ] Notes CRUD works
+- [ ] Chat interface loads
+- [ ] Can send messages to Cally
 - [ ] `npm run lint` passes
 - [ ] Push to develop triggers Cloud Build
 - [ ] Dev deployment accessible

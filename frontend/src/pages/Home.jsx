@@ -1,83 +1,129 @@
-import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Settings } from 'lucide-react';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import { useState, useEffect } from 'react';
+import { api } from '../api/services';
+import MacroCard from '../components/ui/MacroCard';
+import MealItem from '../components/ui/MealItem';
+import { ChevronDown, Utensils } from 'lucide-react';
+import { cn } from '../utils/cn';
 
 export default function Home() {
-  const navigate = useNavigate();
+  const [dailySummary, setDailySummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSummary = async () => {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
+        const data = await api.getDailySummary(today);
+        setDailySummary(data);
+      } catch (error) {
+        console.error('Failed to fetch daily summary:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSummary();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <div className="font-serif text-primary/60 animate-pulse">Loading Cally...</div>
+      </div>
+    );
+  }
+
+  const summary = dailySummary?.summary || { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 };
+  const goals = dailySummary?.goals || { targetCalories: 2000, targetProtein: 150, targetCarbs: 200, targetFat: 65 };
+  const progress = dailySummary?.progress || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const remainingCalories = Math.round(goals.targetCalories - summary.totalCalories);
 
   return (
-    <div className="px-6 py-4 space-y-6">
-      {/* Welcome Section */}
-      <Card className="p-6 bg-gradient-to-br from-sky-500 to-blue-600 text-white">
-        <h2 className="text-2xl font-bold mb-2">Welcome!</h2>
-        <p className="opacity-90">
-          This is your app dashboard. Start by creating your first note.
-        </p>
-      </Card>
+    <div className="space-y-8 pb-8">
 
-      {/* Quick Actions */}
-      <div className="space-y-3">
-        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Quick Actions</h3>
+      {/* Daily Summary Card */}
+      <section className="bg-white rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
+        {/* Header */}
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <h2 className="font-serif font-black text-3xl text-primary mb-1">Today's Fuel</h2>
+            <p className="font-sans text-primary/60 text-sm">Summary of your nutrition.</p>
+          </div>
+          <div className="text-right">
+            <span className="font-mono font-bold text-4xl text-primary block leading-none">
+              {Math.round(summary.totalCalories)}
+            </span>
+            <span className="font-sans text-xs text-primary/40 uppercase tracking-widest font-semibold">
+              Calories
+            </span>
+          </div>
+        </div>
 
-        <button
-          onClick={() => navigate('/notes/new')}
-          className="w-full flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-        >
-          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center dark:bg-green-900/30">
-            <Plus className="w-6 h-6 text-green-600 dark:text-green-400" />
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex justify-between text-xs font-mono text-primary/60 mb-2">
+            <span>0</span>
+            <span>Goal: {goals.targetCalories}</span>
           </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-800 dark:text-slate-200">Create Note</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Add a new note</p>
+          <div className="w-full bg-primary/5 rounded-full h-4 overflow-hidden">
+            <div
+              className="bg-primary h-full rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${Math.min(100, progress.calories)}%` }}
+            />
           </div>
-        </button>
+          <div className="mt-2 text-right">
+            <span className="font-sans text-sm font-medium text-accent">
+              {remainingCalories > 0 ? `${remainingCalories} left` : `${Math.abs(remainingCalories)} over`}
+            </span>
+          </div>
+        </div>
 
-        <button
-          onClick={() => navigate('/notes')}
-          className="w-full flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-        >
-          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center dark:bg-blue-900/30">
-            <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-          </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-800 dark:text-slate-200">View Notes</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Browse all your notes</p>
-          </div>
-        </button>
+        {/* Macros */}
+        <div className="grid grid-cols-3 gap-4">
+          <MacroCard
+            label="Protein"
+            current={summary.totalProtein}
+            target={goals.targetProtein}
+            progress={progress.protein}
+            color="protein"
+          />
+          <MacroCard
+            label="Carbs"
+            current={summary.totalCarbs}
+            target={goals.targetCarbs}
+            progress={progress.carbs}
+            color="carbs"
+          />
+          <MacroCard
+            label="Fat"
+            current={summary.totalFat}
+            target={goals.targetFat}
+            progress={progress.fat}
+            color="fat"
+          />
+        </div>
 
-        <button
-          onClick={() => navigate('/settings')}
-          className="w-full flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-        >
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center dark:bg-slate-700">
-            <Settings className="w-6 h-6 text-slate-600 dark:text-slate-400" />
-          </div>
-          <div className="text-left">
-            <p className="font-semibold text-slate-800 dark:text-slate-200">Settings</p>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Configure your app</p>
-          </div>
-        </button>
-      </div>
+        {/* Decorative background element */}
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+      </section>
 
-      {/* Getting Started */}
-      <Card className="p-4">
-        <h3 className="font-semibold text-slate-800 mb-2 dark:text-slate-200">Getting Started</h3>
-        <ul className="text-sm text-slate-600 space-y-2 dark:text-slate-400">
-          <li className="flex items-start gap-2">
-            <span className="text-green-500">✓</span>
-            <span>You're logged in!</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-slate-300 dark:text-slate-600">○</span>
-            <span>Create your first note</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-slate-300 dark:text-slate-600">○</span>
-            <span>Explore the settings</span>
-          </li>
-        </ul>
-      </Card>
+      {/* Meals Feed */}
+      {dailySummary?.meals && dailySummary.meals.length > 0 && (
+        <section className="space-y-4">
+          <h3 className="font-serif font-bold text-xl text-primary px-4">Recent Meals</h3>
+          <div className="bg-white rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
+            {dailySummary.meals.map((meal, index) => (
+              <MealItem key={index} meal={meal} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
+
+

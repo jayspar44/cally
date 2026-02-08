@@ -2,11 +2,13 @@ import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import Home from './pages/Home';
-import Notes from './pages/Notes';
-import NoteEdit from './pages/NoteEdit';
+import Chat from './pages/Chat';
+import Insights from './pages/Insights';
+import Database from './pages/Database';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
 import { AuthProvider } from './contexts/AuthContext';
+import { ChatProvider } from './contexts/ChatContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext';
@@ -22,7 +24,7 @@ function AppContent() {
   useEffect(() => {
     const env = getEnvironment();
     const envSuffix = env === 'prod' ? '' : ` (${env})`;
-    document.title = `{{PROJECT_TITLE}}${envSuffix}`;
+    document.title = `Cally${envSuffix}`;
   }, []);
 
   // Set up API connection status callback
@@ -36,13 +38,15 @@ function AppContent() {
 
       <Route path="/" element={
         <ProtectedRoute>
-          <Layout />
+          <ChatProvider>
+            <Layout />
+          </ChatProvider>
         </ProtectedRoute>
       }>
         <Route index element={<Home />} />
-        <Route path="notes" element={<Notes />} />
-        <Route path="notes/new" element={<NoteEdit />} />
-        <Route path="notes/:id" element={<NoteEdit />} />
+        <Route path="chat" element={<Chat />} />
+        <Route path="insights" element={<Insights />} />
+        <Route path="database" element={<Database />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

@@ -26,8 +26,8 @@ const { gitHash, gitBranch } = getGitInfo()
 const buildTimestamp = new Date().toISOString()
 
 // Get backend port from environment or calculate it
-const frontendPort = parseInt(process.env.PORT) || 4000;
-const backendPort = parseInt(process.env.BACKEND_PORT) || (frontendPort + 1);
+const frontendPort = parseInt(process.env.PORT) || 3500;
+const backendPort = parseInt(process.env.BACKEND_PORT) || 3501;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -42,6 +42,7 @@ export default defineConfig({
     port: frontendPort,
     host: '0.0.0.0', // Explicitly bind to all interfaces
     strictPort: true,
+    allowedHosts: true, // Allow all hosts (Tailscale, etc.)
     proxy: {
       '/api': {
         target: `http://localhost:${backendPort}`,

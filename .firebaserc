@@ -1,17 +1,18 @@
 {
   "projects": {
-    "default": "{{FIREBASE_PROJECT_ID}}"
+    "default": "cally-658"
   },
   "targets": {
-    "{{FIREBASE_PROJECT_ID}}": {
+    "cally-658": {
       "hosting": {
         "dev": [
-          "{{FIREBASE_SITE_DEV}}"
+          "cally-658-dev"
         ],
         "prod": [
-          "{{FIREBASE_SITE_PROD}}"
+          "cally-658"
         ]
       }
     }
-  }
+  },
+  "etags": {}
 }

@@ -5,8 +5,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      // Notes subcollection - each user can only access their own notes
-      match /notes/{noteId} {
+      // Food logs subcollection - each user can only access their own logs
+      match /foodLogs/{logId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Chat history subcollection - each user can only access their own chat
+      match /chatHistory/{messageId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }

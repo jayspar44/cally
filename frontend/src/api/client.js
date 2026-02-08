@@ -3,7 +3,7 @@ import { getAuth } from 'firebase/auth';
 
 const client = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
-    timeout: 10000, // 10 second timeout
+    timeout: 60000, // 60 second timeout
 });
 
 // Store connection status callback

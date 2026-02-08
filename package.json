@@ -1,7 +1,7 @@
 {
-  "name": "{{PROJECT_NAME}}",
+  "name": "cally",
   "version": "0.1.0",
-  "description": "{{PROJECT_DESCRIPTION}}",
+  "description": "AI-based habit companion app",
   "main": "backend/src/index.js",
   "scripts": {
     "install-all": "npm install && cd frontend && npm install && cd ../backend && npm install",

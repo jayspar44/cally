@@ -3,7 +3,7 @@ const { db } = require('../services/firebase');
 const updateProfile = async (req, res) => {
     try {
         const { uid, email } = req.user;
-        const { firstName } = req.body;
+        const { firstName, settings } = req.body;
 
         if (!uid) {
             return res.status(400).json({ error: 'User ID missing from token' });
@@ -17,11 +17,26 @@ const updateProfile = async (req, res) => {
         };
 
         if (!userDoc.exists) {
-            userData.registeredDate = new Date().toISOString();
+            userData.registeredDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            // Set default nutrition settings for new users
+            userData.settings = {
+                targetCalories: 2000,
+                targetProtein: 50,
+                targetCarbs: 250,
+                targetFat: 65,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
+                notificationsEnabled: true
+            };
         }
 
         if (firstName !== undefined) {
             userData.firstName = firstName;
+        }
+
+        // Merge settings if provided
+        if (settings) {
+            const existingSettings = userDoc.exists ? (userDoc.data().settings || {}) : (userData.settings || {});
+            userData.settings = { ...existingSettings, ...settings };
         }
 
         await db.collection('users').doc(uid).set(userData, { merge: true });
@@ -40,11 +55,19 @@ const getProfile = async (req, res) => {
         const doc = await db.collection('users').doc(uid).get();
 
         if (!doc.exists) {
-            // Return basic info from token if DB record doesn't exist yet
+            // Return basic info with default settings if DB record doesn't exist yet
             return res.json({
                 firstName: '',
                 email: req.user.email,
-                registeredDate: new Date().toISOString()
+                registeredDate: new Date().toISOString().split('T')[0],
+                settings: {
+                    targetCalories: 2000,
+                    targetProtein: 50,
+                    targetCarbs: 250,
+                    targetFat: 65,
+                    timezone: 'America/New_York',
+                    notificationsEnabled: true
+                }
             });
         }
 
@@ -52,7 +75,15 @@ const getProfile = async (req, res) => {
         res.json({
             firstName: data.firstName || '',
             email: data.email || req.user.email,
-            registeredDate: data.registeredDate || data.updatedAt || new Date().toISOString()
+            registeredDate: data.registeredDate || data.updatedAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+            settings: data.settings || {
+                targetCalories: 2000,
+                targetProtein: 50,
+                targetCarbs: 250,
+                targetFat: 65,
+                timezone: 'America/New_York',
+                notificationsEnabled: true
+            }
         });
 
     } catch (error) {

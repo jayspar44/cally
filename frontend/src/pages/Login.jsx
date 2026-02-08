@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import { ArrowRight, Moon, Sun, Zap } from 'lucide-react';
 import { logger } from '../utils/logger';
 import { getVersionString } from '../utils/appConfig';
@@ -75,72 +75,72 @@ const Login = () => {
                 </button>
 
                 <Card className="w-full max-w-md p-8 shadow-xl bg-white border-slate-100 dark:bg-slate-800 dark:border-slate-700">
-                <div className="text-center mb-8">
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
-                            <Zap className="w-6 h-6" />
+                    <div className="text-center mb-8">
+                        <div className="flex items-center justify-center gap-3 mb-2">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                                <Zap className="w-6 h-6" />
+                            </div>
                         </div>
-                    </div>
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                        Welcome
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400">
-                        Sign in to continue
-                    </p>
-                </div>
-
-                {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                        {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                    <div>
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
-                        />
-                    </div>
-                    <div>
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
-                        />
+                        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                            Welcome
+                        </h1>
+                        <p className="text-slate-500 dark:text-slate-400">
+                            Sign in to continue
+                        </p>
                     </div>
 
-                    <Button
-                        type="submit"
-                        variant="primary"
-                        className="w-full h-12 mt-2 shadow-lg shadow-sky-200 text-lg"
-                        disabled={loading}
-                    >
-                        {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Sign In')}
-                        {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
-                    </Button>
-                </form>
+                    {error && (
+                        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+                            {error}
+                        </div>
+                    )}
 
-                <div className="mt-8 pt-6 border-t border-slate-100 text-center dark:border-slate-700">
-                    <p className="text-slate-500 text-sm mb-3 dark:text-slate-400">
-                        {isSignup ? 'Already have an account?' : "Don't have an account?"}
-                    </p>
-                    <Button
-                        variant="ghost"
-                        className="w-full hover:bg-slate-50 text-slate-600 dark:hover:bg-slate-700 dark:text-slate-300"
-                        onClick={() => setIsSignup(!isSignup)}
-                    >
-                        {isSignup ? 'Sign In' : 'Create Account'}
-                    </Button>
-                </div>
-            </Card>
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <div>
+                            <input
+                                type="email"
+                                placeholder="Email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
+                            />
+                        </div>
+                        <div>
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
+                            />
+                        </div>
+
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            className="w-full h-12 mt-2 shadow-lg shadow-sky-200 text-lg"
+                            disabled={loading}
+                        >
+                            {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Sign In')}
+                            {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
+                        </Button>
+                    </form>
+
+                    <div className="mt-8 pt-6 border-t border-slate-100 text-center dark:border-slate-700">
+                        <p className="text-slate-500 text-sm mb-3 dark:text-slate-400">
+                            {isSignup ? 'Already have an account?' : "Don't have an account?"}
+                        </p>
+                        <Button
+                            variant="ghost"
+                            className="w-full hover:bg-slate-50 text-slate-600 dark:hover:bg-slate-700 dark:text-slate-300"
+                            onClick={() => setIsSignup(!isSignup)}
+                        >
+                            {isSignup ? 'Sign In' : 'Create Account'}
+                        </Button>
+                    </div>
+                </Card>
             </div>
         </MobileContainer>
     );

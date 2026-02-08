@@ -112,5 +112,18 @@ ios/
 # Firebase cache
 .firebase/
 
-# Windows artifacts
-nul
+
+# Backend temporary files
+backend/debug_data.js
+backend/debug_output.txt
+backend/dump_models.js
+backend/fix_dates.js
+backend/list_models.js
+backend/models.json
+backend/simple-test.js
+backend/test-gemini.js
+backend/test_gemini_3.js
+backend/test_gemini_conversation.js
+backend/test_gemini_tools.js
+backend/verify-tools-import.js
+backend/verify_syntax.js
