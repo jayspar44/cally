@@ -47,9 +47,14 @@ const toolDeclarations = [
                         required: ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat']
                     },
                     description: 'Array of individual food items with nutrition info'
+                },
+                nutritionSource: {
+                    type: 'string',
+                    enum: ['ai_estimate', 'usda', 'common_foods', 'user_input', 'nutrition_label'],
+                    description: 'Source of the nutrition data. Use "ai_estimate" if you estimated it, "usda" if you used lookupNutrition and found it in USDA, "common_foods" if you used lookupNutrition and found it there, "user_input" if the user explicitly provided macros, "nutrition_label" if from an image/label.'
                 }
             },
-            required: ['date', 'meal', 'items']
+            required: ['date', 'meal', 'items', 'nutritionSource']
         }
     },
     {
@@ -112,6 +117,24 @@ const toolDeclarations = [
         }
     },
     {
+        name: 'searchFoodLogs',
+        description: 'Search for past food logs to get their IDs. Use this BEFORE updateFoodLog when the user wants to change a previous entry.',
+        parameters: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description: 'Search term (e.g., "coffee", "breakfast", "sandwich")'
+                },
+                date: {
+                    type: 'string',
+                    description: 'Date to search in YYYY-MM-DD format (defaults to today)'
+                }
+            },
+            required: ['query']
+        }
+    },
+    {
         name: 'getUserGoals',
         description: 'Get the user\'s nutrition goals (daily calorie and macro targets).',
         parameters: {
@@ -137,6 +160,8 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
                 return await getDailySummaryTool(args, userId, userTimezone);
             case 'getUserGoals':
                 return await getUserGoals(userId);
+            case 'searchFoodLogs':
+                return await searchFoodLogs(args, userId, userTimezone);
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
@@ -150,7 +175,24 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
  * Log food to Firestore
  */
 const logFood = async (args, userId, userTimezone) => {
-    let { date, meal, description, items, originalMessage } = args;
+    let { date, meal, description, items, originalMessage, nutritionSource } = args;
+
+    // Compatibility layer for malformed AI arguments (Model sometimes sends flat fields instead of specific schema)
+    if (!meal && args.mealType) meal = args.mealType;
+
+    // Normalize meal to lowercase and valid enum
+    if (meal) {
+        meal = meal.toLowerCase();
+        if (!['breakfast', 'lunch', 'dinner', 'snack'].includes(meal)) {
+            // Default to snack if invalid, or try to infer? 
+            // Better to default to snack to avoid crash
+            logger.warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
+            meal = 'snack';
+        }
+    } else {
+        // Fallback if strictly missing
+        meal = 'snack';
+    }
 
     // Default to user's local today if date not provided
     if (!date) {
@@ -165,8 +207,20 @@ const logFood = async (args, userId, userTimezone) => {
     const batch = db.batch();
     const createdIds = [];
 
-    // If description is provided but no items, we still want to log it (maybe as a generic item)
-    // But the tool definition requires items.
+    // Check if AI sent flat item details instead of items array
+    if ((!items || items.length === 0) && args.foodName) {
+        logger.info('Detected flat food arguments, converting to items array');
+        items = [{
+            name: args.foodName,
+            quantity: args.quantity || 1,
+            unit: args.unit || 'serving',
+            calories: args.calories || 0,
+            protein: args.protein || 0,
+            carbs: args.carbs || 0,
+            fat: args.fat || 0,
+            confidence: args.confidence || 0.8
+        }];
+    }
 
     // Safety check for items
     if (!items || !Array.isArray(items)) {
@@ -189,6 +243,7 @@ const logFood = async (args, userId, userTimezone) => {
             fat: item.fat || 0,
             originalMessage: originalMessage || '',
             source: 'chat',
+            nutritionSource: nutritionSource || 'ai_estimate', // distinct from 'source' which tracks how the log was created
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp()
@@ -269,6 +324,63 @@ const lookupNutrition = async (args) => {
 };
 
 /**
+ * Search food logs
+ */
+const searchFoodLogs = async (args, userId, userTimezone) => {
+    let { query, date } = args;
+
+    if (!date) {
+        if (userTimezone) {
+            date = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
+        } else {
+            date = new Date().toISOString().split('T')[0];
+        }
+    }
+
+    try {
+        const snapshot = await db.collection('users').doc(userId)
+            .collection('foodLogs')
+            .where('date', '==', date)
+            .get();
+
+        if (snapshot.empty) {
+            return { success: true, count: 0, matches: [], message: `No food logs found for ${date}` };
+        }
+
+        const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const lowerQuery = query.toLowerCase();
+
+        // Simple client-side fuzzy match
+        const matches = logs.filter(log => {
+            const nameMatch = log.name?.toLowerCase().includes(lowerQuery);
+            const msgMatch = log.originalMessage?.toLowerCase().includes(lowerQuery);
+            const mealMatch = log.meal?.toLowerCase().includes(lowerQuery);
+            return nameMatch || msgMatch || mealMatch;
+        });
+
+        return {
+            success: true,
+            data: {
+                count: matches.length,
+                date,
+                matches: matches.map(m => ({
+                    id: m.id,
+                    name: m.name,
+                    meal: m.meal,
+                    quantity: m.quantity,
+                    unit: m.unit,
+                    calories: m.calories,
+                    time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
+                }))
+            }
+        };
+    } catch (error) {
+        logger.error({ err: error }, 'Error searching food logs');
+        return { success: false, error: 'Failed to search logs' };
+    }
+};
+
+/**
  * Update an existing food log
  */
 const updateFoodLog = async (args, userId) => {
@@ -278,7 +390,7 @@ const updateFoodLog = async (args, userId) => {
     const doc = await docRef.get();
 
     if (!doc.exists) {
-        return { success: false, error: 'Food log item not found' };
+        return { success: false, error: 'Food log item not found. Please use searchFoodLogs to find the correct ID first.' };
     }
 
     // Flatten updates? If Gemini sends `updates: { items: [...] }` that's bad.

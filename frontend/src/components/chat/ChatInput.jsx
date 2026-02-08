@@ -28,14 +28,20 @@ export default function ChatInput({ onSend, sending, disabled }) {
 
     const handleSubmit = async (e) => {
         e?.preventDefault();
-        if (sending || disabled || (!message.trim() && !imageBase64)) return;
+        const msgToSend = message.trim();
+        const imgToSend = imageBase64;
+
+        if (sending || disabled || (!msgToSend && !imgToSend)) return;
 
         try {
-            await onSend(message.trim(), imageBase64);
-            setMessage('');
-            setImagePreview(null);
-            setImageBase64(null);
-            if (textAreaRef.current) textAreaRef.current.style.height = 'auto';
+            // Pass a callback that clears the input ONLY when upload is 100% complete
+            await onSend(msgToSend, imgToSend, () => {
+                setMessage('');
+                setImagePreview(null);
+                setImageBase64(null);
+                if (textAreaRef.current) textAreaRef.current.style.height = 'auto';
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            });
         } catch (err) {
             // Error handled by context
         }
@@ -57,6 +63,8 @@ export default function ChatInput({ onSend, sending, disabled }) {
 
     const handleFileSelect = (e) => {
         const file = e.target.files?.[0];
+        console.log('File selected:', file); // Debug
+
         if (!file) return;
 
         if (!file.type.startsWith('image/')) {
@@ -64,17 +72,19 @@ export default function ChatInput({ onSend, sending, disabled }) {
             return;
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-            alert('Image must be less than 10MB');
+        if (file.size > 50 * 1024 * 1024) { // Updated to 50MB to match backend
+            alert('Image must be less than 50MB');
             return;
         }
 
         const reader = new FileReader();
         reader.onload = (e) => {
+            console.log('File read success'); // Debug
             setImagePreview(e.target.result);
             const base64 = e.target.result.split(',')[1];
             setImageBase64(base64);
         };
+        reader.onerror = (err) => console.error('File read error:', err);
         reader.readAsDataURL(file);
     };
 
@@ -127,6 +137,7 @@ export default function ChatInput({ onSend, sending, disabled }) {
                     type="file"
                     accept="image/*"
                     onChange={handleFileSelect}
+                    onClick={(e) => (e.target.value = null)}
                     className="hidden"
                 />
 

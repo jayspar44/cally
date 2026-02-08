@@ -133,8 +133,26 @@ const clearHistory = async (req, res) => {
     }
 };
 
+/**
+ * Delete a specific message
+ */
+const deleteMessage = async (req, res) => {
+    try {
+        const userId = req.user.uid;
+        const messageId = req.params.id;
+
+        await db.collection('users').doc(userId).collection('chatHistory').doc(messageId).delete();
+
+        res.json({ success: true, id: messageId });
+    } catch (error) {
+        req.log.error({ err: error }, 'Failed to delete message');
+        res.status(500).json({ error: 'Failed to delete message' });
+    }
+};
+
 module.exports = {
     sendMessage,
     getHistory,
-    clearHistory
+    clearHistory,
+    deleteMessage
 };

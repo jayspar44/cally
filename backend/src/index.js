@@ -23,7 +23,7 @@ app.use(helmet());
 // Global Rate Limiting (DDoS protection)
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // 100 requests per IP per window
+    max: 1000, // 1000 requests per IP per window (Relaxed from 100 for dev/single-user usage)
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
@@ -45,6 +45,11 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
+        // Allow all origins in development to facilitate mobile testing via IP
+        if (process.env.NODE_ENV === 'development') {
+            return callback(null, true);
+        }
+
         // Check if origin is in allowed list or is a Tailscale domain
         if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('.ts.net')) {
             callback(null, true);
@@ -57,7 +62,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // HTTP request logging middleware (attaches req.log to all requests)
 app.use(pinoHttp({

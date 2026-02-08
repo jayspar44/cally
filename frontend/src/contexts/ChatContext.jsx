@@ -31,13 +31,15 @@ export const ChatProvider = ({ children }) => {
         } catch (err) {
             console.error('Failed to load chat history:', err);
             setError('Failed to load messages');
+            // Mark as initialized even on error to prevent infinite retry loops in UI
+            setInitialized(true);
         } finally {
             setLoading(false);
         }
     }, [loading]);
 
     // Send a message
-    const sendMessage = useCallback(async (messageText, imageBase64 = null) => {
+    const sendMessage = useCallback(async (messageText, imageBase64 = null, onUploadSuccess = null) => {
         if (sending || (!messageText?.trim() && !imageBase64)) return;
 
         setSending(true);
@@ -57,7 +59,16 @@ export const ChatProvider = ({ children }) => {
 
         try {
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const response = await api.sendMessage(messageText, imageBase64, userTimezone);
+
+            // Define progress handler
+            const onUploadProgress = (progressEvent) => {
+                // Check if upload is complete (approximate for 'sent')
+                if (progressEvent.loaded === progressEvent.total) {
+                    if (onUploadSuccess) onUploadSuccess();
+                }
+            };
+
+            const response = await api.sendMessage(messageText, imageBase64, userTimezone, onUploadProgress);
 
             // Replace temp message with real ones
             setMessages(prev => {
@@ -107,6 +118,7 @@ export const ChatProvider = ({ children }) => {
 
     const value = {
         messages,
+        setMessages, // Exposed for optimistic updates
         loading,
         sending,
         error,

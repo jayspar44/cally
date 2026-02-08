@@ -1,0 +1,11 @@
+[dotenv@17.2.4] injecting env (5) from .env -- tip: Γ£à audit secrets and track compliance: https://dotenvx.com/ops
+FIREBASE_SERVICE_ACCOUNT present: true
+Starting Search & Update Test...
+1. Setting up test data...
+[17:50:47] [32mINFO[39m: [36mFirebase Admin initialized successfully[39m
+   Created test log with ID: UCNi2j1nTdQsNX3V1Rd2
+2. Testing searchFoodLogs...
+DEBUG: searchFoodLogs called. DB is: Defined
+TEST FAILED: TypeError: Cannot read properties of undefined (reading 'matches')
+    at testSearchAndUpdate (C:\Users\jason\OneDrive\Documents\projects\cally\backend\test_search_update.js:32:56)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)

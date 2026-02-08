@@ -83,7 +83,7 @@ export default function Insights() {
     const daysTracked = weeklyTrends?.daysTracked || 0;
 
     return (
-        <div className="space-y-6 pb-24 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-6 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Weekly Overview Card */}
             <section className="bg-white/90 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-8 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 relative overflow-hidden group">
                 {/* Decorative background gradient */}

@@ -3,9 +3,13 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '../../utils/cn';
 import FoodLogCard from './FoodLogCard';
 
-export default function ChatMessage({ message, onEditLog }) {
+import { Trash2 } from 'lucide-react';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
+
+export default function ChatMessage({ message, onEditLog, onDelete }) {
     const isUser = message.role === 'user';
     const isPending = message.pending;
+    const { developerMode } = useUserPreferences();
 
     return (
         <div className={cn(
@@ -13,15 +17,15 @@ export default function ChatMessage({ message, onEditLog }) {
             isUser ? 'justify-end' : 'justify-start'
         )}>
             <div className={cn(
-                'max-w-[85%] sm:max-w-[75%] relative group',
+                'max-w-[95%] sm:max-w-[95%] relative group', // INCREASED WIDTH (was 85%)
                 isUser ? 'items-end' : 'items-start'
             )}>
                 {/* Bubble */}
                 <div className={cn(
-                    'px-5 py-4 shadow-sm backdrop-blur-sm',
+                    'px-4 py-3 shadow-sm backdrop-blur-sm relative', // Added relative for delete button positioning if needed
                     isUser
-                        ? 'bg-primary text-primary-foreground rounded-[1.5rem] rounded-tr-sm'
-                        : 'bg-white border border-border/60 rounded-[1.5rem] rounded-tl-sm',
+                        ? 'bg-primary text-primary-foreground rounded-[1.25rem] rounded-tr-sm'
+                        : 'bg-white border border-border/60 rounded-[1.25rem] rounded-tl-sm',
                     isPending && 'opacity-80'
                 )}>
                     {/* Content */}
@@ -51,6 +55,23 @@ export default function ChatMessage({ message, onEditLog }) {
                         <div className="mt-4 -mx-1">
                             <FoodLogCard foodLog={message.foodLog} onEdit={onEditLog} />
                         </div>
+                    )}
+
+                    {/* Developer Delete Button */}
+                    {developerMode && onDelete && !isPending && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete();
+                            }}
+                            className={cn(
+                                "absolute -top-2 w-6 h-6 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+                                isUser ? "-left-2" : "-right-2"
+                            )}
+                            title="Delete Message (Dev Mode)"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                        </button>
                     )}
                 </div>
 

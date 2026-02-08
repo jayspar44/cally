@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import { ArrowRight, Moon, Sun, Zap } from 'lucide-react';
+import { ArrowRight, Moon, Sun, Sparkles } from 'lucide-react';
 import { logger } from '../utils/logger';
 import { getVersionString } from '../utils/appConfig';
 import { MobileContainer } from '../components/layout/MobileContainer';
+import { cn } from '../utils/cn';
 
 const Login = () => {
     const { loginEmail, signup, user } = useAuth();
@@ -55,92 +54,102 @@ const Login = () => {
 
     return (
         <MobileContainer>
-            <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-slate-50 animate-fadeIn dark:bg-slate-900 relative">
+            <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+                {/* Background Decor */}
+                <div className="absolute top-[-10%] right-[-10%] w-[50vh] h-[50vh] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[50vh] h-[50vh] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+
                 {/* Version string */}
-                <div className="absolute left-1/2 top-4 -translate-x-1/2">
-                    <p className="text-slate-400 font-mono text-[10px] dark:text-slate-500">{getVersionString()}</p>
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+                    <p className="text-primary/30 font-mono text-[10px] tracking-widest uppercase">{getVersionString()}</p>
                 </div>
 
-                {/* Dark Mode Toggle */}
+                {/* Dark Mode Toggle (Hidden for now as design system dictates specific colors, but keeping logic if needed later) */}
+                {/* 
                 <button
                     onClick={toggleTheme}
-                    className="absolute top-4 right-4 p-3 rounded-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shadow-lg dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
-                    aria-label="Toggle dark mode"
+                    className="absolute top-6 right-6 p-3 rounded-full bg-white/50 backdrop-blur-sm border border-primary/10 text-primary/60 hover:bg-white active:scale-95 transition-all shadow-sm"
                 >
-                    {isDark ? (
-                        <Sun className="w-5 h-5" />
-                    ) : (
-                        <Moon className="w-5 h-5" />
-                    )}
-                </button>
+                    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                </button> 
+                */}
 
-                <Card className="w-full max-w-md p-8 shadow-xl bg-white border-slate-100 dark:bg-slate-800 dark:border-slate-700">
-                    <div className="text-center mb-8">
-                        <div className="flex items-center justify-center gap-3 mb-2">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
-                                <Zap className="w-6 h-6" />
+                <div className="w-full max-w-sm z-10">
+                    {/* Header */}
+                    <div className="text-center mb-12 space-y-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-primary to-primary/80 text-white shadow-xl shadow-primary/20 rotate-[-6deg] mb-4">
+                            <Sparkles className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h1 className="text-4xl font-serif font-black text-primary tracking-tight mb-2">
+                                Cally
+                            </h1>
+                            <p className="text-primary/60 font-sans text-lg text-balance">
+                                Your gourmet AI nutrition companion.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Card */}
+                    <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-card border border-white/50">
+                        {error && (
+                            <div className="mb-6 p-4 bg-red-50/80 border border-red-100 rounded-2xl text-red-600 text-sm font-medium text-center">
+                                {error}
                             </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                            <div className="space-y-1.5">
+                                <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Email</label>
+                                <input
+                                    type="email"
+                                    placeholder="hello@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    required
+                                    className="w-full h-14 px-6 rounded-2xl bg-background/50 border border-primary/10 text-primary placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/50 transition-all font-sans text-lg"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Password</label>
+                                <input
+                                    type="password"
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                    className="w-full h-14 px-6 rounded-2xl bg-background/50 border border-primary/10 text-primary placeholder:text-primary/30 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/50 transition-all font-sans text-lg"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className={cn(
+                                    "w-full h-14 mt-4 rounded-2xl font-serif font-bold text-lg tracking-wide transition-all shadow-lg shadow-primary/10 flex items-center justify-center gap-2",
+                                    loading
+                                        ? "bg-primary/5 text-primary/40 cursor-not-allowed"
+                                        : "bg-primary text-white hover:translate-y-[-2px] active:translate-y-[0px] hover:shadow-xl active:shadow-sm"
+                                )}
+                            >
+                                {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Sign In')}
+                                {!loading && <ArrowRight className="w-5 h-5 opacity-80" />}
+                            </button>
+                        </form>
+
+                        <div className="mt-8 pt-6 border-t border-primary/5 text-center">
+                            <p className="text-primary/40 text-sm mb-3 font-medium">
+                                {isSignup ? 'Already have an account?' : "New to Cally?"}
+                            </p>
+                            <button
+                                onClick={() => setIsSignup(!isSignup)}
+                                className="text-accent hover:text-accent/80 font-bold text-sm tracking-wide active:scale-95 transition-transform"
+                            >
+                                {isSignup ? 'Sign In to your account' : 'Create a new account'}
+                            </button>
                         </div>
-                        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                            Welcome
-                        </h1>
-                        <p className="text-slate-500 dark:text-slate-400">
-                            Sign in to continue
-                        </p>
                     </div>
-
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
-                            {error}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        <div>
-                            <input
-                                type="email"
-                                placeholder="Email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
-                            />
-                        </div>
-                        <div>
-                            <input
-                                type="password"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 dark:placeholder:text-slate-500"
-                            />
-                        </div>
-
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            className="w-full h-12 mt-2 shadow-lg shadow-sky-200 text-lg"
-                            disabled={loading}
-                        >
-                            {loading ? 'Processing...' : (isSignup ? 'Create Account' : 'Sign In')}
-                            {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
-                        </Button>
-                    </form>
-
-                    <div className="mt-8 pt-6 border-t border-slate-100 text-center dark:border-slate-700">
-                        <p className="text-slate-500 text-sm mb-3 dark:text-slate-400">
-                            {isSignup ? 'Already have an account?' : "Don't have an account?"}
-                        </p>
-                        <Button
-                            variant="ghost"
-                            className="w-full hover:bg-slate-50 text-slate-600 dark:hover:bg-slate-700 dark:text-slate-300"
-                            onClick={() => setIsSignup(!isSignup)}
-                        >
-                            {isSignup ? 'Sign In' : 'Create Account'}
-                        </Button>
-                    </div>
-                </Card>
+                </div>
             </div>
         </MobileContainer>
     );

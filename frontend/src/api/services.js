@@ -34,9 +34,15 @@ export const api = {
     },
 
     // Chat
-    sendMessage: async (message, imageBase64 = null, userTimezone = null) => {
+    sendMessage: async (message, imageBase64 = null, userTimezone = null, onUploadProgress = null) => {
         logger.debug('Sending message to Cally');
-        const response = await client.post('/chat/message', { message, imageBase64, userTimezone });
+        // If we have an image and a progress callback, pass it to axios
+        const config = {};
+        if (onUploadProgress) {
+            config.onUploadProgress = onUploadProgress;
+        }
+
+        const response = await client.post('/chat/message', { message, imageBase64, userTimezone }, config);
         return response.data;
     },
 
@@ -51,6 +57,12 @@ export const api = {
     clearChatHistory: async () => {
         logger.debug('Clearing chat history');
         const response = await client.delete('/chat/history');
+        return response.data;
+    },
+
+    deleteMessage: async (id) => {
+        logger.debug(`Deleting message ${id}`);
+        const response = await client.delete(`/chat/message/${id}`);
         return response.data;
     },
 

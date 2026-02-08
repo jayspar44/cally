@@ -22,10 +22,11 @@ router.post('/user/profile', updateProfile);
 router.get('/user/profile', getProfile);
 
 // Chat
-const { sendMessage, getHistory, clearHistory } = require('../controllers/chatController');
+const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
 router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);
 router.delete('/chat/history', clearHistory);
+router.delete('/chat/message/:id', deleteMessage);
 
 // Food Logs
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');

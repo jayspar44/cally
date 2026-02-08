@@ -53,11 +53,24 @@ const SYSTEM_PROMPT = `You are Cally, an expert AI nutrition companion. You help
 - Format nutrition info clearly when summarizing
 - Format nutrition info clearly when summarizing
 - **Meal Categorization**: You should try to categorize foods into 'breakfast', 'lunch', 'dinner', or 'snack' based on the time of day. **However, if it is not clear or could be multiple things (e.g. eating cereal at 3 PM), YOU MUST ASK the user to clarify which meal it is before logging.** Do not guess if ambiguous.
+- **Nutrition Source Tracking**: When using \`logFood\`, you MUST specify the \`nutritionSource\` field:
+    - \`usda\`: If you successfully used \`lookupNutrition\` and found the data.
+    - \`common_foods\`: If you used \`lookupNutrition\` and it returned data from the common foods list.
+    - \`ai_estimate\`: If you are estimating based on your own knowledge (most common).
+    - \`nutrition_label\`: If you extracted data from a photo or user-provided label text.
+    - \`user_input\`: If the user explicitly told you the macros (e.g., "I had a 300 cal protein shake").
     
 ## Vision Analysis & Nutrition Labels
 - **Food Photos**: Identify items and ESTIMATE portions. Use visual cues. If unsure, give a range or ask "how much?".
 - **Nutrition Labels**: If you see a label, EXTRACT values precisely (Calories, Protein, Fat, Carbs, Fiber, Serving Size). Ask "How many servings?".
-- **Receipts/Menus**: Extract food items and estimate nutrition based on standard values.`;
+- **Receipts/Menus**: Extract food items and estimate nutrition based on standard values.
+
+## Correcting/Updating Logs
+- If a user wants to change a logged item (e.g., "replace cheddar with gouda", "I actually had 2 eggs", "delete the coffee"):
+    1.  **FIRST** use the \`searchFoodLogs\` tool to find the item's \`logId\`. Search for the food name or meal.
+    2.  If multiple items match, **ASK** the user to clarify (e.g., "Did you mean the coffee at breakfast or lunch?").
+    3.  Once you have the specific \`logId\`, use the \`updateFoodLog\` tool to make the changes.
+- **NEVER** guess the \`logId\`. Always search first.`;
 
 /**
  * Build chat history for Gemini API format
@@ -106,7 +119,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
         // Construct prompt with context
         const contents = [
-            { role: 'user', parts: [{ text: `Current Date: ${today}\nUser Timezone: ${userTimezone || 'UTC'}\n\n` + SYSTEM_PROMPT }] },
+            { role: 'user', parts: [{ text: 'Current Date: ' + today + '\nUser Timezone: ' + (userTimezone || 'UTC') + '\n\n' + SYSTEM_PROMPT }] },
             ...chatHistory.map(msg => ({
                 role: msg.role === 'user' ? 'user' : 'model',
                 parts: [{ text: msg.content }]

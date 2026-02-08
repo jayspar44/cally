@@ -143,7 +143,8 @@ const frontendEnv = {
     PORT: frontendPort.toString(), // Vite uses VITE_PORT or --port flag, but we pass it as env too
     // Note: Vite config in Cally likely reads env vars or defaults. 
     // We will use the --port flag to be sure.
-    VITE_API_URL: `http://localhost:${backendPort}/api`, // Override API URL for custom ports
+    // VITE_API_URL: `http://localhost:${backendPort}/api`, // OLD: Broken for mobile/remote
+    VITE_API_URL: '/api', // NEW: Use relative path so Vite proxy handles it (works for localhost, LAN, Tailscale)
     FORCE_COLOR: '1'
 };
 

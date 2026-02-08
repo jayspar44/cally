@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useChat } from '../contexts/ChatContext';
 import ChatMessage from '../components/chat/ChatMessage';
 import ChatInput from '../components/chat/ChatInput';
@@ -6,7 +6,7 @@ import FoodEditModal from '../components/common/FoodEditModal'; // Correct impor
 import { api } from '../api/services';
 
 export default function Chat() {
-    const { messages, loading, sending, error, initialized, loadHistory, sendMessage } = useChat();
+    const { messages, setMessages, loading, sending, error, initialized, loadHistory, sendMessage } = useChat();
     const messagesEndRef = useRef(null);
     const containerRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
@@ -19,21 +19,95 @@ export default function Chat() {
     const isInitialLoad = useRef(true);
 
     // Auto-scroll
-    useEffect(() => {
+    const scrollToBottom = (behavior = 'smooth') => {
         if (messagesEndRef.current) {
-            // If it's the first time messages are loaded (history), scroll instantly
-            if (isInitialLoad.current) {
-                messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
-                // Only mark initial load as done if we actually have messages
-                if (messages.length > 0) {
-                    isInitialLoad.current = false;
-                }
-            } else {
-                // For new messages, scroll smoothly
-                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-            }
+            messagesEndRef.current.scrollIntoView({ behavior, block: 'end' });
+        }
+    };
+
+    // Use layout effect for instant scroll before paint
+    // This prevents the "jump" on initial load
+    useLayoutEffect(() => {
+        if (messages.length === 0) return;
+
+        if (isInitialLoad.current) {
+            scrollToBottom('auto');
+
+            // Secondary check for image loading/layout shifts
+            setTimeout(() => {
+                scrollToBottom('auto');
+                isInitialLoad.current = false;
+            }, 100);
+        } else {
+            scrollToBottom('smooth');
         }
     }, [messages]);
+
+    // Dynamic Sizing State
+    const [spacerHeight, setSpacerHeight] = useState(200);
+    const inputContainerRef = useRef(null);
+    const initialHeightRef = useRef(null);
+    const prevSpacerHeightRef = useRef(200);
+
+    // 1. Separate Layout Effect for SCROLLING (Behavioral)
+    // Triggers ONLY when spacerHeight updates (after render)
+    useLayoutEffect(() => {
+        const delta = spacerHeight - prevSpacerHeightRef.current;
+
+        // If the spacer grew (e.g. image added), scroll DOWN by that amount
+        // This effectively neutralizes the "push up" caused by the spacer expanding
+        if (delta > 5) {
+            console.log(`[Chat] Spacer Grew by ${delta}px. Scrolling down...`);
+            window.scrollBy({ top: delta, behavior: 'smooth' });
+        }
+
+        prevSpacerHeightRef.current = spacerHeight;
+    }, [spacerHeight]);
+
+    // 2. Separate Layout Effect for OBSERVING (Sizing)
+    useLayoutEffect(() => {
+        if (!inputContainerRef.current) return;
+
+        let observer;
+
+        // Stabilize observation
+        const setupObserver = () => {
+            if (!inputContainerRef.current) return;
+
+            observer = new ResizeObserver(entries => {
+                for (const entry of entries) {
+                    const currentHeight = entry.contentRect.height;
+
+                    // Capture initial 'stable' height once
+                    if (initialHeightRef.current === null) {
+                        initialHeightRef.current = currentHeight;
+                        console.log('[Chat] Initial Input Height Locked:', currentHeight);
+                    }
+
+                    // Calculate Target Spacer Height
+                    // Base: 200px + (Current - Initial)
+                    const delta = currentHeight - initialHeightRef.current;
+                    const newSpacer = 200 + delta;
+
+                    // Only update state if changed significantly (avoids loops)
+                    setSpacerHeight(prev => {
+                        if (Math.abs(prev - newSpacer) < 1) return prev;
+                        return newSpacer;
+                    });
+                }
+            });
+
+            observer.observe(inputContainerRef.current);
+        };
+
+        // Small delay to ensure layout is settled on mount (fonts, css)
+        const timer = setTimeout(setupObserver, 50);
+
+        return () => {
+            clearTimeout(timer);
+            if (observer) observer.disconnect();
+        };
+    }, []);
 
     const handleUpdateLog = async (itemId, updates) => {
         try {
@@ -52,24 +126,35 @@ export default function Chat() {
         }
     };
 
+    const handleDeleteMessage = async (messageId) => {
+        if (!window.confirm('Are you sure you want to delete this message?')) return;
+        try {
+            await api.deleteMessage(messageId);
+            // Optimistic update
+            setMessages(prev => prev.filter(m => m.id !== messageId));
+        } catch (err) {
+            console.error('Failed to delete message:', err);
+        }
+    };
+
     if (loading && !initialized) {
         return (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full relative">
-            {/* Messages Area */}
+        <div className="flex flex-col relative min-h-full">
+            {/* Messages Area - No internal scroll, uses Layout scroll */}
             <div
                 ref={containerRef}
-                className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth pb-48"
+                className="flex-1 px-2 py-4"
             >
-                {/* Empty State / Welcome */}
+                {/* Empty State / Welcome - Centered if no messages */}
                 {messages.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full text-center px-6 animate-in fade-in duration-700">
+                    <div className="flex flex-col items-center justify-center py-20 text-center px-4 animate-in fade-in duration-700">
                         <div className="w-16 h-16 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6">
                             <span className="text-3xl">🥗</span>
                         </div>
@@ -101,12 +186,13 @@ export default function Chat() {
                         key={message.id}
                         message={message}
                         onEditLog={(log) => setEditingFoodLog(log)}
+                        onDelete={() => handleDeleteMessage(message.id)}
                     />
                 ))}
 
                 {/* Typing Indicator */}
                 {sending && (
-                    <div className="flex justify-start mb-6 px-5">
+                    <div className="flex justify-start mb-6 px-4">
                         <span className="font-mono text-xs text-primary/40 animate-pulse">
                             Analyzing input...
                         </span>
@@ -120,11 +206,28 @@ export default function Chat() {
                     </div>
                 )}
 
-                <div ref={messagesEndRef} className="h-4" />
+                {/* VISIBLE SPACER for Input Clearance */}
+                {/* Robust Solution: Delta Approach
+                    Base Spacer: 200px (Proven robust)
+                    Adjusted by: (Current Input Height - Initial Input Height)
+                */}
+                <div
+                    style={{ height: `${spacerHeight}px` }}
+                    className="w-full transition-all duration-300 ease-out"
+                    aria-hidden="true"
+                />
+
+                {/* Scroll Target */}
+                <div ref={messagesEndRef} className="h-1" />
             </div>
 
             {/* Input Area - Floating Capsule */}
-            <div className="fixed bottom-32 left-1/2 -translate-x-1/2 w-[90%] max-w-[600px] z-40 px-2 sm:px-0">
+            {/* MATCH LAYOUT WIDTH: max-w-xl and px-4 to match Layout.jsx constraints */}
+            <div
+                ref={inputContainerRef}
+                className="fixed left-1/2 -translate-x-1/2 w-full max-w-xl z-40 px-4 transition-all duration-300 pointer-events-auto"
+                style={{ bottom: '7rem' }}
+            >
                 <ChatInput
                     onSend={sendMessage}
                     sending={sending}

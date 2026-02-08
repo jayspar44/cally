@@ -92,7 +92,7 @@ export default function Database() {
     }
 
     return (
-        <div className="space-y-6 pb-24">
+        <div className="space-y-6 pb-8">
             {/* Search/Filter Bar (Placeholder for now) */}
             <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
@@ -136,7 +136,8 @@ export default function Database() {
                                 logs.map((log) => (
                                     <tr key={log.id} className="group hover:bg-primary/5 transition-colors duration-200">
                                         <td className="px-4 py-3 font-mono text-xs text-primary/70 whitespace-nowrap">
-                                            {new Date(log.date).toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
+                                            {/* Fix Date Offset: Append T00:00:00 to force local timezone interpretation instead of UTC */}
+                                            {new Date(log.date + 'T00:00:00').toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
                                         </td>
                                         <td className="px-4 py-3 font-mono text-xs text-primary/40 whitespace-nowrap">
                                             {log.createdAt ? new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
