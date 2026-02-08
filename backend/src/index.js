@@ -40,8 +40,6 @@ app.use(cors({
     optionsSuccessStatus: 200
 }));
 
-app.options('*', cors());
-
 const apiRoutes = require('./routes/api');
 
 if (process.env.NODE_ENV === 'dev' || process.env.NODE_ENV === 'production') {
