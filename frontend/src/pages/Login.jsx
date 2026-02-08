@@ -70,7 +70,7 @@ const Login = () => {
                         </div>
                         <div>
                             <h1 className="text-4xl font-serif font-black text-primary tracking-tight mb-2">
-                                Cally
+                                Kalli
                             </h1>
                             <p className="text-primary/60 font-sans text-lg text-balance">
                                 Your gourmet AI nutrition companion.
@@ -127,7 +127,7 @@ const Login = () => {
 
                         <div className="mt-8 pt-6 border-t border-primary/5 text-center">
                             <p className="text-primary/40 text-sm mb-3 font-medium">
-                                {isSignup ? 'Already have an account?' : "New to Cally?"}
+                                {isSignup ? 'Already have an account?' : "New to Kalli?"}
                             </p>
                             <button
                                 onClick={() => setIsSignup(!isSignup)}

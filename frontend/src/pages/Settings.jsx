@@ -189,7 +189,7 @@ export default function Settings() {
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-surface shadow-sm border border-border mb-2">
                     <Database className="w-5 h-5 text-primary/40" />
                 </div>
-                <div className="font-serif font-bold text-primary text-lg">Cally System</div>
+                <div className="font-serif font-bold text-primary text-lg">Kalli System</div>
                 <div className="font-mono text-[10px] text-primary/40 tracking-wider">
                     CLIENT: {getVersionString()} | ENV: {environment}
                 </div>

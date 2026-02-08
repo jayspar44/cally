@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 const PAGE_TITLES = {
-    '/': 'Cally',
+    '/': 'Kalli',
     '/database': 'Food Log',
     '/insights': 'Insights',
     '/settings': 'Settings',
@@ -32,7 +32,7 @@ export default function TopBar() {
         return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const title = PAGE_TITLES[location.pathname] || 'Cally';
+    const title = PAGE_TITLES[location.pathname] || 'Kalli';
 
     return (
         <header

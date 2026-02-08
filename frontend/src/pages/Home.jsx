@@ -31,7 +31,7 @@ export default function Home() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <div className="font-serif text-primary/60 animate-pulse">Loading Cally...</div>
+        <div className="font-serif text-primary/60 animate-pulse">Loading Kalli...</div>
       </div>
     );
   }

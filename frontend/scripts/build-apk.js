@@ -38,7 +38,7 @@ const APK_OUTPUT_PATH = process.env.APK_OUTPUT_PATH || join(homedir(), 'apks');
 
 // App configuration - UPDATE THESE VALUES
 const APP_ID_BASE = 'com.cally.app';
-const APP_NAME = 'Cally';
+const APP_NAME = 'Kalli';
 
 // ANSI color codes
 const colors = {
