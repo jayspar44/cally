@@ -1,5 +1,4 @@
 const { db } = require('./firebase');
-const { getTodayStr } = require('../utils/dateUtils');
 
 const DEFAULT_GOALS = {
     targetCalories: 2000,
