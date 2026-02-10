@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
+import { toDateStr } from '../utils/dateUtils';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
 
@@ -11,11 +12,7 @@ export default function Home() {
   useEffect(() => {
     const fetchSummary = async () => {
       try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const today = `${year}-${month}-${day}`;
+        const today = toDateStr();
         const data = await api.getDailySummary(today);
         setDailySummary(data);
       } catch (error) {
@@ -113,7 +110,7 @@ export default function Home() {
       {/* Meals Feed */}
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
         <section className="space-y-4">
-          <h3 className="font-serif font-bold text-xl text-primary px-4">Recent Meals</h3>
+          <h3 className="font-serif font-bold text-xl text-primary px-4">Today's Meals</h3>
           <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
             {dailySummary.meals.map((meal, index) => (
               <MealItem key={index} meal={meal} />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/services';
 import { cn } from '../utils/cn';
+import { toDateStr, isToday as isTodayUtil, formatDateDisplay } from '../utils/dateUtils';
 import MealItem from '../components/ui/MealItem';
 import { HiChevronLeft, HiChevronRight, HiCalendarDays } from 'react-icons/hi2';
 
@@ -33,10 +34,7 @@ export default function Insights() {
         const fetchDaily = async () => {
             setLoadingDaily(true);
             try {
-                const year = selectedDate.getFullYear();
-                const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                const day = String(selectedDate.getDate()).padStart(2, '0');
-                const dateStr = `${year}-${month}-${day}`;
+                const dateStr = toDateStr(selectedDate);
 
                 const data = await api.getDailySummary(dateStr);
                 setDailySummary(data);
@@ -61,12 +59,7 @@ export default function Insights() {
         setSelectedDate(newDate);
     };
 
-    const isToday = (date) => {
-        const today = new Date();
-        return date.getDate() === today.getDate() &&
-            date.getMonth() === today.getMonth() &&
-            date.getFullYear() === today.getFullYear();
-    };
+    const isToday = (date) => isTodayUtil(date);
 
     if (loading) {
         return (
@@ -108,7 +101,7 @@ export default function Insights() {
                 <div className="flex justify-between items-end gap-2 mb-8 h-32 relative z-10">
                     {days.map((day, index) => {
                         const heightPercent = Math.min(100, (day.calories / goals.targetCalories) * 100);
-                        const isToday = new Date(day.date).getDate() === new Date().getDate();
+                        const isToday = isTodayUtil(day.date);
                         const hasData = day.calories > 0;
 
                         return (
@@ -142,7 +135,7 @@ export default function Insights() {
                                     "font-mono text-[10px] uppercase transition-colors",
                                     isToday ? "text-accent font-bold" : "text-primary/40"
                                 )}>
-                                    {new Date(day.date).toLocaleDateString([], { weekday: 'narrow' })}
+                                    {formatDateDisplay(day.date, { weekday: 'narrow' })}
                                 </span>
                             </div>
                         );

@@ -1,4 +1,5 @@
 const { db } = require('../services/firebase');
+const { toDateStr } = require('../utils/dateUtils');
 
 const DEFAULT_SETTINGS = {
     targetCalories: 2000,
@@ -25,7 +26,7 @@ const updateProfile = async (req, res) => {
         };
 
         if (!userDoc.exists) {
-            userData.registeredDate = new Date().toISOString().split('T')[0];
+            userData.registeredDate = toDateStr();
             userData.settings = {
                 ...DEFAULT_SETTINGS,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
@@ -60,7 +61,7 @@ const getProfile = async (req, res) => {
             return res.json({
                 firstName: '',
                 email: req.user.email,
-                registeredDate: new Date().toISOString().split('T')[0],
+                registeredDate: toDateStr(),
                 settings: DEFAULT_SETTINGS
             });
         }
@@ -69,7 +70,7 @@ const getProfile = async (req, res) => {
         res.json({
             firstName: data.firstName || '',
             email: data.email || req.user.email,
-            registeredDate: data.registeredDate || data.updatedAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+            registeredDate: data.registeredDate || data.updatedAt?.split('T')[0] || toDateStr(),
             settings: data.settings || DEFAULT_SETTINGS
         });
     } catch (error) {

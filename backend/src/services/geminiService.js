@@ -1,6 +1,7 @@
 const { GoogleGenAI } = require('@google/genai');
 const logger = require('../logger');
 const { executeTool, toolDeclarations } = require('../agents/agentTools');
+const { getTodayStr } = require('../utils/dateUtils');
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -80,9 +81,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
     try {
         const modelName = MODELS.flash;
 
-        const today = userTimezone
-            ? new Date().toLocaleDateString('en-CA', { timeZone: userTimezone })
-            : new Date().toISOString().split('T')[0];
+        const today = getTodayStr(userTimezone);
 
         const contents = [
             { role: 'user', parts: [{ text: 'Current Date: ' + today + '\nUser Timezone: ' + (userTimezone || 'UTC') + '\n\n' + SYSTEM_PROMPT }] },
@@ -307,9 +306,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
 
 const buildContextMessage = (message, userProfile) => {
     const settings = userProfile?.settings || {};
-    const today = userProfile?.timezone
-        ? new Date().toLocaleDateString('en-CA', { timeZone: userProfile.timezone })
-        : new Date().toISOString().split('T')[0];
+    const today = getTodayStr(userProfile?.timezone);
 
     let context = `[Context: Today is ${today}.`;
 

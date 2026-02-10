@@ -3,6 +3,7 @@ import { api } from '../api/services';
 import FoodEditModal from '../components/common/FoodEditModal';
 import { Pencil, Trash2, Search } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { parseLocalDate, formatDateDisplay, formatTime } from '../utils/dateUtils';
 
 export default function Database() {
     const [logs, setLogs] = useState([]);
@@ -33,8 +34,8 @@ export default function Database() {
             });
 
             setLogs(flattenedLogs.sort((a, b) => {
-                const timeA = new Date(a.createdAt || a.date).getTime();
-                const timeB = new Date(b.createdAt || b.date).getTime();
+                const timeA = (a.createdAt ? new Date(a.createdAt) : parseLocalDate(a.date)).getTime();
+                const timeB = (b.createdAt ? new Date(b.createdAt) : parseLocalDate(b.date)).getTime();
                 return timeB - timeA; // Descending
             }));
         } catch (error) {
@@ -136,11 +137,10 @@ export default function Database() {
                                 logs.map((log) => (
                                     <tr key={log.id} className="group hover:bg-primary/5 transition-colors duration-200">
                                         <td className="px-4 py-3 font-mono text-xs text-primary/70 whitespace-nowrap">
-                                            {/* Fix Date Offset: Append T00:00:00 to force local timezone interpretation instead of UTC */}
-                                            {new Date(log.date + 'T00:00:00').toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
+                                            {formatDateDisplay(log.date, { month: '2-digit', day: '2-digit' })}
                                         </td>
                                         <td className="px-4 py-3 font-mono text-xs text-primary/40 whitespace-nowrap">
-                                            {log.createdAt ? new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                                            {log.createdAt ? formatTime(log.createdAt) : '-'}
                                         </td>
                                         <td className="px-4 py-3 font-sans text-xs font-semibold text-primary/80 capitalize">
                                             {log.meal}
@@ -164,7 +164,7 @@ export default function Database() {
                                             {Math.round(log.fat)}
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() => handleEdit(log)}
                                                     className="p-1.5 text-primary/40 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"

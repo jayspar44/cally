@@ -2,16 +2,10 @@ const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const logger = require('../logger');
+const { getTodayStr } = require('../utils/dateUtils');
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
-
-const getTodayDate = (userTimezone) => {
-    if (userTimezone) {
-        return new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
-    }
-    return new Date().toISOString().split('T')[0];
-};
 
 const toolDeclarations = [
     {
@@ -191,7 +185,7 @@ const logFood = async (args, userId, userTimezone) => {
     }
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     const batch = db.batch();
@@ -308,7 +302,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
     let { query, date } = args;
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     try {
@@ -395,7 +389,7 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
     let { date } = args;
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     const snapshot = await db.collection('users').doc(userId)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toDateStr } from '../../utils/dateUtils';
 
 export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initialData }) {
     const [formData, setFormData] = useState({
@@ -24,7 +25,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                 carbs: initialData.carbs || 0,
                 fat: initialData.fat || 0,
                 meal: initialData.meal || 'snack',
-                date: initialData.date || new Date().toISOString().split('T')[0]
+                date: initialData.date || toDateStr()
             });
         }
     }, [initialData]);
@@ -52,8 +53,8 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-surface rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-surface rounded-t-2xl sm:rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom sm:zoom-in duration-200 sm:m-4 max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-primary">Edit Food Log</h2>
                     <button onClick={onClose} className="text-primary/50 hover:text-primary/80">
@@ -63,7 +64,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                <form onSubmit={handleSubmit} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
                     {/* Name */}
                     <div>
                         <label className="block text-sm font-medium text-primary/80 mb-1">Food Name</label>

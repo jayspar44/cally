@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '../../utils/cn';
+import { formatTime } from '../../utils/dateUtils';
 import FoodLogCard from './FoodLogCard';
 
 import { Trash2 } from 'lucide-react';
@@ -88,7 +89,3 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
     );
 }
 
-function formatTime(timestamp) {
-    if (!timestamp) return '';
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}

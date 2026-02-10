@@ -1,4 +1,5 @@
 const { db } = require('../services/firebase');
+const { toDateStr, parseLocalDate } = require('../utils/dateUtils');
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -114,8 +115,8 @@ const getWeeklyTrends = async (req, res) => {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 6);
 
-        const startStr = startDate.toISOString().split('T')[0];
-        const endStr = endDate.toISOString().split('T')[0];
+        const startStr = toDateStr(startDate);
+        const endStr = toDateStr(endDate);
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -127,7 +128,7 @@ const getWeeklyTrends = async (req, res) => {
 
         const byDate = {};
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dateStr = d.toISOString().split('T')[0];
+            const dateStr = toDateStr(d);
             byDate[dateStr] = { calories: 0, protein: 0, carbs: 0, fat: 0, meals: new Set() };
         }
 
@@ -181,8 +182,8 @@ const getMonthlyTrends = async (req, res) => {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 29);
 
-        const startStr = startDate.toISOString().split('T')[0];
-        const endStr = endDate.toISOString().split('T')[0];
+        const startStr = toDateStr(startDate);
+        const endStr = toDateStr(endDate);
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -194,7 +195,7 @@ const getMonthlyTrends = async (req, res) => {
 
         const weeks = [{}, {}, {}, {}, {}];
         logs.forEach(log => {
-            const logDate = new Date(log.date);
+            const logDate = parseLocalDate(log.date);
             const daysSinceStart = Math.floor((logDate - startDate) / (1000 * 60 * 60 * 24));
             const weekIndex = Math.min(4, Math.floor(daysSinceStart / 7));
 

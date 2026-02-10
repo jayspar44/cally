@@ -309,6 +309,7 @@ Auto-invoked skills (brainstorming, TDD, debugging, verification, etc.) activate
 - **Tailwind CSS v4**: Uses `@theme` directive in `index.css` — no `tailwind.config.js`. Theme tokens defined as CSS variables.
 - **Dark mode**: Class strategy via `@custom-variant dark (&:is(.dark *))` with `.dark` on `<html>`. Color overrides in `html.dark {}` block in `index.css`. Semi-transparent whites (e.g., `bg-white/10`) need explicit `dark:bg-surface/10` since CSS variable swap doesn't handle opacity-based colors.
 - **Chat page spacer**: 200px base + ResizeObserver delta from input container height. Observer depends on `[initialized]` dep — must re-run after loading spinner replaced by full UI.
+- **Date parsing**: Never use `new Date("YYYY-MM-DD")` or `toISOString().split('T')[0]` directly. Import helpers from `utils/dateUtils.js` — `parseLocalDate()` for parsing, `toDateStr()` for formatting. See dateUtils files for full API.
 - **React 19**: No `import React` needed — JSX transform handles it automatically.
 
 ## Coding Conventions
