@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.2](https://github.com/jayspar44/cally/compare/v0.1.1...v0.1.2) (2026-02-10)
+
+
+### Features
+
+* add user-level structured logging with AsyncLocalStorage context bd661de
+
+
+### Bug Fixes
+
+* accumulate multiple logFood calls and support multi-meal summary cards b4b06ac
+* make login page scrollable when mobile keyboard opens dcfd7e1
+* remove unused getTodayStr import in goalsService 3d3e859
+
 ### [0.1.1](https://github.com/jayspar44/cally/compare/v0.1.0...v0.1.1) (2026-02-10)
 
 
