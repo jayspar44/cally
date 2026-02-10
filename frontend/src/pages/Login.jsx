@@ -51,16 +51,19 @@ const Login = () => {
     };
 
     return (
-        <MobileContainer>
-            <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
+        <MobileContainer className="overflow-y-auto">
+            <div className="min-h-[100dvh] flex flex-col items-center p-6 bg-background relative overflow-hidden">
                 {/* Background Decor */}
                 <div className="absolute top-[-10%] right-[-10%] w-[50vh] h-[50vh] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[50vh] h-[50vh] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Version string */}
-                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
+                <div className="z-10 pt-2">
                     <p className="text-primary/30 font-mono text-[10px] tracking-widest uppercase">{getVersionString()}</p>
                 </div>
+
+                {/* Spacer — centers content vertically, collapses when keyboard shrinks viewport */}
+                <div className="flex-1" />
 
                 <div className="w-full max-w-sm z-10">
                     {/* Header */}
@@ -138,6 +141,9 @@ const Login = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Bottom spacer */}
+                <div className="flex-1" />
             </div>
         </MobileContainer>
     );
