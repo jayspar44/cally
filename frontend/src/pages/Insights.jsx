@@ -69,7 +69,7 @@ export default function Insights() {
         );
     }
 
-    const goals = { targetCalories: 2000 };
+    const goals = weeklyTrends?.goals || { targetCalories: 2000 };
     // Defensively handle null weeklyTrends
     const days = weeklyTrends?.days || [];
     const averages = weeklyTrends?.averages || { calories: 0 };

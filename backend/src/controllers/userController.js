@@ -1,11 +1,9 @@
 const { db } = require('../services/firebase');
-const { toDateStr } = require('../utils/dateUtils');
+const { toDateStr, getTodayStr } = require('../utils/dateUtils');
+const { DEFAULT_GOALS, snapshotGoals } = require('../services/goalsService');
 
 const DEFAULT_SETTINGS = {
-    targetCalories: 2000,
-    targetProtein: 50,
-    targetCarbs: 250,
-    targetFat: 65,
+    ...DEFAULT_GOALS,
     timezone: 'America/New_York',
     notificationsEnabled: true
 };
@@ -40,6 +38,9 @@ const updateProfile = async (req, res) => {
         if (settings) {
             const existingSettings = userDoc.exists ? (userDoc.data().settings || {}) : (userData.settings || {});
             userData.settings = { ...existingSettings, ...settings };
+
+            const today = getTodayStr(userData.settings.timezone || DEFAULT_SETTINGS.timezone);
+            await snapshotGoals(uid, today, userData.settings);
         }
 
         await db.collection('users').doc(uid).set(userData, { merge: true });

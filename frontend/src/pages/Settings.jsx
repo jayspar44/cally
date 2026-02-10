@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
-import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database } from 'lucide-react';
+import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target } from 'lucide-react';
 import { getVersionString, getEnvironment, getBackendInfo } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
@@ -13,11 +13,32 @@ export default function Settings() {
     const { user, logout } = useAuth();
     // Theme context kept for compatibility, though we enforce specific theme now
     const { isDark, toggleTheme } = useTheme();
-    const { firstName, saveFirstName, developerMode, setDeveloperMode } = useUserPreferences();
+    const { firstName, saveFirstName, developerMode, setDeveloperMode, settings, updateProfileConfig } = useUserPreferences();
 
     const [editingName, setEditingName] = useState(false);
     const [nameInput, setNameInput] = useState(firstName);
     const [savingName, setSavingName] = useState(false);
+
+    const [editingNutrition, setEditingNutrition] = useState(false);
+    const [nutritionForm, setNutritionForm] = useState({
+        targetCalories: 2000,
+        targetProtein: 50,
+        targetCarbs: 250,
+        targetFat: 65
+    });
+    const [savingNutrition, setSavingNutrition] = useState(false);
+
+    useEffect(() => {
+        if (settings) {
+            setNutritionForm(prev => ({
+                ...prev,
+                targetCalories: settings.targetCalories ?? 2000,
+                targetProtein: settings.targetProtein ?? 50,
+                targetCarbs: settings.targetCarbs ?? 250,
+                targetFat: settings.targetFat ?? 65
+            }));
+        }
+    }, [settings]);
 
     const handleLogout = async () => {
         if (confirm('Are you sure you want to sign out?')) {
@@ -48,6 +69,25 @@ export default function Settings() {
             alert('Failed to save name');
         }
         setSavingName(false);
+    };
+
+    const handleSaveNutrition = async () => {
+        setSavingNutrition(true);
+        try {
+            await updateProfileConfig({
+                settings: {
+                    targetCalories: parseInt(nutritionForm.targetCalories),
+                    targetProtein: parseInt(nutritionForm.targetProtein),
+                    targetCarbs: parseInt(nutritionForm.targetCarbs),
+                    targetFat: parseInt(nutritionForm.targetFat),
+                }
+            });
+            setEditingNutrition(false);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to save nutrition targets');
+        }
+        setSavingNutrition(false);
     };
 
     const backendInfo = getBackendInfo();
@@ -115,6 +155,97 @@ export default function Settings() {
                     </div>
                     <span className="font-mono text-xs text-primary/60">{user?.email}</span>
                 </div>
+            </Section>
+
+            {/* Nutrition Targets */}
+            <Section title="Nutrition Targets">
+                <div className="flex items-center justify-between py-2">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary">
+                            <Target className="w-5 h-5" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-sans text-sm font-medium text-primary">Daily Goals</span>
+                            <span className="font-mono text-xs text-primary/40">Calorie & Macro Targets</span>
+                        </div>
+                    </div>
+                    {editingNutrition ? (
+                        <button
+                            onClick={handleSaveNutrition}
+                            disabled={savingNutrition}
+                            className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                            <Check className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setEditingNutrition(true)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-primary/5 transition-colors group"
+                        >
+                            <span className="font-serif font-bold text-primary group-hover:text-accent transition-colors">Edit</span>
+                        </button>
+                    )}
+                </div>
+
+                {editingNutrition ? (
+                    <div className="grid grid-cols-2 gap-4 pt-4 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Calories</label>
+                            <input
+                                type="number"
+                                value={nutritionForm.targetCalories}
+                                onChange={e => setNutritionForm({...nutritionForm, targetCalories: e.target.value})}
+                                className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Protein (g)</label>
+                            <input
+                                type="number"
+                                value={nutritionForm.targetProtein}
+                                onChange={e => setNutritionForm({...nutritionForm, targetProtein: e.target.value})}
+                                className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Carbs (g)</label>
+                            <input
+                                type="number"
+                                value={nutritionForm.targetCarbs}
+                                onChange={e => setNutritionForm({...nutritionForm, targetCarbs: e.target.value})}
+                                className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Fat (g)</label>
+                            <input
+                                type="number"
+                                value={nutritionForm.targetFat}
+                                onChange={e => setNutritionForm({...nutritionForm, targetFat: e.target.value})}
+                                className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-4 gap-2 pt-4">
+                        <div className="text-center p-2 rounded-lg bg-primary/5">
+                            <div className="font-mono text-lg font-bold text-primary">{nutritionForm.targetCalories}</div>
+                            <div className="text-[9px] uppercase font-bold text-primary/40 tracking-wider">Kcal</div>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-primary/5">
+                            <div className="font-mono text-lg font-bold text-primary">{nutritionForm.targetProtein}</div>
+                            <div className="text-[9px] uppercase font-bold text-primary/40 tracking-wider">Prot</div>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-primary/5">
+                            <div className="font-mono text-lg font-bold text-primary">{nutritionForm.targetCarbs}</div>
+                            <div className="text-[9px] uppercase font-bold text-primary/40 tracking-wider">Carb</div>
+                        </div>
+                        <div className="text-center p-2 rounded-lg bg-primary/5">
+                            <div className="font-mono text-lg font-bold text-primary">{nutritionForm.targetFat}</div>
+                            <div className="text-[9px] uppercase font-bold text-primary/40 tracking-wider">Fat</div>
+                        </div>
+                    </div>
+                )}
             </Section>
 
             {/* System Preferences */}

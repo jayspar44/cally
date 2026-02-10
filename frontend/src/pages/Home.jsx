@@ -34,7 +34,7 @@ export default function Home() {
   }
 
   const summary = dailySummary?.summary || { totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 };
-  const goals = dailySummary?.goals || { targetCalories: 2000, targetProtein: 150, targetCarbs: 200, targetFat: 65 };
+  const goals = dailySummary?.goals || { targetCalories: 2000, targetProtein: 50, targetCarbs: 250, targetFat: 65 };
   const progress = dailySummary?.progress || { calories: 0, protein: 0, carbs: 0, fat: 0 };
   const remainingCalories = Math.round(goals.targetCalories - summary.totalCalories);
 

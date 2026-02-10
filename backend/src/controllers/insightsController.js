@@ -1,5 +1,6 @@
 const { db } = require('../services/firebase');
-const { toDateStr, parseLocalDate } = require('../utils/dateUtils');
+const { toDateStr, parseLocalDate, getTodayStr } = require('../utils/dateUtils');
+const { getGoalsForDate, snapshotGoals, getUserSettings } = require('../services/goalsService');
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -69,15 +70,14 @@ const getDailySummary = async (req, res) => {
 
         summary.mealCount = meals.length;
 
-        const userDoc = await db.collection('users').doc(userId).get();
-        const settings = userDoc.exists ? userDoc.data().settings : {};
+        const settings = await getUserSettings(userId);
+        const goals = await getGoalsForDate(userId, date, settings);
 
-        const goals = {
-            targetCalories: settings.targetCalories || 2000,
-            targetProtein: settings.targetProtein || 50,
-            targetCarbs: settings.targetCarbs || 250,
-            targetFat: settings.targetFat || 65
-        };
+        // Lock in today's goals on first access
+        const today = getTodayStr(settings.timezone);
+        if (date === today) {
+            await snapshotGoals(userId, today, settings);
+        }
 
         const remaining = {
             calories: goals.targetCalories - summary.totalCalories,
@@ -160,12 +160,16 @@ const getWeeklyTrends = async (req, res) => {
             fat: Math.round(totals.fat / daysWithData)
         };
 
+        const settings = await getUserSettings(userId);
+        const goals = await getGoalsForDate(userId, toDateStr(), settings);
+
         res.json({
             startDate: startStr,
             endDate: endStr,
             days,
             totals,
             averages,
+            goals,
             daysTracked: daysWithData
         });
     } catch (error) {

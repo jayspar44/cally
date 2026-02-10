@@ -1,6 +1,7 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
+const { getGoalsForDate, getUserSettings } = require('../services/goalsService');
 const logger = require('../logger');
 const { getTodayStr } = require('../utils/dateUtils');
 
@@ -445,18 +446,10 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
 };
 
 const getUserGoals = async (userId) => {
-    const userDoc = await db.collection('users').doc(userId).get();
-    const settings = userDoc.exists ? userDoc.data().settings : {};
-
-    return {
-        success: true,
-        data: {
-            targetCalories: settings.targetCalories || 2000,
-            targetProtein: settings.targetProtein || 50,
-            targetCarbs: settings.targetCarbs || 250,
-            targetFat: settings.targetFat || 65
-        }
-    };
+    const settings = await getUserSettings(userId);
+    const today = getTodayStr(settings.timezone);
+    const goals = await getGoalsForDate(userId, today, settings);
+    return { success: true, data: goals };
 };
 
 module.exports = {
