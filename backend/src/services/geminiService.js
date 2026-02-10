@@ -70,6 +70,20 @@ const SYSTEM_PROMPT = `You are Cally, an expert AI nutrition companion. You help
     3.  Once you have the specific \`logId\`, use the \`updateFoodLog\` tool to make the changes.
 - **NEVER** guess the \`logId\`. Always search first.`;
 
+const mergeFoodLogs = (existing, incoming) => {
+    if (!existing) return incoming;
+    return {
+        date: existing.date,
+        meal: existing.meal === incoming.meal ? existing.meal : 'mixed',
+        items: [...existing.items, ...incoming.items],
+        count: existing.count + incoming.count,
+        totalCalories: existing.totalCalories + incoming.totalCalories,
+        totalProtein: existing.totalProtein + incoming.totalProtein,
+        totalCarbs: existing.totalCarbs + incoming.totalCarbs,
+        totalFat: existing.totalFat + incoming.totalFat,
+    };
+};
+
 const buildChatHistory = (messages) => {
     return messages.map(msg => ({
         role: msg.role === 'assistant' ? 'model' : 'user',
@@ -139,7 +153,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
 
                 if (call.name === 'logFood' && toolResult.success) {
-                    foodLog = toolResult.data;
+                    foodLog = mergeFoodLogs(foodLog, toolResult.data);
                 }
 
                 functionResponses.push({
@@ -252,7 +266,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
 
                 if (call.name === 'logFood' && toolResult.success) {
-                    foodLog = toolResult.data;
+                    foodLog = mergeFoodLogs(foodLog, toolResult.data);
                 }
 
                 functionResponses.push({
