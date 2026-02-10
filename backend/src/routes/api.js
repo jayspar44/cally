@@ -16,6 +16,7 @@ router.get('/health', (req, res) => res.json({
 }));
 
 router.use(verifyToken);
+router.use(require('../middleware/requestLogger').requestLogger);
 
 router.post('/user/profile', updateProfile);
 router.get('/user/profile', getProfile);

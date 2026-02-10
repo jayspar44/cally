@@ -16,6 +16,8 @@ const getDailySummary = async (req, res) => {
         const userId = req.user.uid;
         const { date } = req.params;
 
+        req.log.info({ action: 'insights.getDailySummary', date }, 'Fetching daily summary');
+
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: 'Valid date (YYYY-MM-DD) required' });
         }
@@ -93,6 +95,13 @@ const getDailySummary = async (req, res) => {
             fat: Math.min(100, (summary.totalFat / goals.targetFat) * 100)
         };
 
+        req.log.info({
+            action: 'insights.getDailySummary',
+            date,
+            totalCalories: summary.totalCalories,
+            mealCount: summary.mealCount
+        }, 'Daily summary fetched');
+
         res.json({
             date,
             summary,
@@ -110,6 +119,8 @@ const getDailySummary = async (req, res) => {
 const getWeeklyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
+
+        req.log.info({ action: 'insights.getWeeklyTrends' }, 'Fetching weekly trends');
 
         const endDate = new Date();
         const startDate = new Date();
@@ -163,6 +174,12 @@ const getWeeklyTrends = async (req, res) => {
         const settings = await getUserSettings(userId);
         const goals = await getGoalsForDate(userId, toDateStr(), settings);
 
+        req.log.info({
+            action: 'insights.getWeeklyTrends',
+            daysTracked: daysWithData,
+            avgCalories: averages.calories
+        }, 'Weekly trends fetched');
+
         res.json({
             startDate: startStr,
             endDate: endStr,
@@ -181,6 +198,8 @@ const getWeeklyTrends = async (req, res) => {
 const getMonthlyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
+
+        req.log.info({ action: 'insights.getMonthlyTrends' }, 'Fetching monthly trends');
 
         const endDate = new Date();
         const startDate = new Date();
@@ -236,6 +255,12 @@ const getMonthlyTrends = async (req, res) => {
             carbs: Math.round(totals.carbs / daysWithData),
             fat: Math.round(totals.fat / daysWithData)
         };
+
+        req.log.info({
+            action: 'insights.getMonthlyTrends',
+            daysTracked: daysWithData,
+            avgCalories: averages.calories
+        }, 'Monthly trends fetched');
 
         res.json({
             startDate: startStr,

@@ -2,7 +2,7 @@ const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const { getGoalsForDate, getUserSettings } = require('../services/goalsService');
-const logger = require('../logger');
+const { getLogger } = require('../logger');
 const { getTodayStr } = require('../utils/dateUtils');
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -165,7 +165,7 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
     } catch (error) {
-        logger.error({ err: error, toolName }, 'Tool execution failed');
+        getLogger().error({ err: error, toolName }, 'Tool execution failed');
         return { success: false, error: error.message };
     }
 };
@@ -178,7 +178,7 @@ const logFood = async (args, userId, userTimezone) => {
     if (meal) {
         meal = meal.toLowerCase();
         if (!VALID_MEALS.includes(meal)) {
-            logger.warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
+            getLogger().warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
             meal = 'snack';
         }
     } else {
@@ -193,7 +193,7 @@ const logFood = async (args, userId, userTimezone) => {
     const createdIds = [];
 
     if ((!items || items.length === 0) && args.foodName) {
-        logger.info('Detected flat food arguments, converting to items array');
+        getLogger().info('Detected flat food arguments, converting to items array');
         items = [{
             name: args.foodName,
             quantity: args.quantity || 1,
@@ -207,7 +207,7 @@ const logFood = async (args, userId, userTimezone) => {
     }
 
     if (!items || !Array.isArray(items)) {
-        logger.warn({ args }, 'logFood called without valid items array');
+        getLogger().warn({ args }, 'logFood called without valid items array');
         items = [];
     }
 
@@ -244,6 +244,15 @@ const logFood = async (args, userId, userTimezone) => {
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
     await batch.commit();
+
+    getLogger().info({
+        action: 'tool.logFood',
+        date,
+        meal,
+        logIds: createdIds.map(i => i.id),
+        items: items.map(i => ({ name: i.name, calories: i.calories })),
+        totalCalories: Math.round(totals.calories)
+    }, 'Food logged via AI tool');
 
     return {
         success: true,
@@ -343,7 +352,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
             }
         };
     } catch (error) {
-        logger.error({ err: error }, 'Error searching food logs');
+        getLogger().error({ err: error }, 'Error searching food logs');
         return { success: false, error: 'Failed to search logs' };
     }
 };
@@ -377,6 +386,13 @@ const updateFoodLog = async (args, userId) => {
 
     cleanUpdates.updatedAt = FieldValue.serverTimestamp();
     cleanUpdates.corrected = true;
+
+    getLogger().info({
+        action: 'tool.updateFoodLog',
+        logId,
+        fields: Object.keys(cleanUpdates).filter(k => k !== 'updatedAt' && k !== 'corrected'),
+        updates: cleanUpdates
+    }, 'Updating food log via AI tool');
 
     await docRef.update(cleanUpdates);
 

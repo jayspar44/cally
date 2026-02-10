@@ -1,4 +1,5 @@
 require('dotenv').config({ quiet: true });
+const crypto = require('node:crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -64,6 +65,9 @@ app.use(pinoHttp({
     logger,
     autoLogging: false,
     quietReqLogger: true,
+    genReqId: (req) => req.headers['x-cloud-trace-context']?.split('/')[0]
+        || req.headers['x-request-id']
+        || crypto.randomUUID(),
     serializers: {
         req: (req) => ({ method: req.method, url: req.url }),
         res: (res) => ({ statusCode: res.statusCode })

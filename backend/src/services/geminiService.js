@@ -1,5 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
-const logger = require('../logger');
+const { getLogger } = require('../logger');
 const { executeTool, toolDeclarations } = require('../agents/agentTools');
 const { getTodayStr } = require('../utils/dateUtils');
 
@@ -110,7 +110,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         const getResponseText = (response) => {
             const candidate = response.candidates?.[0];
             if (candidate?.finishReason !== 'STOP') {
-                logger.warn({
+                getLogger().warn({
                     finishReason: candidate?.finishReason,
                     safetyRatings: candidate?.safetyRatings
                 }, 'Gemini generation finished potentially incomplete');
@@ -147,7 +147,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                logger.info({ tool: call.name }, 'Executing tool');
+                getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
@@ -195,7 +195,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             foodLog
         };
     } catch (error) {
-        logger.error({
+        getLogger().error({
             err: error,
             errorMessage: error.message,
             errorStatus: error.status,
@@ -207,7 +207,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
 const processImageMessage = async (message, imageBase64, chatHistory, userProfile, userId, userTimezone) => {
     const modelName = MODELS.pro;
-    logger.info({ modelName, hasMessage: !!message }, 'Processing image message');
+    getLogger().info({ modelName, hasMessage: !!message }, 'Processing image message');
 
     try {
         const parts = [];
@@ -260,7 +260,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                logger.info({ tool: call.name }, 'Executing tool');
+                getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
@@ -308,7 +308,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             foodLog
         };
     } catch (error) {
-        logger.error({
+        getLogger().error({
             err: error,
             errorMessage: error.message,
             errorStatus: error.status,

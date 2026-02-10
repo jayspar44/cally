@@ -13,6 +13,11 @@ const updateProfile = async (req, res) => {
         const { uid, email } = req.user;
         const { firstName, settings } = req.body;
 
+        req.log.info({
+            action: 'user.updateProfile',
+            settingKeys: settings ? Object.keys(settings) : []
+        }, 'Updating user profile');
+
         if (!uid) {
             return res.status(400).json({ error: 'User ID missing from token' });
         }
@@ -45,6 +50,8 @@ const updateProfile = async (req, res) => {
 
         await db.collection('users').doc(uid).set(userData, { merge: true });
 
+        req.log.info({ action: 'user.updateProfile' }, 'User profile updated');
+
         res.json({ success: true, message: 'Profile updated' });
     } catch (error) {
         req.log.error({ err: error }, 'Error updating profile');
@@ -56,9 +63,12 @@ const getProfile = async (req, res) => {
     try {
         const { uid } = req.user;
 
+        req.log.info({ action: 'user.getProfile' }, 'Fetching user profile');
+
         const doc = await db.collection('users').doc(uid).get();
 
         if (!doc.exists) {
+            req.log.info({ action: 'user.getProfile', profileExists: false }, 'Profile fetched (default)');
             return res.json({
                 firstName: '',
                 email: req.user.email,
@@ -66,6 +76,8 @@ const getProfile = async (req, res) => {
                 settings: DEFAULT_SETTINGS
             });
         }
+
+        req.log.info({ action: 'user.getProfile', profileExists: true }, 'Profile fetched');
 
         const data = doc.data();
         res.json({

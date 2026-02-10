@@ -22,4 +22,13 @@ const logger = pino({
     })
 });
 
+const { getRequestContext } = require('./requestContext');
+
+const getLogger = () => {
+    const ctx = getRequestContext();
+    if (ctx.userId) return logger.child({ userId: ctx.userId, requestId: ctx.requestId });
+    return logger;
+};
+
 module.exports = logger;
+module.exports.getLogger = getLogger;
