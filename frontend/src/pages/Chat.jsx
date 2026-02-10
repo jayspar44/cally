@@ -5,15 +5,28 @@ import ChatInput from '../components/chat/ChatInput';
 import FoodEditModal from '../components/common/FoodEditModal';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
+import { AlertCircle } from 'lucide-react';
 
 export default function Chat() {
-    const { messages, setMessages, loading, sending, error, initialized, loadHistory, sendMessage } = useChat();
+    const { messages, setMessages, loading, sending, error, setError, initialized, loadHistory, sendMessage, retryMessage } = useChat();
     const messagesEndRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
+    const errorTimerRef = useRef(null);
 
     useEffect(() => {
         if (!initialized) loadHistory();
     }, [initialized, loadHistory]);
+
+    // Auto-dismiss error banner after 5 seconds
+    useEffect(() => {
+        if (error) {
+            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+            errorTimerRef.current = setTimeout(() => setError(null), 5000);
+        }
+        return () => {
+            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        };
+    }, [error, setError]);
 
     const isInitialLoad = useRef(true);
 
@@ -100,9 +113,9 @@ export default function Chat() {
     const handleUpdateLog = async (itemId, updates) => {
         try {
             await api.updateFoodLog(itemId, updates);
-            // Ideally notify user or optimistic update
         } catch (err) {
             logger.error('Failed to update log:', err);
+            setError('Failed to update food log');
         }
     };
 
@@ -111,6 +124,7 @@ export default function Chat() {
             await api.deleteFoodLog(itemId);
         } catch (err) {
             logger.error('Failed to delete log:', err);
+            setError('Failed to delete food log');
         }
     };
 
@@ -169,20 +183,26 @@ export default function Chat() {
                         message={message}
                         onEditLog={(log) => setEditingFoodLog(log)}
                         onDelete={() => handleDeleteMessage(message.id)}
+                        onRetry={retryMessage}
                     />
                 ))}
 
-                {sending && (
-                    <div className="flex justify-start mb-6 px-4">
-                        <span className="font-mono text-xs text-primary/40 animate-pulse">
-                            Analyzing input...
-                        </span>
+                {/* Processing indicator */}
+                {sending && !messages.some(m => m.status === 'sending') && (
+                    <div className="flex items-center gap-2.5 px-4 mb-6 animate-in fade-in duration-300">
+                        <div className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0ms]" />
+                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:150ms]" />
+                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:300ms]" />
+                        </div>
+                        <span className="text-sm text-primary/60">Kalli is thinking...</span>
                     </div>
                 )}
 
                 {error && (
-                    <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-xs px-4 py-2 rounded-full text-center mb-4 border border-red-100 dark:border-red-500/20">
-                        {error}
+                    <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm px-4 py-2.5 rounded-xl text-center mb-4 border border-red-100 dark:border-red-500/20 flex items-center justify-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{error}</span>
                     </div>
                 )}
 

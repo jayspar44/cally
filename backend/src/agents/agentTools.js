@@ -11,7 +11,7 @@ const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 
 const toolDeclarations = [
     {
         name: 'logFood',
-        description: 'Log a food entry to the user\'s food log. Use this when the user tells you what they ate and you have identified the food and quantities.',
+        description: 'Log a NEW food entry to the user\'s food log. Use ONLY when the user tells you what they ate and you need to create a new record. The nutrition values you pass MUST match what you quoted to the user. NEVER use this to correct or adjust an existing entry — use updateFoodLog instead.',
         parameters: {
             type: 'object',
             properties: {
@@ -143,6 +143,20 @@ const toolDeclarations = [
             type: 'object',
             properties: {}
         }
+    },
+    {
+        name: 'deleteFoodLog',
+        description: 'Permanently delete a food log entry. IMPORTANT: You MUST confirm with the user before calling this tool. Always use searchFoodLogs first to find the correct logId, show the user what you plan to delete, and only proceed after explicit confirmation.',
+        parameters: {
+            type: 'object',
+            properties: {
+                logId: {
+                    type: 'string',
+                    description: 'ID of the food log entry to delete. Must be obtained from searchFoodLogs.'
+                }
+            },
+            required: ['logId']
+        }
     }
 ];
 
@@ -161,6 +175,8 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
                 return await getUserGoals(userId);
             case 'searchFoodLogs':
                 return await searchFoodLogs(args, userId, userTimezone);
+            case 'deleteFoodLog':
+                return await deleteFoodLog(args, userId);
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
@@ -256,6 +272,7 @@ const logFood = async (args, userId, userTimezone) => {
 
     return {
         success: true,
+        message: `Logged ${createdIds.length} item(s) for ${meal}: ${Math.round(totals.calories)} cal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fat)}g fat.`,
         data: {
             date,
             meal,
@@ -326,6 +343,25 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
         }
 
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!query) {
+            return {
+                success: true,
+                data: {
+                    count: logs.length,
+                    date,
+                    matches: logs.map(m => ({
+                        id: m.id,
+                        name: m.name,
+                        meal: m.meal,
+                        quantity: m.quantity,
+                        unit: m.unit,
+                        calories: m.calories,
+                        time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
+                    }))
+                }
+            };
+        }
+
         const lowerQuery = query.toLowerCase();
 
         const matches = logs.filter(log => {
@@ -360,6 +396,10 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
 const updateFoodLog = async (args, userId) => {
     const { logId, updates } = args;
 
+    if (!logId) {
+        return { success: false, error: 'logId is required. Use searchFoodLogs to find the correct ID first.' };
+    }
+
     const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(logId);
     const doc = await docRef.get();
 
@@ -367,16 +407,19 @@ const updateFoodLog = async (args, userId) => {
         return { success: false, error: 'Food log item not found. Please use searchFoodLogs to find the correct ID first.' };
     }
 
+    // AI may pass fields directly in args or nested under updates
+    const source = updates && typeof updates === 'object' ? updates : args;
+
     const cleanUpdates = {};
 
-    if (updates.items && Array.isArray(updates.items) && updates.items.length > 0) {
-        const item = updates.items[0];
+    if (source.items && Array.isArray(source.items) && source.items.length > 0) {
+        const item = source.items[0];
         Object.keys(item).forEach(k => {
             if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = item[k];
         });
     } else {
-        Object.keys(updates).forEach(k => {
-            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = updates[k];
+        Object.keys(source).forEach(k => {
+            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = source[k];
         });
     }
 
@@ -399,6 +442,36 @@ const updateFoodLog = async (args, userId) => {
     return {
         success: true,
         data: { id: logId, updated: true, fields: Object.keys(cleanUpdates) }
+    };
+};
+
+const deleteFoodLog = async (args, userId) => {
+    const { logId } = args;
+
+    if (!logId) {
+        return { success: false, error: 'logId is required. Use searchFoodLogs to find the correct ID first.' };
+    }
+
+    const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(logId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+        return { success: false, error: 'Food log entry not found. Use searchFoodLogs to verify the ID.' };
+    }
+
+    const data = doc.data();
+
+    await docRef.delete();
+
+    getLogger().info({
+        action: 'tool.deleteFoodLog',
+        logId,
+        deletedItem: { name: data.name, meal: data.meal, calories: data.calories, date: data.date }
+    }, 'Food log deleted via AI tool');
+
+    return {
+        success: true,
+        data: { id: logId, deleted: true, name: data.name, meal: data.meal, calories: data.calories }
     };
 };
 

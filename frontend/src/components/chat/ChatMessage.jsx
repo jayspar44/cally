@@ -4,12 +4,13 @@ import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/dateUtils';
 import FoodLogCard from './FoodLogCard';
 
-import { Trash2 } from 'lucide-react';
+import { Trash2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
-export default function ChatMessage({ message, onEditLog, onDelete }) {
+export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
     const isUser = message.role === 'user';
-    const isPending = message.pending;
+    const isSending = message.status === 'sending';
+    const isFailed = message.status === 'failed';
     const { developerMode } = useUserPreferences();
 
     return (
@@ -18,21 +19,21 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
             isUser ? 'justify-end' : 'justify-start'
         )}>
             <div className={cn(
-                'max-w-[95%] sm:max-w-[95%] relative group', // INCREASED WIDTH (was 85%)
+                'max-w-[95%] sm:max-w-[95%] relative group',
                 isUser ? 'items-end' : 'items-start'
             )}>
                 {/* Bubble */}
                 <div className={cn(
-                    'px-4 py-3 shadow-sm backdrop-blur-sm relative', // Added relative for delete button positioning if needed
+                    'px-4 py-3 shadow-sm backdrop-blur-sm relative',
                     isUser
                         ? 'bg-primary text-primary-foreground dark:bg-[#232525] dark:text-[#E2E5E1] rounded-[1.25rem] rounded-tr-sm'
                         : 'bg-surface border border-border/60 rounded-[1.25rem] rounded-tl-sm',
-                    isPending && 'opacity-80'
+                    isSending && 'opacity-80'
                 )}>
                     {/* Content */}
                     <div className={cn(
                         "text-sm leading-relaxed break-words markdown-body",
-                        isUser && "text-white [&_*]:text-white/90" // Override markdown styles for user bubble
+                        isUser && "text-white [&_*]:text-white/90"
                     )}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {message.content}
@@ -51,6 +52,16 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
                         </div>
                     )}
 
+                    {/* Inline Error for Failed Messages */}
+                    {isFailed && message.errorMessage && (
+                        <div className="mt-2 pt-2 border-t border-red-300/30 dark:border-red-500/20 flex items-center gap-1.5">
+                            <AlertCircle className="w-3 h-3 text-red-400 dark:text-red-400 shrink-0" />
+                            <span className="text-[10px] text-red-400 dark:text-red-400">
+                                {message.errorMessage}
+                            </span>
+                        </div>
+                    )}
+
                     {/* Food Log Card (Assistant Only) */}
                     {!isUser && message.foodLog && (
                         <div className="mt-4 -mx-1">
@@ -59,7 +70,7 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
                     )}
 
                     {/* Developer Delete Button */}
-                    {developerMode && onDelete && !isPending && (
+                    {developerMode && onDelete && !isSending && !isFailed && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -76,16 +87,30 @@ export default function ChatMessage({ message, onEditLog, onDelete }) {
                     )}
                 </div>
 
-                {/* Timestamp (Outside Bubble) */}
+                {/* Timestamp & Status (Outside Bubble) */}
                 <div className={cn(
-                    'text-[10px] font-mono text-primary/30 mt-1 absolute -bottom-4 min-w-max',
-                    isUser ? 'right-2' : 'left-2'
+                    'text-[10px] font-mono mt-1 absolute -bottom-4 min-w-max flex items-center gap-1',
+                    isUser ? 'right-2' : 'left-2',
+                    isFailed ? 'text-red-500 dark:text-red-400' : 'text-primary/30'
                 )}>
-                    {formatTime(message.timestamp)}
-                    {isPending && ' • Sending...'}
+                    {isSending ? (
+                        <>
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            <span>Sending</span>
+                        </>
+                    ) : isFailed ? (
+                        <button
+                            onClick={() => onRetry?.(message.id)}
+                            className="flex items-center gap-1 text-accent hover:underline"
+                        >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            <span>Tap to retry</span>
+                        </button>
+                    ) : (
+                        formatTime(message.timestamp)
+                    )}
                 </div>
             </div>
         </div>
     );
 }
-
