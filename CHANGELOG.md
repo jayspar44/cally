@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.5](https://github.com/jayspar44/cally/compare/v0.1.4...v0.1.5) (2026-02-11)
+
+
+### Features
+
+* add chat-powered onboarding flow with updateUserProfile AI tool b9099ce
+
 ### [0.1.4](https://github.com/jayspar44/cally/compare/v0.1.3...v0.1.4) (2026-02-11)
 
 

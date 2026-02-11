@@ -1,6 +1,6 @@
 {
   "name": "cally",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "AI-based habit companion app",
   "main": "backend/src/index.js",
   "scripts": {
