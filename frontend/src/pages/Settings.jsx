@@ -225,7 +225,7 @@ export default function Settings() {
     const environment = getEnvironment();
 
     return (
-        <div className="space-y-8 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-6 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
             {/* User Profile Section */}
             <Section title="Profile Identity">
@@ -790,11 +790,11 @@ export default function Settings() {
 
 function Section({ title, children }) {
     return (
-        <div className="space-y-3">
+        <div className="space-y-2">
             <h3 className="px-4 font-sans text-[10px] uppercase tracking-[0.2em] font-bold text-primary/40">
                 {title}
             </h3>
-            <div className="bg-surface rounded-[2.5rem] p-6 shadow-card border border-border/40">
+            <div className="bg-surface rounded-[2rem] p-5 shadow-card border border-border/40">
                 {children}
             </div>
         </div>

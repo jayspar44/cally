@@ -21,16 +21,16 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
 
     return (
         <div className={cn(
-            'flex w-full mb-6',
+            'flex w-full mb-5',
             isUser ? 'justify-end' : 'justify-start'
         )}>
             <div className={cn(
-                'max-w-[95%] sm:max-w-[95%] relative group',
-                isUser ? 'items-end' : 'items-start'
+                'relative group',
+                isUser ? 'max-w-[85%] items-end' : 'max-w-[98%] items-start'
             )}>
                 {/* Bubble */}
                 <div className={cn(
-                    'px-4 py-3 shadow-sm backdrop-blur-sm relative',
+                    'px-3.5 py-2 shadow-sm backdrop-blur-sm relative',
                     isUser
                         ? 'bg-primary text-primary-foreground dark:bg-[#232525] dark:text-[#E2E5E1] rounded-[1.25rem] rounded-tr-sm'
                         : 'bg-surface border border-border/60 rounded-[1.25rem] rounded-tl-sm',
@@ -38,7 +38,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                 )}>
                     {/* Content */}
                     <div className={cn(
-                        "text-sm leading-relaxed break-words markdown-body",
+                        "text-sm leading-normal break-words markdown-body",
                         isUser && "text-white [&_*]:text-white/90"
                     )}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -70,7 +70,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
 
                     {/* Food Log Card (Assistant Only) */}
                     {!isUser && message.foodLog && (
-                        <div className="mt-4 -mx-1">
+                        <div className="mt-3 -mx-0.5">
                             <FoodLogCard foodLog={message.foodLog} onEdit={onEditLog} />
                         </div>
                     )}

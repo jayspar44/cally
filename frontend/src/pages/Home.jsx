@@ -45,17 +45,17 @@ export default function Home() {
   const remainingCalories = Math.round(goals.targetCalories - summary.totalCalories);
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 pb-8">
 
       {/* Onboarding Card */}
       {needsOnboarding && (
-        <section className="bg-surface rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
+        <section className="bg-surface rounded-[2rem] p-6 shadow-card relative overflow-hidden">
           <div className="flex flex-col items-center text-center">
-            <div className="w-14 h-14 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-5">
+            <div className="w-14 h-14 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-4">
               <Sparkles className="w-7 h-7 text-accent" />
             </div>
             <h2 className="font-serif font-black text-2xl text-primary mb-2">Get Personalized Coaching</h2>
-            <p className="font-sans text-primary/60 text-sm max-w-xs leading-relaxed mb-6">
+            <p className="font-sans text-primary/60 text-sm max-w-xs leading-snug mb-5">
               Share a few details and Kalli will calculate your ideal calorie and macro targets using science-backed formulas.
             </p>
             <button
@@ -70,15 +70,15 @@ export default function Home() {
       )}
 
       {/* Daily Summary Card */}
-      <section className="bg-surface rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
+      <section className="bg-surface rounded-[2rem] p-6 shadow-card relative overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-end mb-6">
           <div>
-            <h2 className="font-serif font-black text-3xl text-primary mb-1">Today's Fuel</h2>
+            <h2 className="font-serif font-black text-2xl text-primary mb-1">Today's Fuel</h2>
             <p className="font-sans text-primary/60 text-sm">Summary of your nutrition.</p>
           </div>
           <div className="text-right">
-            <span className="font-mono font-bold text-4xl text-primary block leading-none">
+            <span className="font-mono font-bold text-3xl text-primary block leading-none">
               {Math.round(summary.totalCalories)}
             </span>
             <span className="font-sans text-xs text-primary/40 uppercase tracking-widest font-semibold">
@@ -88,7 +88,7 @@ export default function Home() {
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex justify-between text-xs font-mono text-primary/60 mb-2">
             <span>0</span>
             <span>Goal: {goals.targetCalories}</span>
@@ -139,7 +139,7 @@ export default function Home() {
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
         <section className="space-y-4">
           <h3 className="font-serif font-bold text-xl text-primary px-4">Today's Meals</h3>
-          <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden divide-y divide-border">
+          <div className="bg-surface rounded-[2rem] shadow-card overflow-hidden divide-y divide-border">
             {dailySummary.meals.map((meal, index) => (
               <MealItem key={index} meal={meal} />
             ))}

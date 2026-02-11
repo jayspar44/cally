@@ -97,7 +97,7 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
     return (
         <form
             onSubmit={handleSubmit}
-            className="bg-accent/15 backdrop-blur-xl border border-accent/20 rounded-[2rem] p-3 shadow-[0_8px_32px_rgba(196,90,60,0.1)] relative z-10 transition-all duration-300 focus-within:bg-accent/20 focus-within:shadow-[0_8px_32px_rgba(196,90,60,0.15)]"
+            className="bg-accent/15 backdrop-blur-xl border border-accent/20 rounded-[1.5rem] p-2 shadow-[0_8px_32px_rgba(196,90,60,0.1)] relative z-10 transition-all duration-300 focus-within:bg-accent/20 focus-within:shadow-[0_8px_32px_rgba(196,90,60,0.15)]"
         >
             {/* Image Preview */}
             {imagePreview && (
@@ -117,14 +117,14 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
                 </div>
             )}
 
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2">
                 {/* Photo Button */}
                 <button
                     type="button"
                     onClick={handleCameraClick}
                     disabled={sending || disabled}
                     className={cn(
-                        'flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200',
+                        'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200',
                         'bg-primary/5 text-primary/60 border border-transparent',
                         'hover:bg-primary/10 hover:text-primary active:scale-95',
                         (sending || disabled) && 'opacity-50 cursor-not-allowed'
@@ -152,7 +152,7 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
                         disabled={sending || disabled}
                         rows={1}
                         className={cn(
-                            'w-full px-4 py-3 rounded-xl resize-none font-sans text-sm',
+                            'w-full px-3 py-2 rounded-lg resize-none font-sans text-sm',
                             'bg-surface text-primary placeholder-primary/40 shadow-sm',
                             'border-transparent focus:ring-2 focus:ring-primary/10 transition-all duration-200',
                             (sending || disabled) && 'opacity-50 cursor-not-allowed'
@@ -166,7 +166,7 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
                     type="submit"
                     disabled={sending || disabled || (!message.trim() && !imageBase64)}
                     className={cn(
-                        'flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300',
+                        'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-300',
                         'bg-accent text-white shadow-lg shadow-accent/20',
                         'hover:bg-accent/90 hover:shadow-accent/30 active:scale-95',
                         (sending || disabled || (!message.trim() && !imageBase64)) && 'opacity-50 cursor-not-allowed bg-gray-300 shadow-none'

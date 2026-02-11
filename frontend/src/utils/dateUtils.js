@@ -31,8 +31,13 @@ export const isToday = (date) => {
 export const formatDateDisplay = (dateStr, opts = {}) =>
     parseLocalDate(dateStr).toLocaleDateString(undefined, opts);
 
-/** Format a timestamp (ISO string / epoch) to local "HH:MM" time. */
+/** Format a timestamp (ISO string / epoch) to local "HH:MM" time, or "MM/DD HH:MM" for prior days. */
 export const formatTime = (timestamp) => {
     if (!timestamp) return '';
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const date = new Date(timestamp);
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (isToday(date)) return time;
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${m}/${d} ${time}`;
 };

@@ -82,10 +82,10 @@ export default function Chat() {
         }
     }, [messages]);
 
-    const [spacerHeight, setSpacerHeight] = useState(200);
+    const [spacerHeight, setSpacerHeight] = useState(150);
     const inputContainerRef = useRef(null);
     const initialHeightRef = useRef(null);
-    const prevSpacerHeightRef = useRef(200);
+    const prevSpacerHeightRef = useRef(150);
 
     useLayoutEffect(() => {
         const delta = spacerHeight - prevSpacerHeightRef.current;
@@ -115,7 +115,7 @@ export default function Chat() {
                     }
 
                     const delta = currentHeight - initialHeightRef.current;
-                    const newSpacer = 200 + delta;
+                    const newSpacer = 150 + delta;
 
                     setSpacerHeight(prev => {
                         if (Math.abs(prev - newSpacer) < 5) return prev;
@@ -181,7 +181,7 @@ export default function Chat() {
 
     return (
         <div className="flex flex-col relative min-h-full">
-            <div className="flex-1 px-2 py-4">
+            <div className="flex-1 px-0 py-2">
                 {messages.length === 0 && !needsOnboarding && (
                     <div className="flex flex-col items-center justify-center py-20 text-center px-4 animate-in fade-in duration-700">
                         <div className="w-16 h-16 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6">
@@ -221,7 +221,7 @@ export default function Chat() {
 
                 {/* Processing indicator */}
                 {sending && !messages.some(m => m.status === 'sending') && (
-                    <div className="flex items-center gap-2.5 px-4 mb-6 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-2.5 px-4 mb-5 animate-in fade-in duration-300">
                         <div className="flex items-center gap-1">
                             <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0ms]" />
                             <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:150ms]" />
@@ -239,7 +239,7 @@ export default function Chat() {
                 )}
 
                 <div
-                    style={{ height: `${spacerHeight}px` }}
+                    style={{ height: `calc(${spacerHeight}px + env(safe-area-inset-bottom))` }}
                     className="w-full"
                     aria-hidden="true"
                 />
@@ -250,7 +250,7 @@ export default function Chat() {
             <div
                 ref={inputContainerRef}
                 className="fixed left-1/2 -translate-x-1/2 w-full max-w-xl z-40 px-4 transition-all duration-300 pointer-events-auto"
-                style={{ bottom: '7rem' }}
+                style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
             >
                 <ChatInput
                     onSend={sendMessage}
