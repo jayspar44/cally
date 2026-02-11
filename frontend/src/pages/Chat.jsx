@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
+import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import ChatMessage from '../components/chat/ChatMessage';
 import ChatInput from '../components/chat/ChatInput';
 import FoodEditModal from '../components/common/FoodEditModal';
@@ -9,6 +11,11 @@ import { AlertCircle } from 'lucide-react';
 
 export default function Chat() {
     const { messages, setMessages, loading, sending, error, setError, initialized, loadHistory, sendMessage, retryMessage } = useChat();
+    const { biometrics, profileLoading, refreshProfile } = useUserPreferences();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
+    const [onboardingTriggered, setOnboardingTriggered] = useState(false);
     const messagesEndRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
     const errorTimerRef = useRef(null);
@@ -27,6 +34,31 @@ export default function Chat() {
             if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
         };
     }, [error, setError]);
+
+    // Trigger onboarding from Settings navigation
+    useEffect(() => {
+        if (location.state?.triggerOnboarding && initialized && !onboardingTriggered) {
+            setOnboardingTriggered(true);
+            navigate('/chat', { replace: true, state: {} });
+            sendMessage("I'd like to update my profile information");
+        }
+    }, [location.state, initialized, onboardingTriggered, navigate, sendMessage]);
+
+    // Auto-trigger onboarding for new users with no chat history
+    useEffect(() => {
+        if (needsOnboarding && initialized && messages.length === 0 && !onboardingTriggered && !sending) {
+            setOnboardingTriggered(true);
+            sendMessage("Hey Kalli, I'd like to get started!");
+        }
+    }, [needsOnboarding, initialized, messages.length, onboardingTriggered, sending, sendMessage]);
+
+    // Detect profileUpdated and refresh context
+    useEffect(() => {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg?.profileUpdated) {
+            refreshProfile();
+        }
+    }, [messages, refreshProfile]);
 
     const isInitialLoad = useRef(true);
 
@@ -150,7 +182,7 @@ export default function Chat() {
     return (
         <div className="flex flex-col relative min-h-full">
             <div className="flex-1 px-2 py-4">
-                {messages.length === 0 && (
+                {messages.length === 0 && !needsOnboarding && (
                     <div className="flex flex-col items-center justify-center py-20 text-center px-4 animate-in fade-in duration-700">
                         <div className="w-16 h-16 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6">
                             <span className="text-3xl">🥗</span>

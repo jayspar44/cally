@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api } from '../api/services';
 import { useAuth } from './AuthContext';
 import { logger } from '../utils/logger';
@@ -55,6 +55,20 @@ export const UserPreferencesProvider = ({ children }) => {
         fetchProfile();
     }, [user]);
 
+    const refreshProfile = useCallback(async () => {
+        try {
+            const data = await api.getUserProfile();
+            if (data) {
+                if (data.firstName !== undefined) setFirstName(data.firstName);
+                if (data.settings) setSettings(data.settings);
+                if (data.biometrics) setBiometrics(data.biometrics);
+                if (data.registeredDate) setRegisteredDate(data.registeredDate);
+            }
+        } catch (error) {
+            logger.error('Failed to refresh profile', error);
+        }
+    }, []);
+
     const saveFirstName = async (name) => {
         try {
             await api.updateUserProfile({ firstName: name });
@@ -93,7 +107,8 @@ export const UserPreferencesProvider = ({ children }) => {
         registeredDate,
         saveFirstName,
         updateProfileConfig,
-        profileLoading
+        profileLoading,
+        refreshProfile
     };
 
     return (

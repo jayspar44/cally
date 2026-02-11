@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
+import { useUserPreferences } from '../contexts/UserPreferencesContext';
+import { Sparkles } from 'lucide-react';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
 
 export default function Home() {
+  const navigate = useNavigate();
+  const { biometrics, profileLoading } = useUserPreferences();
+  const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
   const [dailySummary, setDailySummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,6 +46,28 @@ export default function Home() {
 
   return (
     <div className="space-y-8 pb-8">
+
+      {/* Onboarding Card */}
+      {needsOnboarding && (
+        <section className="bg-surface rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-14 h-14 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-5">
+              <Sparkles className="w-7 h-7 text-accent" />
+            </div>
+            <h2 className="font-serif font-black text-2xl text-primary mb-2">Get Personalized Coaching</h2>
+            <p className="font-sans text-primary/60 text-sm max-w-xs leading-relaxed mb-6">
+              Share a few details and Kalli will calculate your ideal calorie and macro targets using science-backed formulas.
+            </p>
+            <button
+              onClick={() => navigate('/chat')}
+              className="px-8 py-3 bg-accent text-white font-sans font-semibold rounded-2xl shadow-sm hover:bg-accent/90 transition-all active:scale-95"
+            >
+              Get Started
+            </button>
+          </div>
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+        </section>
+      )}
 
       {/* Daily Summary Card */}
       <section className="bg-surface rounded-[2.5rem] p-8 shadow-card relative overflow-hidden">

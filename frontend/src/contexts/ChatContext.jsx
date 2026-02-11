@@ -104,7 +104,8 @@ export const ChatProvider = ({ children }) => {
                         role: 'assistant',
                         content: response.response,
                         timestamp: new Date().toISOString(),
-                        foodLog: response.foodLog
+                        foodLog: response.foodLog,
+                        profileUpdated: (response.toolsUsed || []).includes('updateUserProfile')
                     }
                 ];
             });
@@ -168,7 +169,8 @@ export const ChatProvider = ({ children }) => {
                         role: 'assistant',
                         content: response.response,
                         timestamp: new Date().toISOString(),
-                        foodLog: response.foodLog
+                        foodLog: response.foodLog,
+                        profileUpdated: (response.toolsUsed || []).includes('updateUserProfile')
                     }
                 ];
             });

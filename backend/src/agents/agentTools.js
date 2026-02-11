@@ -1,7 +1,8 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
-const { getGoalsForDate, getUserSettings } = require('../services/goalsService');
+const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
+const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
 const { getLogger } = require('../logger');
 const { getTodayStr } = require('../utils/dateUtils');
 
@@ -157,6 +158,42 @@ const toolDeclarations = [
             },
             required: ['logId']
         }
+    },
+    {
+        name: 'updateUserProfile',
+        description: 'Save or update user profile including name, body measurements, and fitness goals. When recalculateTargets is true, calculates personalized nutrition targets using the Mifflin-St Jeor equation and saves them. IMPORTANT: Only call this AFTER the user has confirmed the proposed values — never call it speculatively.',
+        parameters: {
+            type: 'object',
+            properties: {
+                firstName: { type: 'string', description: "User's preferred name" },
+                biometrics: {
+                    type: 'object',
+                    description: 'Body metrics and goals',
+                    properties: {
+                        weight: { type: 'number' },
+                        weightUnit: { type: 'string', enum: ['lbs', 'kg'] },
+                        height: { type: 'number', description: 'Total inches or cm' },
+                        heightUnit: { type: 'string', enum: ['in', 'cm'] },
+                        age: { type: 'number' },
+                        gender: { type: 'string', enum: ['male', 'female', 'other'] },
+                        goalType: { type: 'string', enum: ['lose_weight', 'maintain', 'gain_muscle'] },
+                        activityLevel: { type: 'string', enum: ['sedentary', 'lightly_active', 'moderately_active', 'very_active'] }
+                    }
+                },
+                targetOverrides: {
+                    type: 'object',
+                    description: 'Optional user overrides for calculated targets',
+                    properties: {
+                        targetCalories: { type: 'number' },
+                        targetProtein: { type: 'number' },
+                        targetCarbs: { type: 'number' },
+                        targetFat: { type: 'number' }
+                    }
+                },
+                recalculateTargets: { type: 'boolean', description: 'Calculate recommended nutrition targets from biometrics. Default true.' }
+            },
+            required: ['biometrics']
+        }
     }
 ];
 
@@ -177,6 +214,8 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
                 return await searchFoodLogs(args, userId, userTimezone);
             case 'deleteFoodLog':
                 return await deleteFoodLog(args, userId);
+            case 'updateUserProfile':
+                return await updateUserProfile(args, userId, userTimezone);
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
@@ -539,6 +578,85 @@ const getUserGoals = async (userId) => {
     const today = getTodayStr(settings.timezone);
     const goals = await getGoalsForDate(userId, today, settings);
     return { success: true, data: goals };
+};
+
+const updateUserProfile = async (args, userId, userTimezone) => {
+    const { firstName, biometrics, targetOverrides, recalculateTargets = true } = args;
+
+    if (!biometrics || !biometrics.weight) {
+        return { success: false, error: 'Weight is required in biometrics.' };
+    }
+
+    const normalizedBio = {
+        weight: biometrics.weight,
+        weightUnit: biometrics.weightUnit || 'lbs',
+        height: biometrics.height || null,
+        heightUnit: biometrics.heightUnit || 'in',
+        age: biometrics.age || null,
+        gender: biometrics.gender || null,
+        goalType: biometrics.goalType || 'maintain',
+        activityLevel: biometrics.activityLevel || 'sedentary',
+    };
+
+    const updateData = { biometrics: normalizedBio };
+    if (firstName) updateData.firstName = firstName;
+
+    let targets = null;
+    let calculationDetails = null;
+
+    if (recalculateTargets) {
+        const result = calculateRecommendedTargets(normalizedBio);
+        if (result.error) {
+            return { success: false, error: result.error };
+        }
+
+        targets = {
+            targetCalories: result.targetCalories,
+            targetProtein: result.targetProtein,
+            targetCarbs: result.targetCarbs,
+            targetFat: result.targetFat,
+        };
+        calculationDetails = result.calculationDetails;
+
+        // Apply user overrides on top of calculated values
+        if (targetOverrides) {
+            if (targetOverrides.targetCalories) targets.targetCalories = targetOverrides.targetCalories;
+            if (targetOverrides.targetProtein) targets.targetProtein = targetOverrides.targetProtein;
+            if (targetOverrides.targetCarbs) targets.targetCarbs = targetOverrides.targetCarbs;
+            if (targetOverrides.targetFat) targets.targetFat = targetOverrides.targetFat;
+        }
+
+        // Preserve existing settings (timezone, etc.) and merge targets
+        const userRef = db.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        const existingSettings = userDoc.exists ? (userDoc.data().settings || {}) : {};
+        updateData.settings = { ...existingSettings, ...targets };
+
+        // Snapshot goals for today
+        const todayStr = getTodayStr(userTimezone);
+        await snapshotGoals(userId, todayStr, updateData.settings);
+    }
+
+    await db.collection('users').doc(userId).set(updateData, { merge: true });
+
+    getLogger().info({
+        action: 'tool.updateUserProfile',
+        userId,
+        firstName: firstName || undefined,
+        biometrics: normalizedBio,
+        targets,
+    }, 'User profile updated via AI tool');
+
+    return {
+        success: true,
+        message: 'Profile updated successfully.',
+        data: {
+            firstName: firstName || undefined,
+            biometrics: normalizedBio,
+            targets,
+            calculationDetails,
+        }
+    };
 };
 
 module.exports = {

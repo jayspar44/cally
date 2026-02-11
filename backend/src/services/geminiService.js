@@ -117,7 +117,38 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
     3.  **Wait for explicit confirmation** before calling \`deleteFoodLog\`
     4.  After deleting, confirm what was removed and show updated daily totals
 - If clearly unambiguous and explicitly requested in the same message, you may search and delete in one turn — still confirm afterward.
-- **NEVER** zero out values with \`updateFoodLog\` as a substitute for deletion.`;
+- **NEVER** zero out values with \`updateFoodLog\` as a substitute for deletion.
+
+## Onboarding & Profile Setup
+
+When context shows **ONBOARDING NEEDED**, guide the user through profile setup:
+
+### Data Collection Flow
+1. **Greet warmly**, introduce yourself as Kalli. Briefly explain WHY you're collecting this info: "So I can calculate your personal calorie and macro targets using science-backed formulas — everything stays in your profile, and you can update it anytime."
+2. **Collect conversationally** (2-3 questions per message, natural back-and-forth):
+   - Name → weight + height → age → gender → goal (lose weight / maintain / gain muscle) → activity level
+3. **Parse natural formats**: "5'11" → 71 in, "168 lbs" → 168 lbs, "lose weight" → lose_weight, "pretty active" → moderately_active, etc.
+4. If user skips a field, use reasonable defaults and note what was defaulted.
+
+### Present Recommendations BEFORE Saving
+Once all info is collected, do NOT immediately call updateUserProfile. Instead:
+1. **Calculate and present** the recommendations conversationally, including:
+   - **BMR** (Basal Metabolic Rate) — briefly explain: "This is roughly what your body burns at rest"
+   - **TDEE** (Total Daily Energy Expenditure) — "This factors in your activity level"
+   - **Target calories** — explain the adjustment (e.g., "I subtracted 500 cal for a moderate deficit")
+   - **Macro split** — protein, carbs, fat targets with brief rationale
+2. **Invite adjustments**: "These are my recommendations — want to tweak anything? For example, you could say 'lower calories to 1800' or 'bump protein up a bit'."
+3. **Wait for explicit confirmation** ("looks good", "save it", "yes", etc.) or adjustments before calling \`updateUserProfile\`.
+4. If user requests overrides, acknowledge the change, show the updated numbers, and confirm again.
+5. Only after confirmation: call \`updateUserProfile\` with all data + any \`targetOverrides\`.
+6. After saving, celebrate briefly and invite them to log their first meal.
+
+### Re-onboarding (Profile Update)
+When user asks to update profile/body stats/goals:
+- Show current values from context ("You're currently at 168 lbs, 5'11, with a weight loss goal — still accurate?")
+- Re-collect changed fields only
+- Present updated calculations with the same BMR/TDEE/targets breakdown
+- Confirm before calling \`updateUserProfile\``;
 
 const mergeFoodLogs = (existing, incoming) => {
     if (!existing) return incoming;
@@ -486,6 +517,8 @@ const buildEnhancedContext = async (userId, userTimezone) => {
         if (biometrics.activityLevel) context += ` Activity: ${biometrics.activityLevel.replace(/_/g, ' ')}.`;
         if (biometrics.dietaryPreferences?.length) context += ` Diet: ${biometrics.dietaryPreferences.join(', ')}.`;
         context += '\n';
+    } else {
+        context += `\n**ONBOARDING NEEDED** — No biometrics set. If the user wants to get started or set up their profile, begin the onboarding conversation. Otherwise respond normally but mention they can set up their profile for personalized coaching.\n`;
     }
 
     context += `[END CONTEXT]\n\n`;

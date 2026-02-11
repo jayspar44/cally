@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
-import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target, Scale, Calculator } from 'lucide-react';
+import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
 import { getVersionString, getEnvironment, getBackendInfo } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
@@ -182,6 +182,24 @@ export default function Settings() {
         });
         setEditingNutrition(true);
         setRecommendedTargets(null);
+    };
+
+    const handleClearBiometrics = async () => {
+        if (!confirm('Clear all body stats? This will remove your biometrics and reset to the onboarding state.')) return;
+        try {
+            await updateProfileConfig({ biometrics: { weight: null, weightUnit: 'lbs', height: null, heightUnit: 'in', age: null, gender: null, goalType: null, activityLevel: null } });
+        } catch {
+            alert('Failed to clear biometrics');
+        }
+    };
+
+    const handleResetTargets = async () => {
+        if (!confirm('Reset nutrition targets to defaults (2000 cal, 50g protein, 250g carbs, 65g fat)?')) return;
+        try {
+            await updateProfileConfig({ settings: { targetCalories: 2000, targetProtein: 50, targetCarbs: 250, targetFat: 65 } });
+        } catch {
+            alert('Failed to reset targets');
+        }
     };
 
     const GENDER_LABELS = {
@@ -460,6 +478,24 @@ export default function Settings() {
                         </div>
                     </div>
                 )}
+
+                <div className="h-px bg-border/50 my-4" />
+
+                <button
+                    onClick={() => navigate('/chat', { state: { triggerOnboarding: true } })}
+                    className="w-full flex items-center justify-between py-2 group"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                            <MessageSquare className="w-5 h-5" />
+                        </div>
+                        <div className="flex flex-col items-start">
+                            <span className="font-sans text-sm font-medium text-primary">Update via Chat</span>
+                            <span className="font-mono text-xs text-primary/40">Let Kalli walk you through it</span>
+                        </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-primary/30 group-hover:text-accent transition-colors" />
+                </button>
             </Section>
 
             {/* Nutrition Targets */}
@@ -681,6 +717,46 @@ export default function Settings() {
                     </div>
                     <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
                 </button>
+
+                {developerMode && (
+                    <>
+                        <div className="h-px bg-border/50 my-2" />
+
+                        <button
+                            onClick={handleClearBiometrics}
+                            className="w-full flex items-center justify-between py-2 group text-red-600 dark:text-red-400 hover:text-red-700 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
+                                    <RotateCcw className="w-5 h-5" />
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-sans text-sm font-medium">Clear Biometrics</span>
+                                    <span className="font-sans text-xs opacity-60">Reset body stats to trigger onboarding</span>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+                        </button>
+
+                        <div className="h-px bg-border/50 my-2" />
+
+                        <button
+                            onClick={handleResetTargets}
+                            className="w-full flex items-center justify-between py-2 group text-red-600 dark:text-red-400 hover:text-red-700 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
+                                    <RotateCcw className="w-5 h-5" />
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-sans text-sm font-medium">Reset Nutrition Targets</span>
+                                    <span className="font-sans text-xs opacity-60">Revert to default 2000 cal / 50p / 250c / 65f</span>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    </>
+                )}
             </Section>
 
             {/* System Info */}

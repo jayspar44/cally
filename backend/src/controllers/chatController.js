@@ -77,7 +77,8 @@ const sendMessage = async (req, res) => {
             userMessageId: userMsgDoc.id,
             assistantMessageId: assistantMsgDoc.id,
             response: response.text,
-            foodLog: response.foodLog || null
+            foodLog: response.foodLog || null,
+            toolsUsed: response.toolsUsed || []
         });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to process message');
