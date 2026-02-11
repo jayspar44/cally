@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.1.4](https://github.com/jayspar44/cally/compare/v0.1.3...v0.1.4) (2026-02-11)
+
+
+### Features
+
+* transform AI into proactive nutrition coach with biometrics support f671dd0
+
+
+### Bug Fixes
+
+* prevent AI hallucinated food logging and strip HTML tags from chat responses a946839
+
 ### [0.1.3](https://github.com/jayspar44/cally/compare/v0.1.2...v0.1.3) (2026-02-10)
 
 
