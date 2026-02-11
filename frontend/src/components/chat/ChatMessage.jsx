@@ -7,6 +7,12 @@ import FoodLogCard from './FoodLogCard';
 import { Trash2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
+// Strip <details>...</details> HTML blocks that Gemini sometimes includes in responses
+const stripDetailsBlocks = (content) => {
+    if (!content) return '';
+    return content.replace(/<details>[\s\S]*?<\/details>/gi, '').trim();
+};
+
 export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
     const isUser = message.role === 'user';
     const isSending = message.status === 'sending';
@@ -36,7 +42,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                         isUser && "text-white [&_*]:text-white/90"
                     )}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {message.content}
+                            {isUser ? message.content : stripDetailsBlocks(message.content)}
                         </ReactMarkdown>
                     </div>
 
