@@ -69,6 +69,7 @@ cp frontend/.env.local.template frontend/.env.local
 npm run dev:local          # Both servers
 npm run dev:frontend       # Frontend only
 npm run dev:backend        # Backend only
+npm run dev:local:kill     # Kill running dev servers
 ```
 
 ## Environment Variables

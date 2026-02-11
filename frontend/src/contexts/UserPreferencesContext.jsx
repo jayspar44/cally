@@ -16,6 +16,7 @@ export const UserPreferencesProvider = ({ children }) => {
 
     const [firstName, setFirstName] = useState('');
     const [settings, setSettings] = useState(null);
+    const [biometrics, setBiometrics] = useState({});
     const [registeredDate, setRegisteredDate] = useState(null);
     const [profileLoading, setProfileLoading] = useState(false);
 
@@ -35,6 +36,7 @@ export const UserPreferencesProvider = ({ children }) => {
                     if (data) {
                         if (data.firstName !== undefined) setFirstName(data.firstName);
                         if (data.settings) setSettings(data.settings);
+                        if (data.biometrics) setBiometrics(data.biometrics);
                         if (data.registeredDate) setRegisteredDate(data.registeredDate);
                     }
                 } catch (error) {
@@ -45,6 +47,7 @@ export const UserPreferencesProvider = ({ children }) => {
             } else {
                 setFirstName('');
                 setSettings(null);
+                setBiometrics({});
                 setRegisteredDate(null);
             }
         };
@@ -70,6 +73,9 @@ export const UserPreferencesProvider = ({ children }) => {
             if (updates.settings) {
                 setSettings(prev => ({ ...prev, ...updates.settings }));
             }
+            if (updates.biometrics) {
+                setBiometrics(prev => ({ ...prev, ...updates.biometrics }));
+            }
             if (updates.registeredDate !== undefined) setRegisteredDate(updates.registeredDate);
             return true;
         } catch (e) {
@@ -83,6 +89,7 @@ export const UserPreferencesProvider = ({ children }) => {
         setDeveloperMode,
         firstName,
         settings,
+        biometrics,
         registeredDate,
         saveFirstName,
         updateProfileConfig,

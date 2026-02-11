@@ -1,6 +1,7 @@
 const { db } = require('../services/firebase');
 const { toDateStr, getTodayStr } = require('../utils/dateUtils');
 const { DEFAULT_GOALS, snapshotGoals } = require('../services/goalsService');
+const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
 
 const DEFAULT_SETTINGS = {
     ...DEFAULT_GOALS,
@@ -11,7 +12,7 @@ const DEFAULT_SETTINGS = {
 const updateProfile = async (req, res) => {
     try {
         const { uid, email } = req.user;
-        const { firstName, settings } = req.body;
+        const { firstName, settings, biometrics } = req.body;
 
         req.log.info({
             action: 'user.updateProfile',
@@ -48,6 +49,11 @@ const updateProfile = async (req, res) => {
             await snapshotGoals(uid, today, userData.settings);
         }
 
+        if (biometrics) {
+            const existingBiometrics = userDoc.exists ? (userDoc.data().biometrics || {}) : {};
+            userData.biometrics = { ...existingBiometrics, ...biometrics };
+        }
+
         await db.collection('users').doc(uid).set(userData, { merge: true });
 
         req.log.info({ action: 'user.updateProfile' }, 'User profile updated');
@@ -73,7 +79,8 @@ const getProfile = async (req, res) => {
                 firstName: '',
                 email: req.user.email,
                 registeredDate: toDateStr(),
-                settings: DEFAULT_SETTINGS
+                settings: DEFAULT_SETTINGS,
+                biometrics: {}
             });
         }
 
@@ -84,7 +91,8 @@ const getProfile = async (req, res) => {
             firstName: data.firstName || '',
             email: data.email || req.user.email,
             registeredDate: data.registeredDate || data.updatedAt?.split('T')[0] || toDateStr(),
-            settings: data.settings || DEFAULT_SETTINGS
+            settings: data.settings || DEFAULT_SETTINGS,
+            biometrics: data.biometrics || {}
         });
     } catch (error) {
         req.log.error({ err: error }, 'Error fetching profile');
@@ -92,7 +100,35 @@ const getProfile = async (req, res) => {
     }
 };
 
+const getRecommendedTargets = async (req, res) => {
+    try {
+        const { uid } = req.user;
+
+        req.log.info({ action: 'user.getRecommendedTargets' }, 'Calculating recommended targets');
+
+        const doc = await db.collection('users').doc(uid).get();
+        const biometrics = doc.exists ? (doc.data().biometrics || {}) : {};
+
+        if (!biometrics.weight) {
+            return res.status(400).json({ error: 'Weight is required. Please set your body stats in Settings first.' });
+        }
+
+        const result = calculateRecommendedTargets(biometrics);
+
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
+        }
+
+        req.log.info({ action: 'user.getRecommendedTargets' }, 'Recommended targets calculated');
+        res.json(result);
+    } catch (error) {
+        req.log.error({ err: error }, 'Error calculating recommended targets');
+        res.status(500).json({ error: 'Failed to calculate recommended targets' });
+    }
+};
+
 module.exports = {
     updateProfile,
-    getProfile
+    getProfile,
+    getRecommendedTargets
 };
