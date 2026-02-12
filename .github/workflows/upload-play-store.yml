@@ -184,9 +184,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          # Decode keystore to app directory
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
+          # Decode keystore to app directory (printf avoids echo mangling base64)
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore
           ls -la app/release.keystore
+
+          # Validate keystore was decoded correctly
+          if ! keytool -list -keystore app/release.keystore -storepass "$KEYSTORE_PASSWORD" -storetype PKCS12 > /dev/null 2>&1; then
+            echo "ERROR: Failed to read keystore. Check KEYSTORE_BASE64 and KEYSTORE_PASSWORD secrets."
+            exit 1
+          fi
+          echo "✓ Keystore validated successfully"
 
           # Update versionCode (run_number * 100 - allows ~100 manual uploads between CI runs)
           VERSION_CODE=$(( ${{ github.run_number }} * 100 ))
@@ -197,29 +204,26 @@ jobs:
 
           echo "Set versionCode=$VERSION_CODE (run #${{ github.run_number }} x 100), versionName=${{ steps.version.outputs.version }}"
 
-          # Write signing credentials to gradle.properties (more reliable for special chars)
-          echo "" >> gradle.properties
-          echo "# Signing credentials (added by CI)" >> gradle.properties
-          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> gradle.properties
-          echo "KEY_ALIAS=$KEY_ALIAS" >> gradle.properties
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> gradle.properties
+          # Write signing credentials to gradle.properties
+          cat >> gradle.properties << PROPS
+
+          # Signing credentials (added by CI)
+          KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}
+          KEY_ALIAS=${KEY_ALIAS}
+          KEY_PASSWORD=${KEY_PASSWORD}
+          PROPS
           echo "✓ Signing credentials written to gradle.properties"
 
-          # Add signing config to build.gradle that reads from project properties
-          sed -i '/buildTypes {/i\
-              signingConfigs {\
-                  release {\
-                      storeFile file("release.keystore")\
-                      storePassword project.hasProperty("KEYSTORE_PASSWORD") ? project.KEYSTORE_PASSWORD : ""\
-                      keyAlias project.hasProperty("KEY_ALIAS") ? project.KEY_ALIAS : ""\
-                      keyPassword project.hasProperty("KEY_PASSWORD") ? project.KEY_PASSWORD : ""\
-                  }\
-              }' app/build.gradle
+          # Inject signingConfigs block before buildTypes in build.gradle
+          SIGNING_BLOCK='    signingConfigs {\n        release {\n            storeFile file("release.keystore")\n            storeType "PKCS12"\n            storePassword project.hasProperty("KEYSTORE_PASSWORD") ? project.KEYSTORE_PASSWORD : ""\n            keyAlias project.hasProperty("KEY_ALIAS") ? project.KEY_ALIAS : ""\n            keyPassword project.hasProperty("KEY_PASSWORD") ? project.KEY_PASSWORD : ""\n        }\n    }\n'
+          sed -i "s|    buildTypes {|${SIGNING_BLOCK}    buildTypes {|" app/build.gradle
 
           # Update release buildType to use signing config
           sed -i '/release {/,/}/ s/minifyEnabled false/signingConfig signingConfigs.release\n            minifyEnabled false/' app/build.gradle
 
           echo "✓ Updated build.gradle with signing config"
+          echo "--- build.gradle signing section ---"
+          grep -A 12 "signingConfigs" app/build.gradle || echo "WARNING: signingConfigs not found"
 
       - name: Build Release AAB
         working-directory: frontend/android
