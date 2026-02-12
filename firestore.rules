@@ -14,11 +14,6 @@ service cloud.firestore {
       match /chatHistory/{messageId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
-
-      // Daily goals subcollection - per-day nutrition target snapshots
-      match /dailyGoals/{goalDate} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
     }
 
     // Deny all other access by default

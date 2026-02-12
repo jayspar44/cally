@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from '../api/services';
 import { useAuth } from './AuthContext';
 import { logger } from '../utils/logger';
@@ -15,8 +15,6 @@ export const UserPreferencesProvider = ({ children }) => {
     });
 
     const [firstName, setFirstName] = useState('');
-    const [settings, setSettings] = useState(null);
-    const [biometrics, setBiometrics] = useState({});
     const [registeredDate, setRegisteredDate] = useState(null);
     const [profileLoading, setProfileLoading] = useState(false);
 
@@ -35,8 +33,6 @@ export const UserPreferencesProvider = ({ children }) => {
 
                     if (data) {
                         if (data.firstName !== undefined) setFirstName(data.firstName);
-                        if (data.settings) setSettings(data.settings);
-                        if (data.biometrics) setBiometrics(data.biometrics);
                         if (data.registeredDate) setRegisteredDate(data.registeredDate);
                     }
                 } catch (error) {
@@ -46,28 +42,12 @@ export const UserPreferencesProvider = ({ children }) => {
                 }
             } else {
                 setFirstName('');
-                setSettings(null);
-                setBiometrics({});
                 setRegisteredDate(null);
             }
         };
 
         fetchProfile();
     }, [user]);
-
-    const refreshProfile = useCallback(async () => {
-        try {
-            const data = await api.getUserProfile();
-            if (data) {
-                if (data.firstName !== undefined) setFirstName(data.firstName);
-                if (data.settings) setSettings(data.settings);
-                if (data.biometrics) setBiometrics(data.biometrics);
-                if (data.registeredDate) setRegisteredDate(data.registeredDate);
-            }
-        } catch (error) {
-            logger.error('Failed to refresh profile', error);
-        }
-    }, []);
 
     const saveFirstName = async (name) => {
         try {
@@ -84,12 +64,6 @@ export const UserPreferencesProvider = ({ children }) => {
         try {
             await api.updateUserProfile(updates);
             if (updates.firstName !== undefined) setFirstName(updates.firstName);
-            if (updates.settings) {
-                setSettings(prev => ({ ...prev, ...updates.settings }));
-            }
-            if (updates.biometrics) {
-                setBiometrics(prev => ({ ...prev, ...updates.biometrics }));
-            }
             if (updates.registeredDate !== undefined) setRegisteredDate(updates.registeredDate);
             return true;
         } catch (e) {
@@ -102,13 +76,10 @@ export const UserPreferencesProvider = ({ children }) => {
         developerMode,
         setDeveloperMode,
         firstName,
-        settings,
-        biometrics,
         registeredDate,
         saveFirstName,
         updateProfileConfig,
-        profileLoading,
-        refreshProfile
+        profileLoading
     };
 
     return (

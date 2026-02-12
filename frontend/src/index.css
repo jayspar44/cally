@@ -147,11 +147,11 @@ html.dark {
 
   /* Markdown Styles for Chat */
   .markdown-body {
-    @apply text-primary/90 font-sans leading-normal;
+    @apply text-primary/90 font-sans leading-relaxed;
   }
 
   .markdown-body p {
-    @apply mb-1.5 last:mb-0;
+    @apply mb-3 last:mb-0;
   }
 
   .markdown-body strong {
@@ -159,15 +159,15 @@ html.dark {
   }
 
   .markdown-body ul {
-    @apply list-disc list-outside ml-3 mb-1.5;
+    @apply list-disc list-outside ml-4 mb-3;
   }
 
   .markdown-body ol {
-    @apply list-decimal list-outside ml-3 mb-1.5;
+    @apply list-decimal list-outside ml-4 mb-3;
   }
 
   .markdown-body li {
-    @apply mb-0.5;
+    @apply mb-1;
   }
 
   .markdown-body a {

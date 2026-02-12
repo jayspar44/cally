@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/services';
 import FoodEditModal from '../components/common/FoodEditModal';
-import { Pencil, Trash2, Search, X } from 'lucide-react';
+import { Pencil, Trash2, Search } from 'lucide-react';
 import { cn } from '../utils/cn';
-import { parseLocalDate, formatDateDisplay, formatTime } from '../utils/dateUtils';
 
 export default function Database() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchLogs = async () => {
         setLoading(true);
@@ -35,8 +33,8 @@ export default function Database() {
             });
 
             setLogs(flattenedLogs.sort((a, b) => {
-                const timeA = (a.createdAt ? new Date(a.createdAt) : parseLocalDate(a.date)).getTime();
-                const timeB = (b.createdAt ? new Date(b.createdAt) : parseLocalDate(b.date)).getTime();
+                const timeA = new Date(a.createdAt || a.date).getTime();
+                const timeB = new Date(b.createdAt || b.date).getTime();
                 return timeB - timeA; // Descending
             }));
         } catch (error) {
@@ -84,13 +82,6 @@ export default function Database() {
         }
     };
 
-    const filteredLogs = searchQuery.trim()
-        ? logs.filter(log => {
-            const q = searchQuery.toLowerCase();
-            return log.name?.toLowerCase().includes(q) || log.meal?.toLowerCase().includes(q);
-        })
-        : logs;
-
     if (loading && logs.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
@@ -108,21 +99,11 @@ export default function Database() {
                 <input
                     type="text"
                     placeholder="Search logs..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-surface rounded-xl pl-10 pr-10 py-3 font-sans text-sm text-primary placeholder:text-primary/30 shadow-sm border border-transparent focus:border-border focus:ring-0 outline-none transition-all"
+                    className="w-full bg-surface rounded-xl pl-10 pr-4 py-3 font-sans text-sm text-primary placeholder:text-primary/30 shadow-sm border border-transparent focus:border-border focus:ring-0 outline-none transition-all"
                 />
-                {searchQuery && (
-                    <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary/60 transition-colors"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                )}
             </div>
 
-            <div className="bg-surface rounded-2xl shadow-card overflow-hidden border border-border/50">
+            <div className="bg-surface rounded-[2.5rem] shadow-card overflow-hidden border border-border/50">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead className="bg-primary/5">
@@ -131,57 +112,59 @@ export default function Database() {
                                     <th
                                         key={header}
                                         className={cn(
-                                            "px-1.5 py-3 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold first:pl-3",
+                                            "px-4 py-4 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold",
                                             (header === 'Cals' || header === 'Qty' || ['P', 'C', 'F'].includes(header)) && "text-right",
-                                            header === 'Time' && "hidden xl:table-cell",
-                                            header === 'Qty' && "hidden xl:table-cell"
+                                            ['P', 'C', 'F'].includes(header) && "hidden sm:table-cell",
+                                            header === 'Item' && "w-[45%] min-w-[220px]",
+                                            header === 'Qty' && "min-w-[80px]"
                                         )}
                                     >
                                         {header}
                                     </th>
                                 ))}
-                                <th className="px-1.5 py-3 pr-3 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold text-right">Actions</th>
+                                <th className="px-4 py-4 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {filteredLogs.length === 0 ? (
+                            {logs.length === 0 ? (
                                 <tr>
                                     <td colSpan="10" className="px-4 py-12 text-center text-primary/40 font-mono text-sm">
-                                        {searchQuery.trim() ? 'No logs match your search.' : 'No logs found. Initialize sequence via Chat.'}
+                                        No logs found. Initialize sequence via Chat.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredLogs.map((log) => (
+                                logs.map((log) => (
                                     <tr key={log.id} className="group hover:bg-primary/5 transition-colors duration-200">
-                                        <td className="pl-3 pr-1.5 py-2.5 font-mono text-xs text-primary/70 whitespace-nowrap">
-                                            {formatDateDisplay(log.date, { month: '2-digit', day: '2-digit' })}
+                                        <td className="px-4 py-3 font-mono text-xs text-primary/70 whitespace-nowrap">
+                                            {/* Fix Date Offset: Append T00:00:00 to force local timezone interpretation instead of UTC */}
+                                            {new Date(log.date + 'T00:00:00').toLocaleDateString(undefined, { month: '2-digit', day: '2-digit' })}
                                         </td>
-                                        <td className="px-1.5 py-2.5 font-mono text-xs text-primary/40 whitespace-nowrap hidden xl:table-cell">
-                                            {log.createdAt ? formatTime(log.createdAt) : '-'}
+                                        <td className="px-4 py-3 font-mono text-xs text-primary/40 whitespace-nowrap">
+                                            {log.createdAt ? new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                                         </td>
-                                        <td className="px-1.5 py-2.5 font-mono text-xs text-primary/70 capitalize">
+                                        <td className="px-4 py-3 font-sans text-xs font-semibold text-primary/80 capitalize">
                                             {log.meal}
                                         </td>
-                                        <td className="px-1.5 py-2.5 max-w-[180px]">
-                                            <span className="font-mono text-xs font-medium text-primary block truncate" title={log.name}>{log.name}</span>
+                                        <td className="px-4 py-3 font-mono text-sm font-medium text-primary">
+                                            {log.name}
                                         </td>
-                                        <td className="px-1.5 py-2.5 text-right font-mono text-xs text-primary/70 whitespace-nowrap hidden xl:table-cell">
+                                        <td className="px-4 py-3 text-right font-mono text-xs text-primary/70">
                                             {log.quantity} {log.unit}
                                         </td>
-                                        <td className="px-1.5 py-2.5 text-right font-mono text-xs font-bold text-primary">
+                                        <td className="px-4 py-3 text-right font-mono text-sm font-bold text-primary">
                                             {Math.round(log.calories)}
                                         </td>
-                                        <td className="px-1.5 py-2.5 text-right font-mono text-xs text-primary/60">
+                                        <td className="px-4 py-3 text-right font-mono text-xs text-primary/60 hidden sm:table-cell">
                                             {Math.round(log.protein)}
                                         </td>
-                                        <td className="px-1.5 py-2.5 text-right font-mono text-xs text-primary/60">
+                                        <td className="px-4 py-3 text-right font-mono text-xs text-primary/60 hidden sm:table-cell">
                                             {Math.round(log.carbs)}
                                         </td>
-                                        <td className="px-1.5 py-2.5 text-right font-mono text-xs text-primary/60">
+                                        <td className="px-4 py-3 text-right font-mono text-xs text-primary/60 hidden sm:table-cell">
                                             {Math.round(log.fat)}
                                         </td>
-                                        <td className="px-1.5 pr-3 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() => handleEdit(log)}
                                                     className="p-1.5 text-primary/40 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"

@@ -15,8 +15,6 @@ const getLogs = async (req, res) => {
         const userId = req.user.uid;
         const { startDate, endDate, meal } = req.query;
 
-        req.log.info({ action: 'food.getLogs', startDate, endDate, meal }, 'Fetching food logs');
-
         let query = foodLogsRef(userId).orderBy('date', 'desc');
 
         if (startDate) query = query.where('date', '>=', startDate);
@@ -30,8 +28,6 @@ const getLogs = async (req, res) => {
             ...serializeTimestamps(doc.data())
         }));
 
-        req.log.info({ action: 'food.getLogs', count: logs.length }, 'Food logs fetched');
-
         res.json({ logs });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get food logs');
@@ -44,15 +40,11 @@ const getLog = async (req, res) => {
         const userId = req.user.uid;
         const { id } = req.params;
 
-        req.log.info({ action: 'food.getLog', logId: id }, 'Fetching food log');
-
         const doc = await foodLogsRef(userId).doc(id).get();
 
         if (!doc.exists) {
             return res.status(404).json({ error: 'Food log not found' });
         }
-
-        req.log.info({ action: 'food.getLog', logId: id }, 'Food log fetched');
 
         res.json({
             id: doc.id,
@@ -69,14 +61,6 @@ const createLog = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { date, meal, items, source = 'manual', originalMessage } = req.body;
-
-        req.log.info({
-            action: 'food.createLog',
-            date,
-            meal,
-            source,
-            items: items?.map(i => ({ name: i.name, calories: i.calories }))
-        }, 'Creating food log');
 
         if (!date || !meal || !items || !Array.isArray(items)) {
             return res.status(400).json({ error: 'date, meal, and items array required' });
@@ -109,12 +93,6 @@ const createLog = async (req, res) => {
 
         await batch.commit();
 
-        req.log.info({
-            action: 'food.createLog',
-            logIds: createdLogs.map(l => l.id),
-            totalCalories: createdLogs.reduce((sum, l) => sum + (l.calories || 0), 0)
-        }, 'Food log created');
-
         res.status(201).json({ success: true, logs: createdLogs });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to create food log');
@@ -127,12 +105,6 @@ const updateLog = async (req, res) => {
         const userId = req.user.uid;
         const { id } = req.params;
         const updates = req.body;
-
-        req.log.info({
-            action: 'food.updateLog',
-            logId: id,
-            updateFields: Object.keys(updates)
-        }, 'Updating food log');
 
         const docRef = foodLogsRef(userId).doc(id);
         const doc = await docRef.get();
@@ -155,8 +127,6 @@ const updateLog = async (req, res) => {
 
         await docRef.update(cleanUpdates);
 
-        req.log.info({ action: 'food.updateLog', logId: id }, 'Food log updated');
-
         const updated = await docRef.get();
         res.json({
             id: updated.id,
@@ -175,8 +145,6 @@ const deleteLog = async (req, res) => {
         const userId = req.user.uid;
         const { id } = req.params;
 
-        req.log.info({ action: 'food.deleteLog', logId: id }, 'Deleting food log');
-
         const docRef = foodLogsRef(userId).doc(id);
         const doc = await docRef.get();
 
@@ -185,9 +153,6 @@ const deleteLog = async (req, res) => {
         }
 
         await docRef.delete();
-
-        req.log.info({ action: 'food.deleteLog', logId: id }, 'Food log deleted');
-
         res.json({ success: true });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to delete food log');

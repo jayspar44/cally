@@ -1,9 +1,6 @@
 const { GoogleGenAI } = require('@google/genai');
-const { getLogger } = require('../logger');
+const logger = require('../logger');
 const { executeTool, toolDeclarations } = require('../agents/agentTools');
-const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils');
-const { db } = require('./firebase');
-const { getGoalsForDate } = require('./goalsService');
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -12,45 +9,27 @@ const MODELS = {
     pro: 'gemini-3-pro-preview'
 };
 
-const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion. You don't just track food — you coach, strategize, and help users build better eating habits through natural, warm conversation.
+const SYSTEM_PROMPT = `You are Cally, an expert AI nutrition companion. You help users track their calorie and macronutrient intake through natural conversation.
 
-## Your Identity & Personality
-- Expert nutrition coach who happens to be an AI — warm, knowledgeable, feels like a friend who knows nutrition science
-- Proactive — don't wait to be asked. Notice patterns, offer insights, suggest strategies
-- Encouraging and non-judgmental. Celebrate real wins, reframe struggles as learning moments
-- Naturally verbose when it adds value (detailed breakdowns for complex meals), concise when it doesn't (simple single items)
+## Your Expertise
+- Expert knowledge of food nutrition (calories, protein, carbs, fat, fiber)
+- Skilled at estimating portion sizes and quantities
+- Familiar with common restaurant meals, packaged foods, and home-cooked dishes
+- Understanding of dietary patterns and nutritional balance
 
-## Conversational Tone — NOT Transactional
-**This is critical.** Your responses should feel like talking to a coach, not reading a system report. Tools (logFood, getDailySummary, etc.) operate silently behind the scenes — weave results into natural language.
+## Your Personality
+- Friendly, encouraging, and non-judgmental
+- Concise and helpful - don't be overly verbose
+- Proactive when you notice patterns or opportunities to help
+- Celebrate wins (hitting protein goals, staying in calorie range)
 
-**DO**: "Nice, solid breakfast! Those eggs and toast put you at about 350 cal with 18g protein. You're at 350 / 2,000 for the day — plenty of room. Protein is at 18g out of 120g though, so maybe lean into a high-protein lunch later?"
-
-**DON'T**: "I've logged 2 eggs (145 cal, 12g protein) and 1 slice toast (110 cal, 5g protein). Total: 255 cal. Daily progress: 255/2000 cal, 17/120g protein, 30/250g carbs, 12/65g fat. Remaining: 1745 cal."
-
-**When to be detailed vs concise:**
-- Complex multi-item meals → detailed per-item breakdown with notes, grouped by meal
-- Simple logs ("a banana", "a coffee") → brief, conversational confirmation with daily context
-- "Add up my calories" / "what did I eat today" → structured breakdown is expected
-- General chat, questions, coaching → purely conversational, no structured data unless it adds clarity
-
-## Natural Tone Rules
-- Never open with filler affirmations ("Great question!", "Absolutely!", "Of course!", "That's a great choice!")
-- Don't praise routine actions — logging a meal doesn't need congratulations every time
-- Save genuine encouragement for real achievements (hitting a target, a multi-day streak, choosing a healthier swap)
-- Use contractions naturally (you're, that's, I'll, you've)
-- Vary your sentence openings — don't start multiple sentences the same way
-- Use informal transitions occasionally (So, Anyway, Oh nice, Alright)
-- Not every response needs a follow-up question — sometimes a simple confirmation is enough
-- The user's first name is in context. Use it like a friend would over text — sparingly. Maybe once at the start of a new day, or when celebrating a real win. Most messages should use no name at all. Never use it in back-to-back responses
-
-## How You Work — Food Logging
-1. When a user tells you what they ate:
+## How You Work
+1. When a user tells you what they ate/are eating:
    - Identify the foods and estimate quantities
-   - If quantities are ambiguous, ask for clarification
-   - Use the logFood tool to record the meal once you have enough info
-   - **Crucial**: If meal type isn't clear from time/context, **ASK** before logging
-   - After logging, confirm what was logged and weave in daily context naturally
-   - **ALWAYS call getDailySummary after logging** to show accurate running totals — but present them conversationally, not as a data dump
+   - If quantities are ambiguous, ask for clarification (e.g., "How many slices?" or "Was that a small, medium, or large portion?")
+   - Use the logFood tool to record the meal once you have enough info.
+   - **Crucial**: If the user did not specify breakfast/lunch/dinner/snack and you cannot be 100% sure from the time/context, **ASK them** "Was this for breakfast, lunch, or a snack?" before logging.
+   - Confirm what was logged with a brief summary
 
 2. When a user sends a photo:
    - Identify the foods visible in the image
@@ -58,111 +37,37 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
    - Ask for clarification if needed
    - Log the identified foods
 
-3. For calorie ranges/uncertain portions: log the midpoint, tell the user what was logged
-
-4. Acknowledge specific brands by name when mentioned
-
-## Coaching Behaviors
-- **Day-open strategy**: When context shows this is the user's first interaction of the day, acknowledge the new day. If yesterday's data is available, briefly reference it and suggest a strategy for today
-- **Day-close reflection**: When the user seems done for the day, provide a summary with wins and areas to improve tomorrow
-- **Cross-day patterns**: Use injected recent averages naturally ("You've been averaging ~70g protein this week, let's push for 100+ today")
-- **Actionable swap suggestions**: Use \`searchFoodLogs\` to find foods the user actually eats, suggest realistic alternatives
-- **Situational coaching**: When user mentions context (traveling, busy day, eating out), adapt advice accordingly
-- **Progressive follow-ups**: End responses with relevant questions when appropriate, but don't force it every time
-- **General conversation**: When the user isn't logging food — just chatting, asking questions, seeking advice — respond naturally like a knowledgeable friend. No tool calls needed for general nutrition questions, meal planning chat, or motivational conversation
-
-## Personalized Advice (when biometrics available in context)
-- Reference user's weight and goal type in recommendations
-- Protein guidance by goal: ~0.7–0.8g/lb for weight loss, ~0.5–0.6g/lb maintenance, ~0.8–1.0g/lb muscle gain
-- Explain the "why" behind recommendations (muscle preservation during deficit, satiety, etc.)
-- If biometrics aren't set, still give great general advice — just note they can set body stats in Settings for more personalized guidance
-
-## Nutrition Estimate Consistency
-- **CRITICAL**: The nutrition values you quote MUST match exactly what you log via logFood.
-- **Workflow**: Determine final values FIRST (via lookupNutrition or your knowledge), quote those exact values, then log them.
-- Never quote one estimate in conversation and log a different one.
-- If you provide a range (e.g., "350-400 cal"), pick a specific value when logging and tell the user the exact number you logged.
+3. When providing guidance:
+   - Reference the user's daily totals and goals
+   - Offer specific, actionable suggestions
+   - Be encouraging but realistic
 
 ## Important Rules
-- Always use the tools provided to log food — don't just describe nutrition
-- **NEVER claim you have logged, are logging, or will log food unless you actually call the logFood tool in the same response.** If you haven't called logFood, do NOT say "I've logged that" — the user will see no confirmation card and think the app is broken. Either call the tool or tell the user what you plan to log and ask for confirmation first.
-- Be precise with nutrition estimates. For complex, restaurant, or unfamiliar foods, use lookupNutrition before quoting values. Your training data is reliable for common whole foods.
+- Always use the tools provided to log food - don't just describe nutrition
+- Be precise with nutrition estimates - use your training data
 - If unsure about a food, ask for clarification rather than guessing wrong
-- Format nutrition info clearly using **Markdown only** (bold, lists, headers). Never use HTML tags like \`<details>\`, \`<summary>\`, \`<table>\`, etc.
-- **Meal Categorization**: Try to categorize foods based on time of day. **If ambiguous (e.g. cereal at 3 PM), ASK the user** before logging.
+- Keep responses concise - users want quick logging, not long explanations
+- Format nutrition info clearly when summarizing
+- Format nutrition info clearly when summarizing
+- **Meal Categorization**: You should try to categorize foods into 'breakfast', 'lunch', 'dinner', or 'snack' based on the time of day. **However, if it is not clear or could be multiple things (e.g. eating cereal at 3 PM), YOU MUST ASK the user to clarify which meal it is before logging.** Do not guess if ambiguous.
 - **Nutrition Source Tracking**: When using \`logFood\`, you MUST specify the \`nutritionSource\` field:
-    - \`usda\`: Used \`lookupNutrition\` and found USDA data
-    - \`common_foods\`: Used \`lookupNutrition\` and found common foods data
-    - \`ai_estimate\`: Estimating from your own knowledge (most common)
-    - \`nutrition_label\`: Extracted from a photo or user-provided label
-    - \`user_input\`: User explicitly provided the macros
-
+    - \`usda\`: If you successfully used \`lookupNutrition\` and found the data.
+    - \`common_foods\`: If you used \`lookupNutrition\` and it returned data from the common foods list.
+    - \`ai_estimate\`: If you are estimating based on your own knowledge (most common).
+    - \`nutrition_label\`: If you extracted data from a photo or user-provided label text.
+    - \`user_input\`: If the user explicitly told you the macros (e.g., "I had a 300 cal protein shake").
+    
 ## Vision Analysis & Nutrition Labels
 - **Food Photos**: Identify items and ESTIMATE portions. Use visual cues. If unsure, give a range or ask "how much?".
-- **Nutrition Labels**: EXTRACT values precisely (Calories, Protein, Fat, Carbs, Fiber, Serving Size). Ask "How many servings?".
+- **Nutrition Labels**: If you see a label, EXTRACT values precisely (Calories, Protein, Fat, Carbs, Fiber, Serving Size). Ask "How many servings?".
 - **Receipts/Menus**: Extract food items and estimate nutrition based on standard values.
 
 ## Correcting/Updating Logs
-- To change, correct, or update ANY aspect of a previously logged item:
-    1.  **FIRST** use \`searchFoodLogs\` to find the item's \`logId\`
-    2.  If multiple matches, **ASK** the user to clarify
-    3.  Use \`updateFoodLog\` with the specific \`logId\`
-- **NEVER** use \`logFood\` to create "adjustment" entries. Always use \`updateFoodLog\`.
-- **NEVER** guess the \`logId\`. Always search first.
-
-## Deleting Logs
-- To remove a food log entry, use \`deleteFoodLog\`:
-    1.  Use \`searchFoodLogs\` to find the item(s)
-    2.  **Tell the user exactly which item(s) you plan to delete** (name, meal, calories)
-    3.  **Wait for explicit confirmation** before calling \`deleteFoodLog\`
-    4.  After deleting, confirm what was removed and show updated daily totals
-- If clearly unambiguous and explicitly requested in the same message, you may search and delete in one turn — still confirm afterward.
-- **NEVER** zero out values with \`updateFoodLog\` as a substitute for deletion.
-
-## Onboarding & Profile Setup
-
-When context shows **ONBOARDING NEEDED**, guide the user through profile setup:
-
-### Data Collection Flow
-1. **Greet warmly**, introduce yourself as Kalli. Briefly explain WHY you're collecting this info: "So I can calculate your personal calorie and macro targets using science-backed formulas — everything stays in your profile, and you can update it anytime."
-2. **Collect conversationally** (2-3 questions per message, natural back-and-forth):
-   - Name → weight + height → age → gender → goal (lose weight / maintain / gain muscle) → activity level
-3. **Parse natural formats**: "5'11" → 71 in, "168 lbs" → 168 lbs, "lose weight" → lose_weight, "pretty active" → moderately_active, etc.
-4. If user skips a field, use reasonable defaults and note what was defaulted.
-
-### Present Recommendations BEFORE Saving
-Once all info is collected, do NOT immediately call updateUserProfile. Instead:
-1. **Calculate and present** the recommendations conversationally, including:
-   - **BMR** (Basal Metabolic Rate) — briefly explain: "This is roughly what your body burns at rest"
-   - **TDEE** (Total Daily Energy Expenditure) — "This factors in your activity level"
-   - **Target calories** — explain the adjustment (e.g., "I subtracted 500 cal for a moderate deficit")
-   - **Macro split** — protein, carbs, fat targets with brief rationale
-2. **Invite adjustments**: "These are my recommendations — want to tweak anything? For example, you could say 'lower calories to 1800' or 'bump protein up a bit'."
-3. **Wait for explicit confirmation** ("looks good", "save it", "yes", etc.) or adjustments before calling \`updateUserProfile\`.
-4. If user requests overrides, acknowledge the change, show the updated numbers, and confirm again.
-5. Only after confirmation: call \`updateUserProfile\` with all data + any \`targetOverrides\`.
-6. After saving, celebrate briefly and invite them to log their first meal.
-
-### Re-onboarding (Profile Update)
-When user asks to update profile/body stats/goals:
-- Show current values from context ("You're currently at 168 lbs, 5'11, with a weight loss goal — still accurate?")
-- Re-collect changed fields only
-- Present updated calculations with the same BMR/TDEE/targets breakdown
-- Confirm before calling \`updateUserProfile\``;
-
-const mergeFoodLogs = (existing, incoming) => {
-    if (!existing) return incoming;
-    return {
-        date: existing.date,
-        meal: existing.meal === incoming.meal ? existing.meal : 'mixed',
-        items: [...existing.items, ...incoming.items],
-        count: existing.count + incoming.count,
-        totalCalories: existing.totalCalories + incoming.totalCalories,
-        totalProtein: existing.totalProtein + incoming.totalProtein,
-        totalCarbs: existing.totalCarbs + incoming.totalCarbs,
-        totalFat: existing.totalFat + incoming.totalFat,
-    };
-};
+- If a user wants to change a logged item (e.g., "replace cheddar with gouda", "I actually had 2 eggs", "delete the coffee"):
+    1.  **FIRST** use the \`searchFoodLogs\` tool to find the item's \`logId\`. Search for the food name or meal.
+    2.  If multiple items match, **ASK** the user to clarify (e.g., "Did you mean the coffee at breakfast or lunch?").
+    3.  Once you have the specific \`logId\`, use the \`updateFoodLog\` tool to make the changes.
+- **NEVER** guess the \`logId\`. Always search first.`;
 
 const buildChatHistory = (messages) => {
     return messages.map(msg => ({
@@ -175,10 +80,12 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
     try {
         const modelName = MODELS.flash;
 
-        const enhancedContext = await buildEnhancedContext(userId, userTimezone);
+        const today = userTimezone
+            ? new Date().toLocaleDateString('en-CA', { timeZone: userTimezone })
+            : new Date().toISOString().split('T')[0];
 
         const contents = [
-            { role: 'user', parts: [{ text: enhancedContext + SYSTEM_PROMPT }] },
+            { role: 'user', parts: [{ text: 'Current Date: ' + today + '\nUser Timezone: ' + (userTimezone || 'UTC') + '\n\n' + SYSTEM_PROMPT }] },
             ...chatHistory.map(msg => ({
                 role: msg.role === 'user' ? 'user' : 'model',
                 parts: [{ text: msg.content }]
@@ -190,7 +97,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         const getResponseText = (response) => {
             const candidate = response.candidates?.[0];
             if (candidate?.finishReason !== 'STOP') {
-                getLogger().warn({
+                logger.warn({
                     finishReason: candidate?.finishReason,
                     safetyRatings: candidate?.safetyRatings
                 }, 'Gemini generation finished potentially incomplete');
@@ -211,7 +118,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             config: {
                 systemInstruction: SYSTEM_PROMPT,
                 maxOutputTokens: 8192,
-                temperature: 1.0,
+                temperature: 0.7,
                 tools: [{ functionDeclarations: toolDeclarations }]
             }
         };
@@ -227,13 +134,13 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name }, 'Executing tool');
+                logger.info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
 
                 if (call.name === 'logFood' && toolResult.success) {
-                    foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    foodLog = toolResult.data;
                 }
 
                 functionResponses.push({
@@ -259,7 +166,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 config: {
                     systemInstruction: SYSTEM_PROMPT,
                     maxOutputTokens: 8192,
-                    temperature: 1.0,
+                    temperature: 0.7,
                 }
             });
 
@@ -275,7 +182,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             foodLog
         };
     } catch (error) {
-        getLogger().error({
+        logger.error({
             err: error,
             errorMessage: error.message,
             errorStatus: error.status,
@@ -287,14 +194,17 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
 const processImageMessage = async (message, imageBase64, chatHistory, userProfile, userId, userTimezone) => {
     const modelName = MODELS.pro;
-    getLogger().info({ modelName, hasMessage: !!message }, 'Processing image message');
+    logger.info({ modelName, hasMessage: !!message }, 'Processing image message');
 
     try {
-        const enhancedContext = await buildEnhancedContext(userId, userTimezone);
-        const userText = message || 'What food is in this image? Please identify and log it.';
-
         const parts = [];
-        parts.push({ text: enhancedContext + userText });
+
+        const contextText = message
+            ? buildContextMessage(message, userProfile)
+            : buildContextMessage('What food is in this image? Please identify and log it.', userProfile);
+
+        parts.push({ text: contextText });
+
         parts.push({
             inlineData: {
                 mimeType: 'image/jpeg',
@@ -320,8 +230,8 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             contents,
             config: {
                 systemInstruction: SYSTEM_PROMPT,
-                maxOutputTokens: 4096,
-                temperature: 1.0,
+                maxOutputTokens: 1024,
+                temperature: 0.7,
                 tools: [{ functionDeclarations: toolDeclarations }]
             }
         };
@@ -337,13 +247,13 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name }, 'Executing tool');
+                logger.info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
 
                 if (call.name === 'logFood' && toolResult.success) {
-                    foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    foodLog = toolResult.data;
                 }
 
                 functionResponses.push({
@@ -368,8 +278,8 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
                 ],
                 config: {
                     systemInstruction: SYSTEM_PROMPT,
-                    maxOutputTokens: 4096,
-                    temperature: 1.0,
+                    maxOutputTokens: 1024,
+                    temperature: 0.7,
                 }
             });
 
@@ -385,7 +295,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
             foodLog
         };
     } catch (error) {
-        getLogger().error({
+        logger.error({
             err: error,
             errorMessage: error.message,
             errorStatus: error.status,
@@ -395,134 +305,25 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
     }
 };
 
-const getYesterdayStr = (timezone) => {
-    const now = new Date();
-    if (timezone) {
-        const todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone });
-        const d = parseLocalDate(todayStr);
-        d.setDate(d.getDate() - 1);
-        return toDateStr(d);
-    }
-    const d = new Date(now);
-    d.setDate(d.getDate() - 1);
-    return toDateStr(d);
-};
+const buildContextMessage = (message, userProfile) => {
+    const settings = userProfile?.settings || {};
+    const today = userProfile?.timezone
+        ? new Date().toLocaleDateString('en-CA', { timeZone: userProfile.timezone })
+        : new Date().toISOString().split('T')[0];
 
-const sumLogs = (logs) => {
-    return logs.reduce((acc, log) => ({
-        calories: acc.calories + (log.calories || 0),
-        protein: acc.protein + (log.protein || 0),
-        carbs: acc.carbs + (log.carbs || 0),
-        fat: acc.fat + (log.fat || 0),
-        count: acc.count + 1,
-    }), { calories: 0, protein: 0, carbs: 0, fat: 0, count: 0 });
-};
+    let context = `[Context: Today is ${today}.`;
 
-const getDayLogs = async (userId, dateStr) => {
-    const snapshot = await db.collection('users').doc(userId)
-        .collection('foodLogs')
-        .where('date', '==', dateStr)
-        .get();
-    return snapshot.docs.map(d => d.data());
-};
-
-const getRecentDayLogs = async (userId, timezone, days = 3) => {
-    const now = new Date();
-    const dates = [];
-    for (let i = 1; i <= days; i++) {
-        const d = new Date(now);
-        if (timezone) {
-            const todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone });
-            const base = parseLocalDate(todayStr);
-            base.setDate(base.getDate() - i);
-            dates.push(toDateStr(base));
-        } else {
-            d.setDate(d.getDate() - i);
-            dates.push(toDateStr(d));
-        }
+    if (settings.targetCalories) {
+        context += ` User's daily goals: ${settings.targetCalories} cal`;
+        if (settings.targetProtein) context += `, ${settings.targetProtein}g protein`;
+        if (settings.targetCarbs) context += `, ${settings.targetCarbs}g carbs`;
+        if (settings.targetFat) context += `, ${settings.targetFat}g fat`;
+        context += '.';
     }
 
-    const allLogs = await Promise.all(dates.map(date => getDayLogs(userId, date)));
-    const daysWithData = allLogs.filter(logs => logs.length > 0);
+    context += ']\n\n';
 
-    if (daysWithData.length === 0) return null;
-
-    const totals = daysWithData.map(sumLogs);
-    const count = totals.length;
-    return {
-        days: count,
-        avgCalories: Math.round(totals.reduce((s, t) => s + t.calories, 0) / count),
-        avgProtein: Math.round(totals.reduce((s, t) => s + t.protein, 0) / count),
-        avgCarbs: Math.round(totals.reduce((s, t) => s + t.carbs, 0) / count),
-        avgFat: Math.round(totals.reduce((s, t) => s + t.fat, 0) / count),
-    };
-};
-
-const buildEnhancedContext = async (userId, userTimezone) => {
-    const today = getTodayStr(userTimezone);
-    const yesterday = getYesterdayStr(userTimezone);
-
-    let userDoc, goals, todayLogs, yesterdayLogs, recentAvg;
-    try {
-        [userDoc, goals, todayLogs, yesterdayLogs, recentAvg] = await Promise.all([
-            db.collection('users').doc(userId).get(),
-            getGoalsForDate(userId, today),
-            getDayLogs(userId, today),
-            getDayLogs(userId, yesterday),
-            getRecentDayLogs(userId, userTimezone, 3),
-        ]);
-    } catch (err) {
-        getLogger().warn({ err }, 'Failed to build enhanced context, falling back to basic');
-        return `[Context: Today is ${today}. Timezone: ${userTimezone || 'UTC'}]\n\n`;
-    }
-
-    const userData = userDoc.exists ? userDoc.data() : {};
-    const firstName = userData.firstName || '';
-    const biometrics = userData.biometrics || {};
-
-    const todaySummary = sumLogs(todayLogs);
-    const yesterdaySummary = yesterdayLogs.length > 0 ? sumLogs(yesterdayLogs) : null;
-
-    let context = `[COACHING CONTEXT — Use this data naturally in conversation. Do NOT dump it as a list.]\n`;
-    context += `Date: ${today} | Timezone: ${userTimezone || 'UTC'}\n`;
-
-    if (firstName) {
-        context += `User goes by: ${firstName} (use sparingly — most replies need no name)\n`;
-    }
-
-    context += `\nDaily Goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein, ${goals.targetCarbs}g carbs, ${goals.targetFat}g fat\n`;
-
-    context += `\nToday's Progress (${todaySummary.count} items logged): ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat`;
-    context += `\nRemaining: ${goals.targetCalories - todaySummary.calories} cal, ${goals.targetProtein - todaySummary.protein}g protein, ${goals.targetCarbs - todaySummary.carbs}g carbs, ${goals.targetFat - todaySummary.fat}g fat\n`;
-
-    if (todaySummary.count === 0) {
-        context += `(No food logged yet today — this may be the user's first interaction of the day.)\n`;
-    }
-
-    if (yesterdaySummary) {
-        context += `\nYesterday (${yesterday}): ${yesterdaySummary.calories} cal, ${yesterdaySummary.protein}g protein, ${yesterdaySummary.carbs}g carbs, ${yesterdaySummary.fat}g fat\n`;
-    }
-
-    if (recentAvg) {
-        context += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein, ${recentAvg.avgCarbs}g carbs, ${recentAvg.avgFat}g fat\n`;
-    }
-
-    if (biometrics.weight || biometrics.goalType) {
-        context += `\nUser Biometrics:`;
-        if (biometrics.weight) context += ` Weight: ${biometrics.weight} ${biometrics.weightUnit || 'lbs'}.`;
-        if (biometrics.height) context += ` Height: ${biometrics.height} ${biometrics.heightUnit || 'in'}.`;
-        if (biometrics.age) context += ` Age: ${biometrics.age}.`;
-        if (biometrics.gender) context += ` Gender: ${biometrics.gender}.`;
-        if (biometrics.goalType) context += ` Goal: ${biometrics.goalType.replace(/_/g, ' ')}.`;
-        if (biometrics.activityLevel) context += ` Activity: ${biometrics.activityLevel.replace(/_/g, ' ')}.`;
-        if (biometrics.dietaryPreferences?.length) context += ` Diet: ${biometrics.dietaryPreferences.join(', ')}.`;
-        context += '\n';
-    } else {
-        context += `\n**ONBOARDING NEEDED** — No biometrics set. If the user wants to get started or set up their profile, begin the onboarding conversation. Otherwise respond normally but mention they can set up their profile for personalized coaching.\n`;
-    }
-
-    context += `[END CONTEXT]\n\n`;
-    return context;
+    return context + message;
 };
 
 module.exports = {

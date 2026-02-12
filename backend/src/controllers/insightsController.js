@@ -1,6 +1,4 @@
 const { db } = require('../services/firebase');
-const { toDateStr, parseLocalDate, getTodayStr } = require('../utils/dateUtils');
-const { getGoalsForDate, snapshotGoals, getUserSettings } = require('../services/goalsService');
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -15,8 +13,6 @@ const getDailySummary = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { date } = req.params;
-
-        req.log.info({ action: 'insights.getDailySummary', date }, 'Fetching daily summary');
 
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: 'Valid date (YYYY-MM-DD) required' });
@@ -72,14 +68,15 @@ const getDailySummary = async (req, res) => {
 
         summary.mealCount = meals.length;
 
-        const settings = await getUserSettings(userId);
-        const goals = await getGoalsForDate(userId, date, settings);
+        const userDoc = await db.collection('users').doc(userId).get();
+        const settings = userDoc.exists ? userDoc.data().settings : {};
 
-        // Lock in today's goals on first access
-        const today = getTodayStr(settings.timezone);
-        if (date === today) {
-            await snapshotGoals(userId, today, settings);
-        }
+        const goals = {
+            targetCalories: settings.targetCalories || 2000,
+            targetProtein: settings.targetProtein || 50,
+            targetCarbs: settings.targetCarbs || 250,
+            targetFat: settings.targetFat || 65
+        };
 
         const remaining = {
             calories: goals.targetCalories - summary.totalCalories,
@@ -89,18 +86,11 @@ const getDailySummary = async (req, res) => {
         };
 
         const progress = {
-            calories: goals.targetCalories > 0 ? (summary.totalCalories / goals.targetCalories) * 100 : 0,
-            protein: goals.targetProtein > 0 ? (summary.totalProtein / goals.targetProtein) * 100 : 0,
-            carbs: goals.targetCarbs > 0 ? (summary.totalCarbs / goals.targetCarbs) * 100 : 0,
-            fat: goals.targetFat > 0 ? (summary.totalFat / goals.targetFat) * 100 : 0
+            calories: Math.min(100, (summary.totalCalories / goals.targetCalories) * 100),
+            protein: Math.min(100, (summary.totalProtein / goals.targetProtein) * 100),
+            carbs: Math.min(100, (summary.totalCarbs / goals.targetCarbs) * 100),
+            fat: Math.min(100, (summary.totalFat / goals.targetFat) * 100)
         };
-
-        req.log.info({
-            action: 'insights.getDailySummary',
-            date,
-            totalCalories: summary.totalCalories,
-            mealCount: summary.mealCount
-        }, 'Daily summary fetched');
 
         res.json({
             date,
@@ -120,14 +110,12 @@ const getWeeklyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        req.log.info({ action: 'insights.getWeeklyTrends' }, 'Fetching weekly trends');
-
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 6);
 
-        const startStr = toDateStr(startDate);
-        const endStr = toDateStr(endDate);
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -139,7 +127,7 @@ const getWeeklyTrends = async (req, res) => {
 
         const byDate = {};
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-            const dateStr = toDateStr(d);
+            const dateStr = d.toISOString().split('T')[0];
             byDate[dateStr] = { calories: 0, protein: 0, carbs: 0, fat: 0, meals: new Set() };
         }
 
@@ -171,22 +159,12 @@ const getWeeklyTrends = async (req, res) => {
             fat: Math.round(totals.fat / daysWithData)
         };
 
-        const settings = await getUserSettings(userId);
-        const goals = await getGoalsForDate(userId, toDateStr(), settings);
-
-        req.log.info({
-            action: 'insights.getWeeklyTrends',
-            daysTracked: daysWithData,
-            avgCalories: averages.calories
-        }, 'Weekly trends fetched');
-
         res.json({
             startDate: startStr,
             endDate: endStr,
             days,
             totals,
             averages,
-            goals,
             daysTracked: daysWithData
         });
     } catch (error) {
@@ -199,14 +177,12 @@ const getMonthlyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        req.log.info({ action: 'insights.getMonthlyTrends' }, 'Fetching monthly trends');
-
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 29);
 
-        const startStr = toDateStr(startDate);
-        const endStr = toDateStr(endDate);
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -218,7 +194,7 @@ const getMonthlyTrends = async (req, res) => {
 
         const weeks = [{}, {}, {}, {}, {}];
         logs.forEach(log => {
-            const logDate = parseLocalDate(log.date);
+            const logDate = new Date(log.date);
             const daysSinceStart = Math.floor((logDate - startDate) / (1000 * 60 * 60 * 24));
             const weekIndex = Math.min(4, Math.floor(daysSinceStart / 7));
 
@@ -255,12 +231,6 @@ const getMonthlyTrends = async (req, res) => {
             carbs: Math.round(totals.carbs / daysWithData),
             fat: Math.round(totals.fat / daysWithData)
         };
-
-        req.log.info({
-            action: 'insights.getMonthlyTrends',
-            daysTracked: daysWithData,
-            avgCalories: averages.calories
-        }, 'Monthly trends fetched');
 
         res.json({
             startDate: startStr,

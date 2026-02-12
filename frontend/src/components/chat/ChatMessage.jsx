@@ -1,48 +1,40 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '../../utils/cn';
-import { formatTime } from '../../utils/dateUtils';
 import FoodLogCard from './FoodLogCard';
 
-import { Trash2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
-// Strip <details>...</details> HTML blocks that Gemini sometimes includes in responses
-const stripDetailsBlocks = (content) => {
-    if (!content) return '';
-    return content.replace(/<details>[\s\S]*?<\/details>/gi, '').trim();
-};
-
-export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
+export default function ChatMessage({ message, onEditLog, onDelete }) {
     const isUser = message.role === 'user';
-    const isSending = message.status === 'sending';
-    const isFailed = message.status === 'failed';
+    const isPending = message.pending;
     const { developerMode } = useUserPreferences();
 
     return (
         <div className={cn(
-            'flex w-full mb-5',
+            'flex w-full mb-6',
             isUser ? 'justify-end' : 'justify-start'
         )}>
             <div className={cn(
-                'relative group',
-                isUser ? 'max-w-[85%] items-end' : 'max-w-[98%] items-start'
+                'max-w-[95%] sm:max-w-[95%] relative group', // INCREASED WIDTH (was 85%)
+                isUser ? 'items-end' : 'items-start'
             )}>
                 {/* Bubble */}
                 <div className={cn(
-                    'px-3.5 py-2 shadow-sm backdrop-blur-sm relative',
+                    'px-4 py-3 shadow-sm backdrop-blur-sm relative', // Added relative for delete button positioning if needed
                     isUser
                         ? 'bg-primary text-primary-foreground dark:bg-[#232525] dark:text-[#E2E5E1] rounded-[1.25rem] rounded-tr-sm'
                         : 'bg-surface border border-border/60 rounded-[1.25rem] rounded-tl-sm',
-                    isSending && 'opacity-80'
+                    isPending && 'opacity-80'
                 )}>
                     {/* Content */}
                     <div className={cn(
-                        "text-base leading-normal break-words markdown-body",
-                        isUser && "text-white [&_*]:text-white/90"
+                        "text-sm leading-relaxed break-words markdown-body",
+                        isUser && "text-white [&_*]:text-white/90" // Override markdown styles for user bubble
                     )}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {isUser ? message.content : stripDetailsBlocks(message.content)}
+                            {message.content}
                         </ReactMarkdown>
                     </div>
 
@@ -58,25 +50,15 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                         </div>
                     )}
 
-                    {/* Inline Error for Failed Messages */}
-                    {isFailed && message.errorMessage && (
-                        <div className="mt-2 pt-2 border-t border-red-300/30 dark:border-red-500/20 flex items-center gap-1.5">
-                            <AlertCircle className="w-3 h-3 text-red-400 dark:text-red-400 shrink-0" />
-                            <span className="text-[10px] text-red-400 dark:text-red-400">
-                                {message.errorMessage}
-                            </span>
-                        </div>
-                    )}
-
                     {/* Food Log Card (Assistant Only) */}
                     {!isUser && message.foodLog && (
-                        <div className="mt-3 -mx-0.5">
+                        <div className="mt-4 -mx-1">
                             <FoodLogCard foodLog={message.foodLog} onEdit={onEditLog} />
                         </div>
                     )}
 
                     {/* Developer Delete Button */}
-                    {developerMode && onDelete && !isSending && !isFailed && (
+                    {developerMode && onDelete && !isPending && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -93,30 +75,20 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                     )}
                 </div>
 
-                {/* Timestamp & Status (Outside Bubble) */}
+                {/* Timestamp (Outside Bubble) */}
                 <div className={cn(
-                    'text-[10px] font-mono mt-1 absolute -bottom-4 min-w-max flex items-center gap-1',
-                    isUser ? 'right-2' : 'left-2',
-                    isFailed ? 'text-red-500 dark:text-red-400' : 'text-primary/50 dark:text-primary/30'
+                    'text-[10px] font-mono text-primary/30 mt-1 absolute -bottom-4 min-w-max',
+                    isUser ? 'right-2' : 'left-2'
                 )}>
-                    {isSending ? (
-                        <>
-                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                            <span>Sending</span>
-                        </>
-                    ) : isFailed ? (
-                        <button
-                            onClick={() => onRetry?.(message.id)}
-                            className="flex items-center gap-1 text-accent hover:underline"
-                        >
-                            <RotateCcw className="w-2.5 h-2.5" />
-                            <span>Tap to retry</span>
-                        </button>
-                    ) : (
-                        formatTime(message.timestamp)
-                    )}
+                    {formatTime(message.timestamp)}
+                    {isPending && ' • Sending...'}
                 </div>
             </div>
         </div>
     );
+}
+
+function formatTime(timestamp) {
+    if (!timestamp) return '';
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }

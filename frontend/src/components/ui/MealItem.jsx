@@ -44,7 +44,7 @@ export default function MealItem({ meal }) {
             {/* Expanded Details */}
             <div className={cn(
                 "overflow-hidden transition-all duration-300 ease-in-out bg-primary/5",
-                expanded ? "max-h-[32rem] opacity-100" : "max-h-0 opacity-0"
+                expanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
             )}>
                 <div className="px-6 pb-6 pt-2 space-y-3">
                     <div className="h-px w-full bg-border/50 mb-3" />
@@ -58,16 +58,9 @@ export default function MealItem({ meal }) {
                                     {item.quantity} {item.unit}
                                 </span>
                             </div>
-                            <div className="text-right shrink-0">
-                                <span className="font-mono font-medium text-primary/80 block">
-                                    {Math.round(item.calories)} cal
-                                </span>
-                                <div className="flex gap-2 mt-0.5 justify-end">
-                                    <span className="font-mono text-[10px] text-primary/50">P {Math.round(item.protein || 0)}g</span>
-                                    <span className="font-mono text-[10px] text-accent/70">C {Math.round(item.carbs || 0)}g</span>
-                                    <span className="font-mono text-[10px] text-amber-700/70 dark:text-[#D9A05B]/70">F {Math.round(item.fat || 0)}g</span>
-                                </div>
-                            </div>
+                            <span className="font-mono font-medium text-primary/80">
+                                {Math.round(item.calories)} cal
+                            </span>
                         </div>
                     ))}
                 </div>

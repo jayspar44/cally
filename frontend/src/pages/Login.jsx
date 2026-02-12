@@ -51,19 +51,16 @@ const Login = () => {
     };
 
     return (
-        <MobileContainer className="overflow-y-auto">
-            <div className="min-h-[100dvh] flex flex-col items-center p-6 bg-background relative overflow-hidden">
+        <MobileContainer>
+            <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-background relative overflow-hidden">
                 {/* Background Decor */}
                 <div className="absolute top-[-10%] right-[-10%] w-[50vh] h-[50vh] bg-accent/5 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute bottom-[-10%] left-[-10%] w-[50vh] h-[50vh] bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Version string */}
-                <div className="z-10 pt-2">
+                <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10">
                     <p className="text-primary/30 font-mono text-[10px] tracking-widest uppercase">{getVersionString()}</p>
                 </div>
-
-                {/* Spacer — centers content vertically, collapses when keyboard shrinks viewport */}
-                <div className="flex-1" />
 
                 <div className="w-full max-w-sm z-10">
                     {/* Header */}
@@ -73,7 +70,7 @@ const Login = () => {
                         </div>
                         <div>
                             <h1 className="text-4xl font-serif font-black text-primary tracking-tight mb-2">
-                                Kalli
+                                Cally
                             </h1>
                             <p className="text-primary/60 font-sans text-lg text-balance">
                                 Your gourmet AI nutrition companion.
@@ -130,7 +127,7 @@ const Login = () => {
 
                         <div className="mt-8 pt-6 border-t border-primary/5 text-center">
                             <p className="text-primary/40 text-sm mb-3 font-medium">
-                                {isSignup ? 'Already have an account?' : "New to Kalli?"}
+                                {isSignup ? 'Already have an account?' : "New to Cally?"}
                             </p>
                             <button
                                 onClick={() => setIsSignup(!isSignup)}
@@ -141,9 +138,6 @@ const Login = () => {
                         </div>
                     </div>
                 </div>
-
-                {/* Bottom spacer */}
-                <div className="flex-1" />
             </div>
         </MobileContainer>
     );

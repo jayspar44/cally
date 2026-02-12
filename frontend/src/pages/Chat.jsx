@@ -1,64 +1,19 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useChat } from '../contexts/ChatContext';
-import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import ChatMessage from '../components/chat/ChatMessage';
 import ChatInput from '../components/chat/ChatInput';
 import FoodEditModal from '../components/common/FoodEditModal';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
-import { AlertCircle } from 'lucide-react';
 
 export default function Chat() {
-    const { messages, setMessages, loading, sending, error, setError, initialized, loadHistory, sendMessage, retryMessage } = useChat();
-    const { biometrics, profileLoading, refreshProfile } = useUserPreferences();
-    const location = useLocation();
-    const navigate = useNavigate();
-    const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
-    const [onboardingTriggered, setOnboardingTriggered] = useState(false);
+    const { messages, setMessages, loading, sending, error, initialized, loadHistory, sendMessage } = useChat();
     const messagesEndRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
-    const errorTimerRef = useRef(null);
 
     useEffect(() => {
         if (!initialized) loadHistory();
     }, [initialized, loadHistory]);
-
-    // Auto-dismiss error banner after 5 seconds
-    useEffect(() => {
-        if (error) {
-            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-            errorTimerRef.current = setTimeout(() => setError(null), 5000);
-        }
-        return () => {
-            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-        };
-    }, [error, setError]);
-
-    // Trigger onboarding from Home or Settings navigation
-    useEffect(() => {
-        if (location.state?.triggerOnboarding && initialized && !onboardingTriggered) {
-            setOnboardingTriggered(true);
-            navigate('/chat', { replace: true, state: {} });
-            sendMessage(needsOnboarding ? "Hey Kalli, I'd like to get started!" : "I'd like to update my profile information");
-        }
-    }, [location.state, initialized, onboardingTriggered, needsOnboarding, navigate, sendMessage]);
-
-    // Auto-trigger onboarding for new users with no chat history
-    useEffect(() => {
-        if (needsOnboarding && initialized && messages.length === 0 && !onboardingTriggered && !sending) {
-            setOnboardingTriggered(true);
-            sendMessage("Hey Kalli, I'd like to get started!");
-        }
-    }, [needsOnboarding, initialized, messages.length, onboardingTriggered, sending, sendMessage]);
-
-    // Detect profileUpdated and refresh context
-    useEffect(() => {
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg?.profileUpdated) {
-            refreshProfile();
-        }
-    }, [messages, refreshProfile]);
 
     const isInitialLoad = useRef(true);
 
@@ -82,10 +37,10 @@ export default function Chat() {
         }
     }, [messages]);
 
-    const [spacerHeight, setSpacerHeight] = useState(150);
+    const [spacerHeight, setSpacerHeight] = useState(200);
     const inputContainerRef = useRef(null);
     const initialHeightRef = useRef(null);
-    const prevSpacerHeightRef = useRef(150);
+    const prevSpacerHeightRef = useRef(200);
 
     useLayoutEffect(() => {
         const delta = spacerHeight - prevSpacerHeightRef.current;
@@ -115,7 +70,7 @@ export default function Chat() {
                     }
 
                     const delta = currentHeight - initialHeightRef.current;
-                    const newSpacer = 150 + delta;
+                    const newSpacer = 200 + delta;
 
                     setSpacerHeight(prev => {
                         if (Math.abs(prev - newSpacer) < 5) return prev;
@@ -136,25 +91,6 @@ export default function Chat() {
         };
     }, [initialized]);
 
-    // Scroll to bottom when mobile keyboard appears (visual viewport shrinks)
-    useEffect(() => {
-        const vv = window.visualViewport;
-        if (!vv) return;
-
-        let prevHeight = vv.height;
-
-        const handleResize = () => {
-            const heightDiff = prevHeight - vv.height;
-            if (heightDiff > 100) {
-                setTimeout(() => scrollToBottom('smooth'), 100);
-            }
-            prevHeight = vv.height;
-        };
-
-        vv.addEventListener('resize', handleResize);
-        return () => vv.removeEventListener('resize', handleResize);
-    }, []);
-
     const handleImageChange = (hasImage) => {
         if (hasImage) {
             setTimeout(() => scrollToBottom('smooth'), 350);
@@ -164,9 +100,9 @@ export default function Chat() {
     const handleUpdateLog = async (itemId, updates) => {
         try {
             await api.updateFoodLog(itemId, updates);
+            // Ideally notify user or optimistic update
         } catch (err) {
             logger.error('Failed to update log:', err);
-            setError('Failed to update food log');
         }
     };
 
@@ -175,7 +111,6 @@ export default function Chat() {
             await api.deleteFoodLog(itemId);
         } catch (err) {
             logger.error('Failed to delete log:', err);
-            setError('Failed to delete food log');
         }
     };
 
@@ -200,8 +135,8 @@ export default function Chat() {
 
     return (
         <div className="flex flex-col relative min-h-full">
-            <div className="flex-1 px-0 py-2">
-                {messages.length === 0 && !needsOnboarding && (
+            <div className="flex-1 px-2 py-4">
+                {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center px-4 animate-in fade-in duration-700">
                         <div className="w-16 h-16 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6">
                             <span className="text-3xl">🥗</span>
@@ -234,31 +169,25 @@ export default function Chat() {
                         message={message}
                         onEditLog={(log) => setEditingFoodLog(log)}
                         onDelete={() => handleDeleteMessage(message.id)}
-                        onRetry={retryMessage}
                     />
                 ))}
 
-                {/* Processing indicator */}
-                {sending && !messages.some(m => m.status === 'sending') && (
-                    <div className="flex items-center gap-2.5 px-4 mb-5 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0ms]" />
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:150ms]" />
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:300ms]" />
-                        </div>
-                        <span className="text-sm text-primary/60">Kalli is thinking...</span>
+                {sending && (
+                    <div className="flex justify-start mb-6 px-4">
+                        <span className="font-mono text-xs text-primary/40 animate-pulse">
+                            Analyzing input...
+                        </span>
                     </div>
                 )}
 
                 {error && (
-                    <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm px-4 py-2.5 rounded-xl text-center mb-4 border border-red-100 dark:border-red-500/20 flex items-center justify-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>{error}</span>
+                    <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-xs px-4 py-2 rounded-full text-center mb-4 border border-red-100 dark:border-red-500/20">
+                        {error}
                     </div>
                 )}
 
                 <div
-                    style={{ height: `calc(${spacerHeight}px + env(safe-area-inset-bottom))` }}
+                    style={{ height: `${spacerHeight}px` }}
                     className="w-full"
                     aria-hidden="true"
                 />
@@ -269,7 +198,7 @@ export default function Chat() {
             <div
                 ref={inputContainerRef}
                 className="fixed left-1/2 -translate-x-1/2 w-full max-w-xl z-40 px-4 transition-all duration-300 pointer-events-auto"
-                style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
+                style={{ bottom: '7rem' }}
             >
                 <ChatInput
                     onSend={sendMessage}

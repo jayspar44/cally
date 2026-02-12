@@ -1,7 +1,7 @@
 {
-    "appId": "com.kalli.app.dev",
+    "appId": "com.jayspar.cally.dev",
     "webDir": "dist",
-    "appName": "Kalli (Dev)",
+    "appName": "Cally (Dev)",
     "server": {
         "androidScheme": "https"
     },

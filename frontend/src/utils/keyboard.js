@@ -20,23 +20,10 @@ export const setupKeyboardListeners = () => {
     document.body.classList.remove('keyboard-visible');
   });
 
-  // Reset keyboard state when app returns to foreground (fixes gray area
-  // when switching from another app that had the keyboard open)
-  const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible') {
-      Keyboard.hide().catch(() => {});
-      document.documentElement.style.setProperty('--keyboard-height', '0px');
-      document.body.classList.remove('keyboard-visible');
-    }
-  };
-
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-
   keyboardListeners.push(showListener, hideListener);
 
   return () => {
     keyboardListeners.forEach(listener => listener.remove());
     keyboardListeners = [];
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
   };
 };

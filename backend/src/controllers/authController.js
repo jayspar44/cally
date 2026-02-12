@@ -1,11 +1,6 @@
 const { auth, isReady } = require('../services/firebase');
 
 const verifyToken = async (req, res, next) => {
-    // Skip auth check for preflight requests
-    if (req.method === 'OPTIONS') {
-        return next();
-    }
-
     // Check if Firebase service is ready
     if (!isReady) {
         req.log.warn('Auth Service Unavailable: Firebase not initialized');

@@ -23,7 +23,7 @@ function AppContent() {
   useEffect(() => {
     const env = getEnvironment();
     const envSuffix = env === 'prod' ? '' : ` (${env})`;
-    document.title = `Kalli${envSuffix}`;
+    document.title = `Cally${envSuffix}`;
   }, []);
 
   useEffect(() => {

@@ -6,13 +6,6 @@ const sendMessage = async (req, res) => {
         const userId = req.user.uid;
         const { message, imageBase64 } = req.body;
 
-        req.log.info({
-            action: 'chat.sendMessage',
-            hasImage: !!imageBase64,
-            messageLength: message?.length || 0,
-            messagePreview: message?.substring(0, 200) || ''
-        }, 'Processing chat message');
-
         if (!message && !imageBase64) {
             return res.status(400).json({ error: 'Message or image required' });
         }
@@ -59,26 +52,11 @@ const sendMessage = async (req, res) => {
         };
         const assistantMsgDoc = await chatHistoryRef.add(assistantMessage);
 
-        req.log.info({
-            action: 'chat.sendMessage',
-            userMessageId: userMsgDoc.id,
-            assistantMessageId: assistantMsgDoc.id,
-            model: response.model,
-            tokensUsed: response.tokensUsed,
-            toolsUsed: response.toolsUsed,
-            foodLog: response.foodLog ? {
-                meal: response.foodLog.meal,
-                count: response.foodLog.count,
-                totalCalories: response.foodLog.totalCalories
-            } : null
-        }, 'Chat message processed');
-
         res.json({
             userMessageId: userMsgDoc.id,
             assistantMessageId: assistantMsgDoc.id,
             response: response.text,
-            foodLog: response.foodLog || null,
-            toolsUsed: response.toolsUsed || []
+            foodLog: response.foodLog || null
         });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to process message');
@@ -90,8 +68,6 @@ const getHistory = async (req, res) => {
     try {
         const userId = req.user.uid;
         const { limit = 50, before } = req.query;
-
-        req.log.info({ action: 'chat.getHistory', limit, before }, 'Fetching chat history');
 
         const chatHistoryRef = db.collection('users').doc(userId).collection('chatHistory');
 
@@ -111,8 +87,6 @@ const getHistory = async (req, res) => {
             timestamp: doc.data().timestamp?.toDate?.() || doc.data().timestamp
         })).reverse();
 
-        req.log.info({ action: 'chat.getHistory', messageCount: messages.length }, 'Chat history fetched');
-
         res.json({ messages });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get chat history');
@@ -123,8 +97,6 @@ const getHistory = async (req, res) => {
 const clearHistory = async (req, res) => {
     try {
         const userId = req.user.uid;
-        req.log.info({ action: 'chat.clearHistory' }, 'Clearing chat history');
-
         const chatHistoryRef = db.collection('users').doc(userId).collection('chatHistory');
 
         const snapshot = await chatHistoryRef.get();
@@ -135,8 +107,6 @@ const clearHistory = async (req, res) => {
         });
 
         await batch.commit();
-
-        req.log.info({ action: 'chat.clearHistory', deletedCount: snapshot.size }, 'Chat history cleared');
 
         res.json({ success: true, deletedCount: snapshot.size });
     } catch (error) {
@@ -150,11 +120,7 @@ const deleteMessage = async (req, res) => {
         const userId = req.user.uid;
         const messageId = req.params.id;
 
-        req.log.info({ action: 'chat.deleteMessage', messageId }, 'Deleting chat message');
-
         await db.collection('users').doc(userId).collection('chatHistory').doc(messageId).delete();
-
-        req.log.info({ action: 'chat.deleteMessage', messageId }, 'Chat message deleted');
 
         res.json({ success: true, id: messageId });
     } catch (error) {

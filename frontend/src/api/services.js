@@ -94,9 +94,4 @@ export const api = {
         const response = await client.get('/insights/monthly');
         return response.data;
     },
-
-    getRecommendedTargets: async () => {
-        const response = await client.get('/user/recommended-targets');
-        return response.data;
-    },
 };
