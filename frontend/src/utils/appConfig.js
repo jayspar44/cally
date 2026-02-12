@@ -4,6 +4,10 @@ const getAppVersion = () => {
   return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
 };
 
+export const getBuildVersionCode = () => {
+  return typeof __BUILD_VERSION_CODE__ !== 'undefined' && __BUILD_VERSION_CODE__ ? __BUILD_VERSION_CODE__ : null;
+};
+
 export const getEnvironment = () => {
   if (import.meta.env.DEV) {
     return 'local';
