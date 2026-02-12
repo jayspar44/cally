@@ -35,14 +35,14 @@ export default function Chat() {
         };
     }, [error, setError]);
 
-    // Trigger onboarding from Settings navigation
+    // Trigger onboarding from Home or Settings navigation
     useEffect(() => {
         if (location.state?.triggerOnboarding && initialized && !onboardingTriggered) {
             setOnboardingTriggered(true);
             navigate('/chat', { replace: true, state: {} });
-            sendMessage("I'd like to update my profile information");
+            sendMessage(needsOnboarding ? "Hey Kalli, I'd like to get started!" : "I'd like to update my profile information");
         }
-    }, [location.state, initialized, onboardingTriggered, navigate, sendMessage]);
+    }, [location.state, initialized, onboardingTriggered, needsOnboarding, navigate, sendMessage]);
 
     // Auto-trigger onboarding for new users with no chat history
     useEffect(() => {
@@ -135,6 +135,25 @@ export default function Chat() {
             if (observer) observer.disconnect();
         };
     }, [initialized]);
+
+    // Scroll to bottom when mobile keyboard appears (visual viewport shrinks)
+    useEffect(() => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+
+        let prevHeight = vv.height;
+
+        const handleResize = () => {
+            const heightDiff = prevHeight - vv.height;
+            if (heightDiff > 100) {
+                setTimeout(() => scrollToBottom('smooth'), 100);
+            }
+            prevHeight = vv.height;
+        };
+
+        vv.addEventListener('resize', handleResize);
+        return () => vv.removeEventListener('resize', handleResize);
+    }, []);
 
     const handleImageChange = (hasImage) => {
         if (hasImage) {

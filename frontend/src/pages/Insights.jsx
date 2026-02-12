@@ -100,7 +100,9 @@ export default function Insights() {
                 {/* Days Grid - Flexbox for better spacing control */}
                 <div className="flex justify-between items-end gap-2 mb-5 h-28 relative z-10">
                     {days.map((day, index) => {
-                        const heightPercent = Math.min(100, (day.calories / goals.targetCalories) * 100);
+                        const rawPercent = goals.targetCalories > 0 ? (day.calories / goals.targetCalories) * 100 : 0;
+                        const heightPercent = Math.min(100, rawPercent);
+                        const isOver = rawPercent > 100;
                         const isToday = isTodayUtil(day.date);
                         const hasData = day.calories > 0;
 
@@ -108,14 +110,15 @@ export default function Insights() {
                             <div key={index} className="flex flex-col items-center gap-3 flex-1 h-full justify-end group/bar cursor-default">
                                 {/* Tooltip (Hover) */}
                                 <div className="absolute mb-2 opacity-0 group-hover/bar:opacity-100 transition-opacity bg-primary text-white text-[10px] px-2 py-1 rounded-lg -translate-y-full font-mono whitespace-nowrap z-20 pointer-events-none">
-                                    {Math.round(day.calories)} cal
+                                    {Math.round(day.calories)} cal{isOver ? ` (${Math.round(rawPercent)}%)` : ''}
                                 </div>
 
                                 {/* Capsule Bar */}
                                 <div className={cn(
                                     "relative w-full max-w-[40px] bg-primary/5 rounded-[1rem] overflow-hidden transition-all duration-300",
                                     "h-full border border-transparent",
-                                    hasData ? "hover:border-primary/10 hover:shadow-inner" : ""
+                                    hasData ? "hover:border-primary/10 hover:shadow-inner" : "",
+                                    isOver && "shadow-[0_0_8px_var(--color-primary)]"
                                 )}>
                                     {/* Fill */}
                                     <div

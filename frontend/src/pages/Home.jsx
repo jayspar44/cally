@@ -5,6 +5,7 @@ import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { Sparkles } from 'lucide-react';
+import { cn } from '../utils/cn';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
 
@@ -59,7 +60,7 @@ export default function Home() {
               Share a few details and Kalli will calculate your ideal calorie and macro targets using science-backed formulas.
             </p>
             <button
-              onClick={() => navigate('/chat')}
+              onClick={() => navigate('/chat', { state: { triggerOnboarding: true } })}
               className="px-8 py-3 bg-accent text-white font-sans font-semibold rounded-2xl shadow-sm hover:bg-accent/90 transition-all active:scale-95"
             >
               Get Started
@@ -95,13 +96,19 @@ export default function Home() {
           </div>
           <div className="w-full bg-primary/5 rounded-full h-4 overflow-hidden">
             <div
-              className="bg-primary h-full rounded-full transition-all duration-1000 ease-out"
+              className={cn(
+                "h-full rounded-full transition-all duration-1000 ease-out bg-primary",
+                progress.calories > 100 && "shadow-[0_0_12px_var(--color-primary)]"
+              )}
               style={{ width: `${Math.min(100, progress.calories)}%` }}
             />
           </div>
           <div className="mt-2 text-right">
-            <span className="font-sans text-sm font-medium text-accent">
-              {remainingCalories > 0 ? `${remainingCalories} left` : `${Math.abs(remainingCalories)} over`}
+            <span className={cn(
+              "font-sans text-sm font-medium",
+              remainingCalories >= 0 ? "text-accent" : "text-accent font-bold"
+            )}>
+              {remainingCalories > 0 ? `${remainingCalories} left` : remainingCalories === 0 ? 'Goal reached' : `${Math.abs(remainingCalories)} over`}
             </span>
           </div>
         </div>

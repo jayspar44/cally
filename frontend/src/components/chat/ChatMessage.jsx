@@ -38,7 +38,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                 )}>
                     {/* Content */}
                     <div className={cn(
-                        "text-sm leading-normal break-words markdown-body",
+                        "text-base leading-normal break-words markdown-body",
                         isUser && "text-white [&_*]:text-white/90"
                     )}>
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -97,7 +97,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                 <div className={cn(
                     'text-[10px] font-mono mt-1 absolute -bottom-4 min-w-max flex items-center gap-1',
                     isUser ? 'right-2' : 'left-2',
-                    isFailed ? 'text-red-500 dark:text-red-400' : 'text-primary/30'
+                    isFailed ? 'text-red-500 dark:text-red-400' : 'text-primary/50 dark:text-primary/30'
                 )}>
                     {isSending ? (
                         <>

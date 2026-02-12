@@ -89,10 +89,10 @@ const getDailySummary = async (req, res) => {
         };
 
         const progress = {
-            calories: Math.min(100, (summary.totalCalories / goals.targetCalories) * 100),
-            protein: Math.min(100, (summary.totalProtein / goals.targetProtein) * 100),
-            carbs: Math.min(100, (summary.totalCarbs / goals.targetCarbs) * 100),
-            fat: Math.min(100, (summary.totalFat / goals.targetFat) * 100)
+            calories: goals.targetCalories > 0 ? (summary.totalCalories / goals.targetCalories) * 100 : 0,
+            protein: goals.targetProtein > 0 ? (summary.totalProtein / goals.targetProtein) * 100 : 0,
+            carbs: goals.targetCarbs > 0 ? (summary.totalCarbs / goals.targetCarbs) * 100 : 0,
+            fat: goals.targetFat > 0 ? (summary.totalFat / goals.targetFat) * 100 : 0
         };
 
         req.log.info({

@@ -31,10 +31,10 @@ export default function FoodLogCard({ foodLog, onEdit, onDelete }) {
                         return (
                             <div key={mealName}>
                                 <div className="px-4 py-2.5 bg-primary/5 border-b border-border/50 flex items-center justify-between">
-                                    <span className="font-serif font-bold text-primary capitalize text-sm">
+                                    <span className="font-serif font-bold text-primary capitalize text-base">
                                         {mealName}
                                     </span>
-                                    <span className="font-mono font-bold text-primary text-sm">
+                                    <span className="font-mono font-bold text-primary text-base">
                                         {Math.round(subtotal)} cal
                                     </span>
                                 </div>
@@ -44,8 +44,8 @@ export default function FoodLogCard({ foodLog, onEdit, onDelete }) {
                     })}
                     {/* Grand total */}
                     <div className="px-4 py-2 bg-primary/5 border-t border-border/50 flex items-center justify-between">
-                        <span className="font-serif font-bold text-primary text-xs">Total</span>
-                        <span className="font-mono font-bold text-primary text-xs">
+                        <span className="font-serif font-bold text-primary text-sm">Total</span>
+                        <span className="font-mono font-bold text-primary text-sm">
                             {Math.round(totalCalories)} cal
                         </span>
                     </div>
@@ -69,7 +69,7 @@ export default function FoodLogCard({ foodLog, onEdit, onDelete }) {
 
             {/* Macros */}
             <div className="px-4 py-2 bg-primary/2 border-t border-border/50">
-                <div className="flex justify-between text-[10px] font-mono tracking-tight">
+                <div className="flex justify-between text-xs font-mono tracking-tight">
                     <MacroStat label="PRO" value={totalProtein} color="text-primary" />
                     <MacroStat label="CARB" value={totalCarbs} color="text-accent" />
                     <MacroStat label="FAT" value={totalFat} color="text-amber-700 dark:text-[#D9A05B]" />
@@ -105,12 +105,12 @@ function ItemsList({ items }) {
     return (
         <div className="px-4 py-3 space-y-2">
             {items?.map((item, index) => (
-                <div key={index} className="flex justify-between items-start text-xs">
+                <div key={index} className="flex justify-between items-start text-sm">
                     <div className="flex-1 pr-2">
                         <span className="font-mono text-primary/90 block">
                             {item.name}
                         </span>
-                        <span className="font-sans text-primary/50">
+                        <span className="font-sans text-xs text-primary/50">
                             {item.quantity} {item.unit}
                         </span>
                     </div>
