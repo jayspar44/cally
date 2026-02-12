@@ -41,7 +41,7 @@ const colors = {
 };
 
 // Environment configurations - UPDATE APP_ID_BASE with your app ID
-const APP_ID_BASE = 'com.cally.app';
+const APP_ID_BASE = 'com.kalli.app';
 const APP_NAME = 'Kalli';
 
 const configs = {

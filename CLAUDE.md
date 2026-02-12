@@ -214,9 +214,9 @@ Capacitor for native builds. Three Android flavors with separate app IDs.
 
 | Script | App ID | Backend |
 |--------|--------|---------|
-| `android:local` | `com.cally.app.local` | Local |
-| `android:dev` | `com.cally.app.dev` | GCP dev |
-| `android` | `com.cally.app` | GCP prod |
+| `android:local` | `com.kalli.app.local` | Local |
+| `android:dev` | `com.kalli.app.dev` | GCP dev |
+| `android` | `com.kalli.app` | GCP prod |
 
 ### Android Commands
 
@@ -233,6 +233,10 @@ npm run android                    # GCP prod backend
 npm run apk:local                  # localDebug
 npm run apk:dev                    # devDebug
 npm run apk:prod                   # prodRelease
+
+# Build AAB (for Play Store)
+npm run aab:dev                    # devRelease AAB
+npm run aab:prod                   # prodRelease AAB
 ```
 
 ## GCP Deployment
@@ -244,6 +248,7 @@ npm run apk:prod                   # prodRelease
 | Push to `develop` | Deploy to dev | `cloudbuild.yaml` |
 | Push to `main` | Deploy to prod | `cloudbuild.yaml` |
 | PR to `develop` | Deploy preview | `cloudbuild-preview.yaml` |
+| Manual dispatch | Build AAB + upload to Play Store | `upload-play-store.yml` |
 
 ### Branch Protection
 
@@ -290,6 +295,7 @@ Custom commands in `.claude/commands/`:
 | `/pr-flow` | `/pr-flow [--no-fix] [--auto-merge]` - Autonomous PR workflow |
 | `/pr-merge` | `/pr-merge <pr-number> [--no-sync] [--delete-branch]` - Squash merge |
 | `/release` | `/release [--patch\|--minor\|--major]` - Auto-bump version |
+| `/upload-play-store` | `/upload-play-store [--prod\|--dev] [--internal\|--alpha\|--beta] [--draft\|--completed]` - Play Store upload |
 
 ### Typical Workflow
 
