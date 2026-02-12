@@ -34,6 +34,7 @@ export default defineConfig({
   plugins: [react()],
   define: {
     '__APP_VERSION__': JSON.stringify(pkg.version),
+    '__BUILD_VERSION_CODE__': JSON.stringify(process.env.VERSION_CODE || ''),
     '__BUILD_TIMESTAMP__': JSON.stringify(buildTimestamp),
     '__GIT_HASH__': JSON.stringify(gitHash),
     '__GIT_BRANCH__': JSON.stringify(gitBranch),

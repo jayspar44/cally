@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
 import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
-import { getVersionString, getEnvironment, getBackendInfo } from '../utils/appConfig';
+import { getVersionString, getEnvironment, getBackendInfo, getBuildVersionCode } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
 export default function Settings() {
@@ -766,7 +766,7 @@ export default function Settings() {
                 </div>
                 <div className="font-serif font-bold text-primary text-lg">Kalli System</div>
                 <div className="font-mono text-[10px] text-primary/40 tracking-wider">
-                    CLIENT: {getVersionString()} | ENV: {environment}
+                    CLIENT: {getVersionString()} | ENV: {environment}{getBuildVersionCode() ? ` | BUILD: ${getBuildVersionCode()}` : ''}
                 </div>
                 {backendInfo && (
                     <div className="font-mono text-[10px] text-primary/40 tracking-wider">

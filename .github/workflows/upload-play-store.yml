@@ -97,6 +97,8 @@ jobs:
 
       - name: Build web assets
         working-directory: frontend
+        env:
+          VERSION_CODE: ${{ github.run_number }}00
         run: |
           if [ "${{ inputs.flavor }}" = "prod" ]; then
             npm run build -- --mode production
@@ -176,6 +178,12 @@ jobs:
         run: |
           npx cap sync android
           echo "✓ Capacitor sync complete"
+
+      - name: Copy custom Android assets
+        working-directory: frontend
+        run: |
+          cp -R android-assets/res/mipmap-* android/app/src/main/res/
+          echo "✓ Custom launcher icons copied"
 
       - name: Configure release signing and versioning
         working-directory: frontend/android
