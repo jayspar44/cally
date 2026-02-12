@@ -127,6 +127,8 @@ if (backendMissing || frontendMissing) {
 const backendEnv = {
     ...process.env,
     PORT: backendPort.toString(),
+    NODE_ENV: 'development',
+    ALLOWED_ORIGINS: `http://localhost:${frontendPort},capacitor://localhost`,
     FORCE_COLOR: '1'
 };
 

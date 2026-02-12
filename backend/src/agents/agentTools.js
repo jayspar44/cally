@@ -1,22 +1,18 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
-const logger = require('../logger');
+const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
+const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
+const { getLogger } = require('../logger');
+const { getTodayStr } = require('../utils/dateUtils');
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
 
-const getTodayDate = (userTimezone) => {
-    if (userTimezone) {
-        return new Date().toLocaleDateString('en-CA', { timeZone: userTimezone });
-    }
-    return new Date().toISOString().split('T')[0];
-};
-
 const toolDeclarations = [
     {
         name: 'logFood',
-        description: 'Log a food entry to the user\'s food log. Use this when the user tells you what they ate and you have identified the food and quantities.',
+        description: 'Log a NEW food entry to the user\'s food log. Use ONLY when the user tells you what they ate and you need to create a new record. The nutrition values you pass MUST match what you quoted to the user. NEVER use this to correct or adjust an existing entry — use updateFoodLog instead.',
         parameters: {
             type: 'object',
             properties: {
@@ -148,6 +144,56 @@ const toolDeclarations = [
             type: 'object',
             properties: {}
         }
+    },
+    {
+        name: 'deleteFoodLog',
+        description: 'Permanently delete a food log entry. IMPORTANT: You MUST confirm with the user before calling this tool. Always use searchFoodLogs first to find the correct logId, show the user what you plan to delete, and only proceed after explicit confirmation.',
+        parameters: {
+            type: 'object',
+            properties: {
+                logId: {
+                    type: 'string',
+                    description: 'ID of the food log entry to delete. Must be obtained from searchFoodLogs.'
+                }
+            },
+            required: ['logId']
+        }
+    },
+    {
+        name: 'updateUserProfile',
+        description: 'Save or update user profile including name, body measurements, and fitness goals. When recalculateTargets is true, calculates personalized nutrition targets using the Mifflin-St Jeor equation and saves them. IMPORTANT: Only call this AFTER the user has confirmed the proposed values — never call it speculatively.',
+        parameters: {
+            type: 'object',
+            properties: {
+                firstName: { type: 'string', description: "User's preferred name" },
+                biometrics: {
+                    type: 'object',
+                    description: 'Body metrics and goals',
+                    properties: {
+                        weight: { type: 'number' },
+                        weightUnit: { type: 'string', enum: ['lbs', 'kg'] },
+                        height: { type: 'number', description: 'Total inches or cm' },
+                        heightUnit: { type: 'string', enum: ['in', 'cm'] },
+                        age: { type: 'number' },
+                        gender: { type: 'string', enum: ['male', 'female', 'other'] },
+                        goalType: { type: 'string', enum: ['lose_weight', 'maintain', 'gain_muscle'] },
+                        activityLevel: { type: 'string', enum: ['sedentary', 'lightly_active', 'moderately_active', 'very_active'] }
+                    }
+                },
+                targetOverrides: {
+                    type: 'object',
+                    description: 'Optional user overrides for calculated targets',
+                    properties: {
+                        targetCalories: { type: 'number' },
+                        targetProtein: { type: 'number' },
+                        targetCarbs: { type: 'number' },
+                        targetFat: { type: 'number' }
+                    }
+                },
+                recalculateTargets: { type: 'boolean', description: 'Calculate recommended nutrition targets from biometrics. Default true.' }
+            },
+            required: ['biometrics']
+        }
     }
 ];
 
@@ -166,11 +212,15 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
                 return await getUserGoals(userId);
             case 'searchFoodLogs':
                 return await searchFoodLogs(args, userId, userTimezone);
+            case 'deleteFoodLog':
+                return await deleteFoodLog(args, userId);
+            case 'updateUserProfile':
+                return await updateUserProfile(args, userId, userTimezone);
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
     } catch (error) {
-        logger.error({ err: error, toolName }, 'Tool execution failed');
+        getLogger().error({ err: error, toolName }, 'Tool execution failed');
         return { success: false, error: error.message };
     }
 };
@@ -183,7 +233,7 @@ const logFood = async (args, userId, userTimezone) => {
     if (meal) {
         meal = meal.toLowerCase();
         if (!VALID_MEALS.includes(meal)) {
-            logger.warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
+            getLogger().warn({ meal }, 'Invalid meal type received from AI, defaulting to snack');
             meal = 'snack';
         }
     } else {
@@ -191,14 +241,14 @@ const logFood = async (args, userId, userTimezone) => {
     }
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     const batch = db.batch();
     const createdIds = [];
 
     if ((!items || items.length === 0) && args.foodName) {
-        logger.info('Detected flat food arguments, converting to items array');
+        getLogger().info('Detected flat food arguments, converting to items array');
         items = [{
             name: args.foodName,
             quantity: args.quantity || 1,
@@ -212,7 +262,7 @@ const logFood = async (args, userId, userTimezone) => {
     }
 
     if (!items || !Array.isArray(items)) {
-        logger.warn({ args }, 'logFood called without valid items array');
+        getLogger().warn({ args }, 'logFood called without valid items array');
         items = [];
     }
 
@@ -250,8 +300,18 @@ const logFood = async (args, userId, userTimezone) => {
 
     await batch.commit();
 
+    getLogger().info({
+        action: 'tool.logFood',
+        date,
+        meal,
+        logIds: createdIds.map(i => i.id),
+        items: items.map(i => ({ name: i.name, calories: i.calories })),
+        totalCalories: Math.round(totals.calories)
+    }, 'Food logged via AI tool');
+
     return {
         success: true,
+        message: `Logged ${createdIds.length} item(s) for ${meal}: ${Math.round(totals.calories)} cal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fat)}g fat.`,
         data: {
             date,
             meal,
@@ -308,7 +368,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
     let { query, date } = args;
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     try {
@@ -322,6 +382,25 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
         }
 
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (!query) {
+            return {
+                success: true,
+                data: {
+                    count: logs.length,
+                    date,
+                    matches: logs.map(m => ({
+                        id: m.id,
+                        name: m.name,
+                        meal: m.meal,
+                        quantity: m.quantity,
+                        unit: m.unit,
+                        calories: m.calories,
+                        time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
+                    }))
+                }
+            };
+        }
+
         const lowerQuery = query.toLowerCase();
 
         const matches = logs.filter(log => {
@@ -348,13 +427,17 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
             }
         };
     } catch (error) {
-        logger.error({ err: error }, 'Error searching food logs');
+        getLogger().error({ err: error }, 'Error searching food logs');
         return { success: false, error: 'Failed to search logs' };
     }
 };
 
 const updateFoodLog = async (args, userId) => {
     const { logId, updates } = args;
+
+    if (!logId) {
+        return { success: false, error: 'logId is required. Use searchFoodLogs to find the correct ID first.' };
+    }
 
     const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(logId);
     const doc = await docRef.get();
@@ -363,16 +446,19 @@ const updateFoodLog = async (args, userId) => {
         return { success: false, error: 'Food log item not found. Please use searchFoodLogs to find the correct ID first.' };
     }
 
+    // AI may pass fields directly in args or nested under updates
+    const source = updates && typeof updates === 'object' ? updates : args;
+
     const cleanUpdates = {};
 
-    if (updates.items && Array.isArray(updates.items) && updates.items.length > 0) {
-        const item = updates.items[0];
+    if (source.items && Array.isArray(source.items) && source.items.length > 0) {
+        const item = source.items[0];
         Object.keys(item).forEach(k => {
             if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = item[k];
         });
     } else {
-        Object.keys(updates).forEach(k => {
-            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = updates[k];
+        Object.keys(source).forEach(k => {
+            if (ALLOWED_UPDATE_KEYS.includes(k)) cleanUpdates[k] = source[k];
         });
     }
 
@@ -383,6 +469,13 @@ const updateFoodLog = async (args, userId) => {
     cleanUpdates.updatedAt = FieldValue.serverTimestamp();
     cleanUpdates.corrected = true;
 
+    getLogger().info({
+        action: 'tool.updateFoodLog',
+        logId,
+        fields: Object.keys(cleanUpdates).filter(k => k !== 'updatedAt' && k !== 'corrected'),
+        updates: cleanUpdates
+    }, 'Updating food log via AI tool');
+
     await docRef.update(cleanUpdates);
 
     return {
@@ -391,11 +484,41 @@ const updateFoodLog = async (args, userId) => {
     };
 };
 
+const deleteFoodLog = async (args, userId) => {
+    const { logId } = args;
+
+    if (!logId) {
+        return { success: false, error: 'logId is required. Use searchFoodLogs to find the correct ID first.' };
+    }
+
+    const docRef = db.collection('users').doc(userId).collection('foodLogs').doc(logId);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+        return { success: false, error: 'Food log entry not found. Use searchFoodLogs to verify the ID.' };
+    }
+
+    const data = doc.data();
+
+    await docRef.delete();
+
+    getLogger().info({
+        action: 'tool.deleteFoodLog',
+        logId,
+        deletedItem: { name: data.name, meal: data.meal, calories: data.calories, date: data.date }
+    }, 'Food log deleted via AI tool');
+
+    return {
+        success: true,
+        data: { id: logId, deleted: true, name: data.name, meal: data.meal, calories: data.calories }
+    };
+};
+
 const getDailySummaryTool = async (args, userId, userTimezone) => {
     let { date } = args;
 
     if (!date) {
-        date = getTodayDate(userTimezone);
+        date = getTodayStr(userTimezone);
     }
 
     const snapshot = await db.collection('users').doc(userId)
@@ -451,16 +574,87 @@ const getDailySummaryTool = async (args, userId, userTimezone) => {
 };
 
 const getUserGoals = async (userId) => {
-    const userDoc = await db.collection('users').doc(userId).get();
-    const settings = userDoc.exists ? userDoc.data().settings : {};
+    const settings = await getUserSettings(userId);
+    const today = getTodayStr(settings.timezone);
+    const goals = await getGoalsForDate(userId, today, settings);
+    return { success: true, data: goals };
+};
+
+const updateUserProfile = async (args, userId, userTimezone) => {
+    const { firstName, biometrics, targetOverrides, recalculateTargets = true } = args;
+
+    if (!biometrics || !biometrics.weight) {
+        return { success: false, error: 'Weight is required in biometrics.' };
+    }
+
+    const normalizedBio = {
+        weight: biometrics.weight,
+        weightUnit: biometrics.weightUnit || 'lbs',
+        height: biometrics.height || null,
+        heightUnit: biometrics.heightUnit || 'in',
+        age: biometrics.age || null,
+        gender: biometrics.gender || null,
+        goalType: biometrics.goalType || 'maintain',
+        activityLevel: biometrics.activityLevel || 'sedentary',
+    };
+
+    const updateData = { biometrics: normalizedBio };
+    if (firstName) updateData.firstName = firstName;
+
+    let targets = null;
+    let calculationDetails = null;
+
+    if (recalculateTargets) {
+        const result = calculateRecommendedTargets(normalizedBio);
+        if (result.error) {
+            return { success: false, error: result.error };
+        }
+
+        targets = {
+            targetCalories: result.targetCalories,
+            targetProtein: result.targetProtein,
+            targetCarbs: result.targetCarbs,
+            targetFat: result.targetFat,
+        };
+        calculationDetails = result.calculationDetails;
+
+        // Apply user overrides on top of calculated values
+        if (targetOverrides) {
+            if (targetOverrides.targetCalories) targets.targetCalories = targetOverrides.targetCalories;
+            if (targetOverrides.targetProtein) targets.targetProtein = targetOverrides.targetProtein;
+            if (targetOverrides.targetCarbs) targets.targetCarbs = targetOverrides.targetCarbs;
+            if (targetOverrides.targetFat) targets.targetFat = targetOverrides.targetFat;
+        }
+
+        // Preserve existing settings (timezone, etc.) and merge targets
+        const userRef = db.collection('users').doc(userId);
+        const userDoc = await userRef.get();
+        const existingSettings = userDoc.exists ? (userDoc.data().settings || {}) : {};
+        updateData.settings = { ...existingSettings, ...targets };
+
+        // Snapshot goals for today
+        const todayStr = getTodayStr(userTimezone);
+        await snapshotGoals(userId, todayStr, updateData.settings);
+    }
+
+    await db.collection('users').doc(userId).set(updateData, { merge: true });
+
+    getLogger().info({
+        action: 'tool.updateUserProfile',
+        userId,
+        firstName: firstName || undefined,
+        biometrics: normalizedBio,
+        targets,
+    }, 'User profile updated via AI tool');
 
     return {
         success: true,
+        message: 'Profile updated successfully.',
         data: {
-            targetCalories: settings.targetCalories || 2000,
-            targetProtein: settings.targetProtein || 50,
-            targetCarbs: settings.targetCarbs || 250,
-            targetFat: settings.targetFat || 65
+            firstName: firstName || undefined,
+            biometrics: normalizedBio,
+            targets,
+            calculationDetails,
         }
     };
 };

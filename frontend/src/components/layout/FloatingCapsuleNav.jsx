@@ -7,20 +7,20 @@ export default function FloatingCapsuleNav() {
     const location = useLocation();
 
     return (
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[80%] max-w-[500px] z-50">
-            <div className="bg-white/90 dark:bg-surface/90 backdrop-blur-2xl border border-white/20 dark:border-border/30 rounded-[2.5rem] shadow-[0_20px_40px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] px-6 py-3 flex items-center justify-between relative">
+        <nav className="fixed left-1/2 -translate-x-1/2 w-[80%] max-w-[500px] z-50" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
+            <div className="bg-white/90 dark:bg-surface/90 backdrop-blur-2xl border border-white/20 dark:border-border/30 rounded-[2.5rem] shadow-[0_20px_40px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.5)] px-5 py-2 flex items-center justify-between relative">
                 <NavItem
                     icon={HiHome}
                     isActive={location.pathname === '/'}
                     onClick={() => navigate('/')}
                 />
 
-                <div className="absolute left-1/2 -translate-x-1/2 -top-6">
+                <div className="absolute left-1/2 -translate-x-1/2 -top-5">
                     <button
                         onClick={() => navigate('/chat')}
-                        className="w-16 h-16 rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(200,90,60,0.4)] dark:shadow-[0_10px_30px_rgba(224,122,95,0.5)] transition-all duration-300 active:scale-95 bg-accent text-accent-foreground border-4 border-background"
+                        className="w-14 h-14 rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(200,90,60,0.4)] dark:shadow-[0_10px_30px_rgba(224,122,95,0.5)] transition-all duration-300 active:scale-95 bg-accent text-accent-foreground border-[3px] border-background"
                     >
-                        <HiChatBubbleOvalLeftEllipsis className="w-8 h-8" />
+                        <HiChatBubbleOvalLeftEllipsis className="w-7 h-7" />
                     </button>
                 </div>
 

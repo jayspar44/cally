@@ -1,0 +1,8 @@
+{
+  "track_id": "onboarding_flow_20260208",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-02-08T12:00:00Z",
+  "updated_at": "2026-02-08T12:00:00Z",
+  "description": "Build the Kalli Conversational Onboarding Flow: Create a chat-based onboarding experience that captures user goals and biometrics, calculates BMR/targets, allows for review, and persists data to Firebase."
+}

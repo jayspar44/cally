@@ -12,7 +12,7 @@ export function Layout() {
                 id="layout-container"
                 className="absolute inset-0 overflow-y-auto no-scrollbar"
                 style={{
-                    paddingTop: 'calc(env(safe-area-inset-top) + 6rem)',
+                    paddingTop: 'calc(env(safe-area-inset-top) + 4.5rem)',
                     paddingBottom: 'env(safe-area-inset-bottom)'
                 }}
             >
@@ -20,7 +20,7 @@ export function Layout() {
                     <div className="flex-1">
                         <Outlet />
                     </div>
-                    {!isChatPage && <div className="h-32 w-full flex-shrink-0" aria-hidden="true" />}
+                    {!isChatPage && <div className="h-24 w-full flex-shrink-0" aria-hidden="true" />}
                 </div>
             </div>
 

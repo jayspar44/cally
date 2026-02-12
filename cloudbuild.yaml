@@ -31,7 +31,8 @@ steps:
       - '-c'
       - |
         CLOUD_RUN_URL=$$(gcloud run services describe cally-backend-${_ENV} --region us-central1 --format='value(status.url)')
-        FIREBASE_CONFIG=$$(gcloud secrets versions access latest --secret=FIREBASE_CLIENT_CONFIG)
+        # Get Firebase config and ensure it is valid, single-line JSON
+        FIREBASE_CONFIG=$$(gcloud secrets versions access latest --secret=FIREBASE_CLIENT_CONFIG | python3 -c "import sys, json; print(json.dumps(json.load(sys.stdin), separators=(',', ':')))")
         echo "VITE_API_URL=$${CLOUD_RUN_URL}/api" > /workspace/frontend/.env.production
         echo "VITE_FIREBASE_CONFIG=$${FIREBASE_CONFIG}" >> /workspace/frontend/.env.production
         echo "Created .env.production with API URL and Firebase config"
