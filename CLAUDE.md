@@ -69,6 +69,7 @@ cp frontend/.env.local.template frontend/.env.local
 npm run dev:local          # Both servers
 npm run dev:frontend       # Frontend only
 npm run dev:backend        # Backend only
+npm run dev:local:kill     # Kill running dev servers
 ```
 
 ## Environment Variables
@@ -213,9 +214,9 @@ Capacitor for native builds. Three Android flavors with separate app IDs.
 
 | Script | App ID | Backend |
 |--------|--------|---------|
-| `android:local` | `com.cally.app.local` | Local |
-| `android:dev` | `com.cally.app.dev` | GCP dev |
-| `android` | `com.cally.app` | GCP prod |
+| `android:local` | `com.kalli.app.local` | Local |
+| `android:dev` | `com.kalli.app.dev` | GCP dev |
+| `android` | `com.kalli.app` | GCP prod |
 
 ### Android Commands
 
@@ -232,6 +233,10 @@ npm run android                    # GCP prod backend
 npm run apk:local                  # localDebug
 npm run apk:dev                    # devDebug
 npm run apk:prod                   # prodRelease
+
+# Build AAB (for Play Store)
+npm run aab:dev                    # devRelease AAB
+npm run aab:prod                   # prodRelease AAB
 ```
 
 ## GCP Deployment
@@ -243,6 +248,7 @@ npm run apk:prod                   # prodRelease
 | Push to `develop` | Deploy to dev | `cloudbuild.yaml` |
 | Push to `main` | Deploy to prod | `cloudbuild.yaml` |
 | PR to `develop` | Deploy preview | `cloudbuild-preview.yaml` |
+| Manual dispatch | Build AAB + upload to Play Store | `upload-play-store.yml` |
 
 ### Branch Protection
 
@@ -289,6 +295,7 @@ Custom commands in `.claude/commands/`:
 | `/pr-flow` | `/pr-flow [--no-fix] [--auto-merge]` - Autonomous PR workflow |
 | `/pr-merge` | `/pr-merge <pr-number> [--no-sync] [--delete-branch]` - Squash merge |
 | `/release` | `/release [--patch\|--minor\|--major]` - Auto-bump version |
+| `/upload-play-store` | `/upload-play-store [--prod\|--dev] [--internal\|--alpha\|--beta] [--draft\|--completed]` - Play Store upload |
 
 ### Typical Workflow
 
@@ -309,6 +316,7 @@ Auto-invoked skills (brainstorming, TDD, debugging, verification, etc.) activate
 - **Tailwind CSS v4**: Uses `@theme` directive in `index.css` — no `tailwind.config.js`. Theme tokens defined as CSS variables.
 - **Dark mode**: Class strategy via `@custom-variant dark (&:is(.dark *))` with `.dark` on `<html>`. Color overrides in `html.dark {}` block in `index.css`. Semi-transparent whites (e.g., `bg-white/10`) need explicit `dark:bg-surface/10` since CSS variable swap doesn't handle opacity-based colors.
 - **Chat page spacer**: 200px base + ResizeObserver delta from input container height. Observer depends on `[initialized]` dep — must re-run after loading spinner replaced by full UI.
+- **Date parsing**: Never use `new Date("YYYY-MM-DD")` or `toISOString().split('T')[0]` directly. Import helpers from `utils/dateUtils.js` — `parseLocalDate()` for parsing, `toDateStr()` for formatting. See dateUtils files for full API.
 - **React 19**: No `import React` needed — JSX transform handles it automatically.
 
 ## Coding Conventions

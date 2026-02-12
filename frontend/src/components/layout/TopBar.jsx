@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 const PAGE_TITLES = {
-    '/': 'Cally',
+    '/': 'Kalli',
     '/database': 'Food Log',
     '/insights': 'Insights',
     '/settings': 'Settings',
@@ -32,15 +32,15 @@ export default function TopBar() {
         return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const title = PAGE_TITLES[location.pathname] || 'Cally';
+    const title = PAGE_TITLES[location.pathname] || 'Kalli';
 
     return (
         <header
             className={cn(
                 "fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
                 scrolled
-                    ? "bg-white/80 dark:bg-surface/80 backdrop-blur-xl border-b border-border pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 px-6 shadow-sm"
-                    : "bg-white/80 dark:bg-surface/80 backdrop-blur-md pt-[calc(1.5rem+env(safe-area-inset-top))] pb-6 px-6",
+                    ? "bg-white/80 dark:bg-surface/80 backdrop-blur-xl border-b border-border pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 px-6 shadow-sm"
+                    : "bg-white/80 dark:bg-surface/80 backdrop-blur-md pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 px-6",
                 developerMode && "border-t-[3px] border-t-red-500"
             )}
         >
@@ -51,7 +51,7 @@ export default function TopBar() {
                         <h1
                             className={cn(
                                 "font-serif font-black text-primary transition-all duration-300 origin-left",
-                                scrolled ? "text-lg" : "text-3xl"
+                                scrolled ? "text-base" : "text-xl"
                             )}
                         >
                             {title}
