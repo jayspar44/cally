@@ -216,7 +216,7 @@ Capacitor for native builds. Three Android flavors with separate app IDs.
 |--------|--------|---------|
 | `android:local` | `com.kalli.app.local` | Local |
 | `android:dev` | `com.kalli.app.dev` | GCP dev |
-| `android` | `com.kalli.app` | GCP prod |
+| `android` | `com.getkalli.app` | GCP prod |
 
 ### Android Commands
 

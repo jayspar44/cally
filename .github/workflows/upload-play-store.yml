@@ -132,7 +132,7 @@ jobs:
         run: |
           # Determine app configuration based on flavor
           if [ "${{ inputs.flavor }}" = "prod" ]; then
-            APP_ID="com.kalli.app"
+            APP_ID="com.getkalli.app"
             APP_NAME="Kalli"
           else
             APP_ID="com.kalli.app.dev"
@@ -251,7 +251,7 @@ jobs:
         id: package
         run: |
           if [ "${{ inputs.flavor }}" = "prod" ]; then
-            echo "name=com.kalli.app" >> $GITHUB_OUTPUT
+            echo "name=com.getkalli.app" >> $GITHUB_OUTPUT
           else
             echo "name=com.kalli.app.dev" >> $GITHUB_OUTPUT
           fi
