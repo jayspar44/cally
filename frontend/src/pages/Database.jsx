@@ -131,7 +131,7 @@ export default function Database() {
                                     <th
                                         key={header}
                                         className={cn(
-                                            "px-1.5 py-3 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold first:pl-3",
+                                            "px-1.5 py-3 font-sans text-[10px] uppercase tracking-widest text-primary/65 font-bold first:pl-3",
                                             (header === 'Cals' || header === 'Qty' || ['P', 'C', 'F'].includes(header)) && "text-right",
                                             header === 'Time' && "hidden xl:table-cell",
                                             header === 'Qty' && "hidden xl:table-cell"
@@ -140,7 +140,7 @@ export default function Database() {
                                         {header}
                                     </th>
                                 ))}
-                                <th className="px-1.5 py-3 pr-3 font-sans text-[10px] uppercase tracking-widest text-primary/50 font-bold text-right">Actions</th>
+                                <th className="px-1.5 py-3 pr-3 font-sans text-[10px] uppercase tracking-widest text-primary/65 font-bold text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -156,7 +156,7 @@ export default function Database() {
                                         <td className="pl-3 pr-1.5 py-2.5 font-mono text-xs text-primary/70 whitespace-nowrap">
                                             {formatDateDisplay(log.date, { month: '2-digit', day: '2-digit' })}
                                         </td>
-                                        <td className="px-1.5 py-2.5 font-mono text-xs text-primary/40 whitespace-nowrap hidden xl:table-cell">
+                                        <td className="px-1.5 py-2.5 font-mono text-xs text-primary/55 whitespace-nowrap hidden xl:table-cell">
                                             {log.createdAt ? formatTime(log.createdAt) : '-'}
                                         </td>
                                         <td className="px-1.5 py-2.5 font-mono text-xs text-primary/70 capitalize">

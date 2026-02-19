@@ -10,13 +10,13 @@ export default function MacroCard({ label, current, progress, color }) {
             ring: 'stroke-[var(--color-accent)]',
             text: 'text-accent',
             bg: 'text-accent/10',
-            glow: 'drop-shadow-[0_0_6px_rgba(200,90,60,0.35)]'
+            glow: 'drop-shadow-[0_0_6px_rgba(166,114,88,0.35)]'
         },
         fat: {
-            ring: 'stroke-amber-600 dark:stroke-[#D9A05B]',
-            text: 'text-amber-700 dark:text-[#D9A05B]',
-            bg: 'text-amber-600/10',
-            glow: 'drop-shadow-[0_0_6px_rgba(180,130,50,0.35)]'
+            ring: 'stroke-[var(--color-fat)]',
+            text: 'text-fat',
+            bg: 'text-fat/10',
+            glow: 'drop-shadow-[0_0_6px_rgba(195,150,52,0.35)]'
         }
     };
 
@@ -75,7 +75,7 @@ export default function MacroCard({ label, current, progress, color }) {
                 <div className={`font-mono font-bold text-lg leading-none mb-1 ${theme.text}`}>
                     {Math.round(current)}g
                 </div>
-                <div className="font-sans font-medium text-primary/60 text-xs tracking-wide uppercase">
+                <div className="font-sans font-medium text-primary/70 text-xs tracking-wide uppercase">
                     {label}
                 </div>
             </div>

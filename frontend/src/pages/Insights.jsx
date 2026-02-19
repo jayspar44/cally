@@ -85,13 +85,13 @@ export default function Insights() {
                 <div className="flex justify-between items-start mb-6 relative">
                     <div>
                         <h2 className="font-serif font-bold text-2xl text-primary mb-1">Weekly Pulse</h2>
-                        <p className="font-sans text-xs text-primary/40 font-medium tracking-wide uppercase">Last 7 Days</p>
+                        <p className="font-sans text-xs text-primary/55 font-medium tracking-wide uppercase">Last 7 Days</p>
                     </div>
                     <div className="text-right">
                         <span className="font-serif font-bold text-3xl text-primary block leading-none tracking-tight">
                             {Math.round(averages.calories)}
                         </span>
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-primary/40 font-bold block mt-1">
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-primary/55 font-bold block mt-1">
                             Avg Cals
                         </span>
                     </div>
@@ -136,7 +136,7 @@ export default function Insights() {
                                 {/* Day Label */}
                                 <span className={cn(
                                     "font-mono text-[10px] uppercase transition-colors",
-                                    isToday ? "text-accent font-bold" : "text-primary/40"
+                                    isToday ? "text-accent font-bold" : "text-primary/55"
                                 )}>
                                     {formatDateDisplay(day.date, { weekday: 'narrow' })}
                                 </span>
@@ -149,12 +149,12 @@ export default function Insights() {
                 <div className="flex justify-start items-center gap-6 pt-6 border-t border-dashed border-primary/10 relative z-10">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-                        <span className="font-sans text-xs text-primary/60 font-medium">
+                        <span className="font-sans text-xs text-primary/70 font-medium">
                             <span className="text-primary font-bold">{daysTracked}</span> Days Tracked
                         </span>
                     </div>
                     <div className="w-px h-3 bg-primary/10" />
-                    <span className="font-sans text-xs text-primary/60">
+                    <span className="font-sans text-sm text-primary/70">
                         Goal: <span className="font-mono text-primary font-medium">{goals.targetCalories}</span>
                     </span>
                 </div>

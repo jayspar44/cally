@@ -15,16 +15,19 @@
   /* Deep Moss Green */
   --color-primary-foreground: #FFFFFF;
 
-  --color-accent: #C85A3C;
-  /* Burnt Orange */
+  --color-accent: #A67258;
+  /* Warm Terracotta */
   --color-accent-foreground: #FFFFFF;
+
+  --color-fat: #C39634;
+  /* Harvest Gold */
 
   --color-surface: #FFFFFF;
   --color-surface-foreground: #284136;
 
   --color-border: #E8EAE6;
   --color-input: #FFFFFF;
-  --color-ring: #C85A3C;
+  --color-ring: #A67258;
 
   /* Fonts */
   --font-serif: 'Fraunces', serif;
@@ -53,13 +56,14 @@ html.dark {
   --color-foreground: #E2E5E1;
   --color-primary: #E2E5E1;
   --color-primary-foreground: #111212;
-  --color-accent: #E07A5F;
+  --color-accent: #C89880;
   --color-accent-foreground: #FFFFFF;
+  --color-fat: #D9B35C;
   --color-surface: #1C1D1D;
   --color-surface-foreground: #E2E5E1;
   --color-border: #2B2D2D;
   --color-input: #1C1D1D;
-  --color-ring: #E07A5F;
+  --color-ring: #C89880;
   --shadow-card: 0 30px 70px -10px rgba(0, 0, 0, 0.4);
   --shadow-float: 0 40px 80px rgba(0, 0, 0, 0.6);
 }
