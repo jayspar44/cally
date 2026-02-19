@@ -76,13 +76,13 @@ export default function Home() {
         <div className="flex justify-between items-end mb-6">
           <div>
             <h2 className="font-serif font-black text-2xl text-primary mb-1">Today's Fuel</h2>
-            <p className="font-sans text-primary/60 text-sm">Summary of your nutrition.</p>
+            <p className="font-sans text-primary/70 text-sm">Summary of your nutrition.</p>
           </div>
           <div className="text-right">
             <span className="font-mono font-bold text-3xl text-primary block leading-none">
               {Math.round(summary.totalCalories)}
             </span>
-            <span className="font-sans text-xs text-primary/40 uppercase tracking-widest font-semibold">
+            <span className="font-sans text-xs text-primary/55 uppercase tracking-widest font-semibold">
               Calories
             </span>
           </div>
@@ -90,23 +90,36 @@ export default function Home() {
 
         {/* Progress Bar */}
         <div className="mb-6">
-          <div className="flex justify-between text-xs font-mono text-primary/60 mb-2">
-            <span>0</span>
+          <div className="flex justify-end text-sm font-mono text-primary/70 mb-2">
             <span>Goal: {goals.targetCalories}</span>
           </div>
-          <div className="w-full bg-primary/5 rounded-full h-4 overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-1000 ease-out bg-primary",
-                progress.calories > 100 && "shadow-[0_0_12px_var(--color-primary)]"
-              )}
-              style={{ width: `${Math.min(100, progress.calories)}%` }}
-            />
+          <div className={cn(
+            "w-full bg-primary/5 rounded-full h-4 relative overflow-hidden",
+            progress.calories > 100 && "shadow-[0_0_10px_rgba(40,65,54,0.4)] dark:shadow-[0_0_10px_rgba(226,229,225,0.35)]"
+          )}>
+            {progress.calories <= 100 ? (
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-out bg-primary"
+                style={{ width: `${Math.min(100, progress.calories)}%` }}
+              />
+            ) : (
+              <div className="flex h-full w-full">
+                <div
+                  className="h-full bg-primary rounded-l-full transition-all duration-1000 ease-out"
+                  style={{ width: `${(goals.targetCalories / summary.totalCalories) * 100}%` }}
+                />
+                <div className="w-0.5 h-full bg-primary/30 shrink-0" />
+                <div
+                  className="h-full bg-primary rounded-r-full transition-all duration-1000 ease-out"
+                  style={{ flex: 1 }}
+                />
+              </div>
+            )}
           </div>
           <div className="mt-2 text-right">
             <span className={cn(
               "font-sans text-sm font-medium",
-              remainingCalories >= 0 ? "text-accent" : "text-accent font-bold"
+              remainingCalories >= 0 ? "text-primary" : "text-primary font-bold"
             )}>
               {remainingCalories > 0 ? `${remainingCalories} left` : remainingCalories === 0 ? 'Goal reached' : `${Math.abs(remainingCalories)} over`}
             </span>

@@ -122,12 +122,14 @@ const getWeeklyTrends = async (req, res) => {
 
         req.log.info({ action: 'insights.getWeeklyTrends' }, 'Fetching weekly trends');
 
-        const endDate = new Date();
-        const startDate = new Date();
+        const settings = await getUserSettings(userId);
+        const todayStr = getTodayStr(settings.timezone);
+        const endDate = parseLocalDate(todayStr);
+        const startDate = parseLocalDate(todayStr);
         startDate.setDate(startDate.getDate() - 6);
 
         const startStr = toDateStr(startDate);
-        const endStr = toDateStr(endDate);
+        const endStr = todayStr;
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -171,8 +173,7 @@ const getWeeklyTrends = async (req, res) => {
             fat: Math.round(totals.fat / daysWithData)
         };
 
-        const settings = await getUserSettings(userId);
-        const goals = await getGoalsForDate(userId, toDateStr(), settings);
+        const goals = await getGoalsForDate(userId, todayStr, settings);
 
         req.log.info({
             action: 'insights.getWeeklyTrends',
@@ -201,12 +202,13 @@ const getMonthlyTrends = async (req, res) => {
 
         req.log.info({ action: 'insights.getMonthlyTrends' }, 'Fetching monthly trends');
 
-        const endDate = new Date();
-        const startDate = new Date();
+        const settings = await getUserSettings(userId);
+        const todayStr = getTodayStr(settings.timezone);
+        const startDate = parseLocalDate(todayStr);
         startDate.setDate(startDate.getDate() - 29);
 
         const startStr = toDateStr(startDate);
-        const endStr = toDateStr(endDate);
+        const endStr = todayStr;
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef

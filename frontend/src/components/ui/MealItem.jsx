@@ -30,7 +30,7 @@ export default function MealItem({ meal }) {
                         </span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <p className="font-sans text-sm text-primary/60 truncate pr-4">
+                        <p className="font-sans text-sm text-primary/70 truncate pr-4">
                             {meal.description || 'No description'}
                         </p>
                         <ChevronDown className={cn(
@@ -54,7 +54,7 @@ export default function MealItem({ meal }) {
                                 <span className="font-mono text-primary/80 block">
                                     {item.name}
                                 </span>
-                                <span className="font-sans text-xs text-primary/50">
+                                <span className="font-sans text-xs text-primary/65">
                                     {item.quantity} {item.unit}
                                 </span>
                             </div>
@@ -63,9 +63,9 @@ export default function MealItem({ meal }) {
                                     {Math.round(item.calories)} cal
                                 </span>
                                 <div className="flex gap-2 mt-0.5 justify-end">
-                                    <span className="font-mono text-[10px] text-primary/50">P {Math.round(item.protein || 0)}g</span>
-                                    <span className="font-mono text-[10px] text-accent/70">C {Math.round(item.carbs || 0)}g</span>
-                                    <span className="font-mono text-[10px] text-amber-700/70 dark:text-[#D9A05B]/70">F {Math.round(item.fat || 0)}g</span>
+                                    <span className="font-mono text-[10px] text-primary/65">P {Math.round(item.protein || 0)}g</span>
+                                    <span className="font-mono text-[10px] text-carbs/80">C {Math.round(item.carbs || 0)}g</span>
+                                    <span className="font-mono text-[10px] text-fat/80">F {Math.round(item.fat || 0)}g</span>
                                 </div>
                             </div>
                         </div>

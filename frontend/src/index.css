@@ -19,6 +19,11 @@
   /* Burnt Orange */
   --color-accent-foreground: #FFFFFF;
 
+  --color-carbs: #D4950C;
+  /* Vivid Marigold */
+  --color-fat: #7B4FBF;
+  /* Royal Violet */
+
   --color-surface: #FFFFFF;
   --color-surface-foreground: #284136;
 
@@ -55,6 +60,8 @@ html.dark {
   --color-primary-foreground: #111212;
   --color-accent: #E07A5F;
   --color-accent-foreground: #FFFFFF;
+  --color-carbs: #F0B840;
+  --color-fat: #B088E3;
   --color-surface: #1C1D1D;
   --color-surface-foreground: #E2E5E1;
   --color-border: #2B2D2D;

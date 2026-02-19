@@ -85,23 +85,24 @@ export default function Insights() {
                 <div className="flex justify-between items-start mb-6 relative">
                     <div>
                         <h2 className="font-serif font-bold text-2xl text-primary mb-1">Weekly Pulse</h2>
-                        <p className="font-sans text-xs text-primary/40 font-medium tracking-wide uppercase">Last 7 Days</p>
+                        <p className="font-sans text-xs text-primary/55 font-medium tracking-wide uppercase">Last 7 Days</p>
                     </div>
                     <div className="text-right">
                         <span className="font-serif font-bold text-3xl text-primary block leading-none tracking-tight">
                             {Math.round(averages.calories)}
                         </span>
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-primary/40 font-bold block mt-1">
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-primary/55 font-bold block mt-1">
                             Avg Cals
                         </span>
                     </div>
                 </div>
 
-                {/* Days Grid - Flexbox for better spacing control */}
+                {/* Days Grid */}
                 <div className="flex justify-between items-end gap-2 mb-5 h-28 relative z-10">
                     {days.map((day, index) => {
                         const rawPercent = goals.targetCalories > 0 ? (day.calories / goals.targetCalories) * 100 : 0;
-                        const heightPercent = Math.min(100, rawPercent);
+                        const GOAL_SCALE = 0.8;
+                        const heightPercent = Math.min(100, rawPercent * GOAL_SCALE);
                         const isOver = rawPercent > 100;
                         const isToday = isTodayUtil(day.date);
                         const hasData = day.calories > 0;
@@ -113,17 +114,18 @@ export default function Insights() {
                                     {Math.round(day.calories)} cal{isOver ? ` (${Math.round(rawPercent)}%)` : ''}
                                 </div>
 
-                                {/* Capsule Bar */}
-                                <div className={cn(
-                                    "relative w-full max-w-[40px] bg-primary/5 rounded-[1rem] overflow-hidden transition-all duration-300",
-                                    "h-full border border-transparent",
-                                    hasData ? "hover:border-primary/10 hover:shadow-inner" : "",
-                                    isOver && "shadow-[0_0_8px_var(--color-primary)]"
-                                )}>
-                                    {/* Fill */}
+                                {/* Bar area */}
+                                <div className="relative w-full max-w-[40px] h-full">
+                                    {/* Ghost bar — target silhouette (80% = goal line) */}
+                                    <div
+                                        className="absolute bottom-0 left-0 w-full rounded-[1rem] bg-primary/[0.06] dark:bg-white/[0.04]"
+                                        style={{ height: `${GOAL_SCALE * 100}%` }}
+                                    />
+
+                                    {/* Actual bar — proportional height, extends above ghost when over target */}
                                     <div
                                         className={cn(
-                                            "absolute bottom-0 left-0 w-full transition-all duration-1000 ease-[cubic-bezier(0.25,0.1,0.25,1)] rounded-[1rem]",
+                                            "absolute bottom-0 left-0 w-full rounded-[1rem] transition-all duration-1000 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
                                             isToday ? "bg-accent" : "bg-primary"
                                         )}
                                         style={{
@@ -131,12 +133,20 @@ export default function Insights() {
                                             opacity: hasData ? 1 : 0
                                         }}
                                     />
+
+                                    {/* Goal marker line — only when over target */}
+                                    {isOver && hasData && (
+                                        <div
+                                            className="absolute left-0 w-full h-0.5 bg-black/15 dark:bg-white/15 z-10"
+                                            style={{ bottom: `${GOAL_SCALE * 100}%` }}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* Day Label */}
                                 <span className={cn(
                                     "font-mono text-[10px] uppercase transition-colors",
-                                    isToday ? "text-accent font-bold" : "text-primary/40"
+                                    isToday ? "text-accent font-bold" : "text-primary/55"
                                 )}>
                                     {formatDateDisplay(day.date, { weekday: 'narrow' })}
                                 </span>
@@ -149,12 +159,12 @@ export default function Insights() {
                 <div className="flex justify-start items-center gap-6 pt-6 border-t border-dashed border-primary/10 relative z-10">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-                        <span className="font-sans text-xs text-primary/60 font-medium">
+                        <span className="font-sans text-xs text-primary/70 font-medium">
                             <span className="text-primary font-bold">{daysTracked}</span> Days Tracked
                         </span>
                     </div>
                     <div className="w-px h-3 bg-primary/10" />
-                    <span className="font-sans text-xs text-primary/60">
+                    <span className="font-sans text-sm text-primary/70">
                         Goal: <span className="font-mono text-primary font-medium">{goals.targetCalories}</span>
                     </span>
                 </div>

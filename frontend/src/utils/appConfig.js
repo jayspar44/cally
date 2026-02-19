@@ -1,4 +1,4 @@
-/* global __BUILD_TIMESTAMP__ */
+/* global __BUILD_TIMESTAMP__, __BUILD_VERSION_CODE__ */
 
 const getAppVersion = () => {
   return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
