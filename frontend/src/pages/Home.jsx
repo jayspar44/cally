@@ -93,14 +93,28 @@ export default function Home() {
           <div className="flex justify-end text-sm font-mono text-primary/70 mb-2">
             <span>Goal: {goals.targetCalories}</span>
           </div>
-          <div className="w-full bg-primary/5 rounded-full h-4 overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all duration-1000 ease-out bg-primary",
-                progress.calories > 100 && "shadow-[0_0_12px_var(--color-primary)]"
-              )}
-              style={{ width: `${Math.min(100, progress.calories)}%` }}
-            />
+          <div className={cn(
+            "w-full bg-primary/5 rounded-full h-4 relative overflow-hidden",
+            progress.calories > 100 && "shadow-[0_0_10px_rgba(40,65,54,0.4)] dark:shadow-[0_0_10px_rgba(226,229,225,0.35)]"
+          )}>
+            {progress.calories <= 100 ? (
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-out bg-primary"
+                style={{ width: `${Math.min(100, progress.calories)}%` }}
+              />
+            ) : (
+              <div className="flex h-full w-full">
+                <div
+                  className="h-full bg-primary rounded-l-full transition-all duration-1000 ease-out"
+                  style={{ width: `${(goals.targetCalories / summary.totalCalories) * 100}%` }}
+                />
+                <div className="w-0.5 h-full bg-primary/30 shrink-0" />
+                <div
+                  className="h-full bg-primary rounded-r-full transition-all duration-1000 ease-out"
+                  style={{ flex: 1 }}
+                />
+              </div>
+            )}
           </div>
           <div className="mt-2 text-right">
             <span className={cn(

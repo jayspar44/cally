@@ -128,7 +128,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-accent mb-1">Carbs</label>
+                            <label className="block text-xs font-medium text-carbs mb-1">Carbs</label>
                             <input
                                 type="number"
                                 name="carbs"

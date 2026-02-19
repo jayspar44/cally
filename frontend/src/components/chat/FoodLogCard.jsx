@@ -71,7 +71,7 @@ export default function FoodLogCard({ foodLog, onEdit, onDelete }) {
             <div className="px-4 py-2 bg-primary/2 border-t border-border/50">
                 <div className="flex justify-between text-xs font-mono tracking-tight">
                     <MacroStat label="PRO" value={totalProtein} color="text-primary" />
-                    <MacroStat label="CARB" value={totalCarbs} color="text-accent" />
+                    <MacroStat label="CARB" value={totalCarbs} color="text-carbs" />
                     <MacroStat label="FAT" value={totalFat} color="text-fat" />
                 </div>
             </div>
