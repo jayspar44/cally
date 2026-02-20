@@ -102,19 +102,32 @@ export const api = {
         return response.data;
     },
 
-    getMonthlyTrends: async () => {
-        const response = await client.get('/insights/monthly');
+    getMonthlyTrends: async (monthStart = null) => {
+        const params = monthStart ? { monthStart } : {};
+        const response = await client.get('/insights/monthly', { params });
         return response.data;
     },
 
-    getQuarterlyTrends: async () => {
-        const response = await client.get('/insights/quarterly');
+    getQuarterlyTrends: async (quarterStart = null) => {
+        const params = quarterStart ? { quarterStart } : {};
+        const response = await client.get('/insights/quarterly', { params });
         return response.data;
     },
 
-    getAISummary: async (weekStart = null) => {
-        const params = weekStart ? { week: weekStart } : {};
+    getAISummary: async (range = '1W', periodStart = null, { refresh = false } = {}) => {
+        const params = { range };
+        if (periodStart) {
+            if (range === '1W') params.week = periodStart;
+            else if (range === '1M') params.monthStart = periodStart;
+            else if (range === '3M') params.quarterStart = periodStart;
+        }
+        if (refresh) params.refresh = 'true';
         const response = await client.get('/insights/ai-summary', { params });
+        return response.data;
+    },
+
+    getUserBadges: async () => {
+        const response = await client.get('/user/badges');
         return response.data;
     },
 

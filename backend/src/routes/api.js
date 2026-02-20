@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pkg = require('../../package.json');
 const { verifyToken } = require('../controllers/authController');
-const { updateProfile, getProfile, getRecommendedTargets } = require('../controllers/userController');
+const { updateProfile, getProfile, getRecommendedTargets, getBadges } = require('../controllers/userController');
 const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
 const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
@@ -21,6 +21,7 @@ router.use(require('../middleware/requestLogger').requestLogger);
 router.post('/user/profile', updateProfile);
 router.get('/user/profile', getProfile);
 router.get('/user/recommended-targets', getRecommendedTargets);
+router.get('/user/badges', getBadges);
 
 router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);

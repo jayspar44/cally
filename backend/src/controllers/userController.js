@@ -2,6 +2,7 @@ const { db } = require('../services/firebase');
 const { toDateStr, getTodayStr } = require('../utils/dateUtils');
 const { DEFAULT_GOALS, snapshotGoals } = require('../services/goalsService');
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
+const { getUserBadges } = require('../services/badgeService');
 
 const DEFAULT_SETTINGS = {
     ...DEFAULT_GOALS,
@@ -127,8 +128,21 @@ const getRecommendedTargets = async (req, res) => {
     }
 };
 
+const getBadges = async (req, res) => {
+    try {
+        const { uid } = req.user;
+        req.log.info({ action: 'user.getBadges' }, 'Fetching user badges');
+        const result = await getUserBadges(uid);
+        res.json(result);
+    } catch (error) {
+        req.log.error({ err: error }, 'Error fetching badges');
+        res.status(500).json({ error: 'Failed to fetch badges' });
+    }
+};
+
 module.exports = {
     updateProfile,
     getProfile,
-    getRecommendedTargets
+    getRecommendedTargets,
+    getBadges
 };

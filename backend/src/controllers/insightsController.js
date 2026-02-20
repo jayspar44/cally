@@ -268,15 +268,27 @@ const getMonthlyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        req.log.info({ action: 'insights.getMonthlyTrends' }, 'Fetching monthly trends');
+        const { monthStart: monthStartParam } = req.query;
+        req.log.info({ action: 'insights.getMonthlyTrends', monthStart: monthStartParam }, 'Fetching monthly trends');
 
         const settings = await getUserSettings(userId);
         const todayStr = getTodayStr(settings.timezone);
-        const startDate = parseLocalDate(todayStr);
-        startDate.setDate(startDate.getDate() - 29);
+        const todayDate = parseLocalDate(todayStr);
+
+        let startDate, endDate;
+        if (monthStartParam && /^\d{4}-\d{2}-\d{2}$/.test(monthStartParam)) {
+            startDate = parseLocalDate(monthStartParam);
+            endDate = parseLocalDate(monthStartParam);
+            endDate.setDate(endDate.getDate() + 29);
+            if (endDate > todayDate) endDate = new Date(todayDate);
+        } else {
+            endDate = new Date(todayDate);
+            startDate = parseLocalDate(todayStr);
+            startDate.setDate(startDate.getDate() - 29);
+        }
 
         const startStr = toDateStr(startDate);
-        const endStr = todayStr;
+        const endStr = toDateStr(endDate);
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -287,7 +299,6 @@ const getMonthlyTrends = async (req, res) => {
         const logs = snapshot.docs.map(doc => doc.data());
 
         // Build daily granularity for trend chart
-        const endDate = parseLocalDate(todayStr);
         const byDate = {};
         for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
             const dateStr = toDateStr(d);
@@ -377,15 +388,27 @@ const getQuarterlyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
 
-        req.log.info({ action: 'insights.getQuarterlyTrends' }, 'Fetching quarterly trends');
+        const { quarterStart: quarterStartParam } = req.query;
+        req.log.info({ action: 'insights.getQuarterlyTrends', quarterStart: quarterStartParam }, 'Fetching quarterly trends');
 
         const settings = await getUserSettings(userId);
         const todayStr = getTodayStr(settings.timezone);
-        const startDate = parseLocalDate(todayStr);
-        startDate.setDate(startDate.getDate() - 89);
+        const todayDate = parseLocalDate(todayStr);
+
+        let startDate, endDate;
+        if (quarterStartParam && /^\d{4}-\d{2}-\d{2}$/.test(quarterStartParam)) {
+            startDate = parseLocalDate(quarterStartParam);
+            endDate = parseLocalDate(quarterStartParam);
+            endDate.setDate(endDate.getDate() + 89);
+            if (endDate > todayDate) endDate = new Date(todayDate);
+        } else {
+            endDate = new Date(todayDate);
+            startDate = parseLocalDate(todayStr);
+            startDate.setDate(startDate.getDate() - 89);
+        }
 
         const startStr = toDateStr(startDate);
-        const endStr = todayStr;
+        const endStr = toDateStr(endDate);
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -405,7 +428,7 @@ const getQuarterlyTrends = async (req, res) => {
 
             buckets.push({
                 weekStart: toDateStr(bucketStart),
-                weekEnd: toDateStr(bucketEnd > parseLocalDate(todayStr) ? parseLocalDate(todayStr) : bucketEnd),
+                weekEnd: toDateStr(bucketEnd > endDate ? endDate : bucketEnd),
                 calories: 0, protein: 0, carbs: 0, fat: 0,
                 daysTracked: new Set()
             });
@@ -448,47 +471,88 @@ const getQuarterlyTrends = async (req, res) => {
 const getAISummary = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { week: weekParam } = req.query;
+        const { week: weekParam, monthStart: monthStartParam, quarterStart: quarterStartParam, range: rangeParam } = req.query;
+        const range = ['1W', '1M', '3M'].includes(rangeParam) ? rangeParam : '1W';
 
-        req.log.info({ action: 'insights.getAISummary', week: weekParam }, 'Fetching AI summary');
+        req.log.info({ action: 'insights.getAISummary', week: weekParam, monthStart: monthStartParam, quarterStart: quarterStartParam, range }, 'Fetching AI summary');
 
         const settings = await getUserSettings(userId);
         const todayStr = getTodayStr(settings.timezone);
 
-        // Determine week start
-        let weekStart;
-        if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
-            weekStart = weekParam;
+        // Determine date range based on range param
+        let startStr, endStr, periodIdentifier, totalDaysInPeriod;
+
+        if (range === '1W') {
+            if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
+                const ws = parseLocalDate(weekParam);
+                const we = parseLocalDate(weekParam);
+                we.setDate(we.getDate() + 6);
+                startStr = toDateStr(ws);
+                endStr = toDateStr(we);
+            } else {
+                const wsDate = parseLocalDate(todayStr);
+                wsDate.setDate(wsDate.getDate() - 6);
+                startStr = toDateStr(wsDate);
+                endStr = todayStr;
+            }
+            periodIdentifier = startStr;
+            totalDaysInPeriod = 7;
+        } else if (range === '1M') {
+            if (monthStartParam && /^\d{4}-\d{2}-\d{2}$/.test(monthStartParam)) {
+                const ms = parseLocalDate(monthStartParam);
+                const me = parseLocalDate(monthStartParam);
+                me.setDate(me.getDate() + 29);
+                const td = parseLocalDate(todayStr);
+                startStr = toDateStr(ms);
+                endStr = toDateStr(me > td ? td : me);
+            } else {
+                const msDate = parseLocalDate(todayStr);
+                msDate.setDate(msDate.getDate() - 29);
+                startStr = toDateStr(msDate);
+                endStr = todayStr;
+            }
+            periodIdentifier = startStr;
+            totalDaysInPeriod = 30;
         } else {
-            const wsDate = parseLocalDate(todayStr);
-            wsDate.setDate(wsDate.getDate() - 6);
-            weekStart = toDateStr(wsDate);
+            if (quarterStartParam && /^\d{4}-\d{2}-\d{2}$/.test(quarterStartParam)) {
+                const qs = parseLocalDate(quarterStartParam);
+                const qe = parseLocalDate(quarterStartParam);
+                qe.setDate(qe.getDate() + 89);
+                const td = parseLocalDate(todayStr);
+                startStr = toDateStr(qs);
+                endStr = toDateStr(qe > td ? td : qe);
+            } else {
+                const qsDate = parseLocalDate(todayStr);
+                qsDate.setDate(qsDate.getDate() - 89);
+                startStr = toDateStr(qsDate);
+                endStr = todayStr;
+            }
+            periodIdentifier = startStr;
+            totalDaysInPeriod = 90;
         }
 
-        const weekEnd = parseLocalDate(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        const weekEndStr = toDateStr(weekEnd);
-
-        // Check cache
+        // Cache key: range + period identifier
+        const cacheKey = `${range}_${periodIdentifier}`;
         const cacheRef = db.collection('users').doc(userId)
-            .collection('weeklyInsights').doc(weekStart);
+            .collection('weeklyInsights').doc(cacheKey);
         const cacheDoc = await cacheRef.get();
 
-        if (cacheDoc.exists) {
-            return res.json({ insight: cacheDoc.data().insight, weekStart, cached: true });
+        const refresh = req.query.refresh === 'true';
+        if (!refresh && cacheDoc.exists) {
+            return res.json({ insight: cacheDoc.data().insight, range, periodIdentifier, cached: true });
         }
 
-        // Fetch week's data
+        // Fetch data for the range
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
-            .where('date', '>=', weekStart)
-            .where('date', '<=', weekEndStr)
+            .where('date', '>=', startStr)
+            .where('date', '<=', endStr)
             .get();
 
         const logs = snapshot.docs.map(doc => doc.data());
 
         if (logs.length === 0) {
-            return res.json({ insight: null, weekStart, noData: true });
+            return res.json({ insight: null, range, periodIdentifier, noData: true });
         }
 
         const goals = await getGoalsForDate(userId, todayStr, settings);
@@ -506,38 +570,76 @@ const getAISummary = async (req, res) => {
         const daysTracked = Object.keys(byDate).length;
         const totalCals = Object.values(byDate).reduce((s, d) => s + d.calories, 0);
         const totalProtein = Object.values(byDate).reduce((s, d) => s + d.protein, 0);
+        const totalCarbs = Object.values(byDate).reduce((s, d) => s + d.carbs, 0);
+        const totalFat = Object.values(byDate).reduce((s, d) => s + d.fat, 0);
         const avgCalories = Math.round(totalCals / daysTracked);
         const avgProtein = Math.round(totalProtein / daysTracked);
+        const avgCarbs = Math.round(totalCarbs / daysTracked);
+        const avgFat = Math.round(totalFat / daysTracked);
 
-        const prompt = `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight for the user based on this data. Be warm, specific, and actionable. Use Kalli's conversational voice (contractions, casual tone, no filler affirmations).
+        const RANGE_PROMPTS = {
+            '1W': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight. Focus on ACUTE adjustments and yesterday/today specifics. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
 
-Week: ${weekStart} to ${weekEndStr}
-Days tracked: ${daysTracked}/7
-Average daily calories: ${avgCalories} (goal: ${goals.targetCalories})
-Average daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
+Period: ${startStr} to ${endStr} (this week)
+Days tracked: ${daysTracked}/${totalDaysInPeriod}
+Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
+Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
+Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
+Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`;
+Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`,
+
+            '1M': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized monthly insight. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+
+Period: ${startStr} to ${endStr} (last 30 days)
+Days tracked: ${daysTracked}/${totalDaysInPeriod}
+Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
+Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
+Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
+Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
+Total items logged: ${logs.length}
+Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
+
+Keep it to 2-3 sentences max. Focus on pattern-level observations.`,
+
+            '3M': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized quarterly insight. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations.
+
+Period: ${startStr} to ${endStr} (last 3 months)
+Days tracked: ${daysTracked}/${totalDaysInPeriod}
+Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
+Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
+Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
+Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
+Total items logged: ${logs.length}
+Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
+
+Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`
+        };
+
+        const prompt = RANGE_PROMPTS[range];
 
         const result = await genAI.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { maxOutputTokens: 256, temperature: 0.8 }
+            config: { temperature: 0.8 }
         });
 
-        const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || '';
+        const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
 
         // Cache the result
         await cacheRef.set({
             insight,
-            weekStart,
-            weekEnd: weekEndStr,
+            range,
+            periodIdentifier,
+            startDate: startStr,
+            endDate: endStr,
             generatedAt: new Date(),
             stats: { daysTracked, avgCalories, avgProtein }
         });
 
-        res.json({ insight, weekStart, cached: false });
+        res.json({ insight, range, periodIdentifier, cached: false });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get AI summary');
         res.status(500).json({ error: 'Failed to generate insight' });

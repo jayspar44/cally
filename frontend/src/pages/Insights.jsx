@@ -1,124 +1,202 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../api/services';
 import { cn } from '../utils/cn';
-import { toDateStr, isToday as isTodayUtil, parseLocalDate } from '../utils/dateUtils';
-import MealItem from '../components/ui/MealItem';
+import { parseLocalDate, toDateStr } from '../utils/dateUtils';
 import KalliInsightCard from '../components/insights/KalliInsightCard';
-import SummaryStats from '../components/insights/SummaryStats';
-import WeeklyCalorieChart from '../components/insights/WeeklyCalorieChart';
-import CalorieTrendChart from '../components/insights/CalorieTrendChart';
+import TrendsChart from '../components/insights/TrendsChart';
 import MacroDonutChart from '../components/insights/MacroDonutChart';
-import { HiChevronLeft, HiChevronRight, HiCalendarDays } from 'react-icons/hi2';
-
-const getDefaultWeekStart = () => {
-    const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    d.setDate(d.getDate() - 6);
-    return toDateStr(d);
-};
+import StreakBanner from '../components/insights/StreakBanner';
+import BadgesSection from '../components/insights/BadgesSection';
 
 export default function Insights() {
-    // Week navigation
-    const [selectedWeekStart, setSelectedWeekStart] = useState(getDefaultWeekStart);
-    const [weeklyData, setWeeklyData] = useState(null);
-    const [loadingWeekly, setLoadingWeekly] = useState(true);
+    // Global state
+    const [timeRange, setTimeRange] = useState('1W');
+    const [selectedMetric, setSelectedMetric] = useState('calories');
 
-    // Trend data
+    const [periodOffset, setPeriodOffset] = useState(0);
+
+    // Data stores (one fetch per range type, cached in state)
+    const [weeklyData, setWeeklyData] = useState(null);
     const [monthlyData, setMonthlyData] = useState(null);
     const [quarterlyData, setQuarterlyData] = useState(null);
+    const [loadingData, setLoadingData] = useState(true);
 
-    // Daily Log State
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [dailySummary, setDailySummary] = useState(null);
-    const [loadingDaily, setLoadingDaily] = useState(false);
+    // Badge data (decoupled from timeRange)
+    const [badgeData, setBadgeData] = useState(null);
+    const [loadingBadges, setLoadingBadges] = useState(true);
 
-    const isCurrentWeek = useCallback(() => {
-        const defaultStart = getDefaultWeekStart();
-        return selectedWeekStart === defaultStart;
-    }, [selectedWeekStart]);
+    // Reset offset when timeRange changes
+    useEffect(() => { setPeriodOffset(0); }, [timeRange]);
 
-    // Fetch weekly data when week changes
+    // Fetch all trend data on mount
     useEffect(() => {
         let cancelled = false;
-        const fetchWeekly = async () => {
-            setLoadingWeekly(true);
+        const fetchAllData = async () => {
+            setLoadingData(true);
             try {
-                const data = await api.getWeeklyTrends(selectedWeekStart);
-                if (!cancelled) setWeeklyData(data);
-            } catch (error) {
-                console.error('Failed to fetch weekly trends:', error);
-            } finally {
-                if (!cancelled) setLoadingWeekly(false);
-            }
-        };
-        fetchWeekly();
-        return () => { cancelled = true; };
-    }, [selectedWeekStart]);
-
-    // Fetch monthly and quarterly (once on mount)
-    useEffect(() => {
-        const fetchTrends = async () => {
-            try {
-                const [monthly, quarterly] = await Promise.all([
+                const [weekly, monthly, quarterly] = await Promise.all([
+                    api.getWeeklyTrends(),
                     api.getMonthlyTrends(),
                     api.getQuarterlyTrends()
                 ]);
-                setMonthlyData(monthly);
-                setQuarterlyData(quarterly);
+                if (!cancelled) {
+                    setWeeklyData(weekly);
+                    setMonthlyData(monthly);
+                    setQuarterlyData(quarterly);
+                }
             } catch (error) {
                 console.error('Failed to fetch trends:', error);
+            } finally {
+                if (!cancelled) setLoadingData(false);
             }
         };
-        fetchTrends();
+        fetchAllData();
+        return () => { cancelled = true; };
     }, []);
 
-    // Fetch Daily Summary when selectedDate changes
+    // Fetch badges on mount (decoupled from timeRange)
     useEffect(() => {
         let cancelled = false;
-        const fetchDaily = async () => {
-            setLoadingDaily(true);
+        const fetchBadges = async () => {
+            setLoadingBadges(true);
             try {
-                const dateStr = toDateStr(selectedDate);
-                const data = await api.getDailySummary(dateStr);
-                if (!cancelled) setDailySummary(data);
+                const data = await api.getUserBadges();
+                if (!cancelled) setBadgeData(data);
             } catch (error) {
-                console.error('Failed to fetch daily summary:', error);
+                console.error('Failed to fetch badges:', error);
             } finally {
-                if (!cancelled) setLoadingDaily(false);
+                if (!cancelled) setLoadingBadges(false);
             }
         };
-        fetchDaily();
+        fetchBadges();
         return () => { cancelled = true; };
-    }, [selectedDate]);
+    }, []);
 
-    const handlePrevWeek = () => {
-        const current = parseLocalDate(selectedWeekStart);
-        current.setDate(current.getDate() - 7);
-        setSelectedWeekStart(toDateStr(current));
-    };
+    function computePeriodStart(range, offset) {
+        if (offset === 0) return null;
+        const now = new Date();
+        let start;
+        if (range === '1W') {
+            start = new Date(now);
+            start.setDate(start.getDate() - 6 + (offset * 7));
+        } else if (range === '1M') {
+            start = new Date(now);
+            start.setDate(start.getDate() - 29 + (offset * 30));
+        } else {
+            start = new Date(now);
+            start.setDate(start.getDate() - 89 + (offset * 90));
+        }
+        return toDateStr(start);
+    }
 
-    const handleNextWeek = () => {
-        if (isCurrentWeek()) return;
-        const current = parseLocalDate(selectedWeekStart);
-        current.setDate(current.getDate() + 7);
-        setSelectedWeekStart(toDateStr(current));
-    };
+    function formatPeriodLabel(startStr, endStr) {
+        if (!startStr || !endStr) return '';
+        const fmt = { month: 'short', day: 'numeric' };
+        const start = parseLocalDate(startStr);
+        const end = parseLocalDate(endStr);
+        return `${start.toLocaleDateString('en-US', fmt)} – ${end.toLocaleDateString('en-US', fmt)}`;
+    }
 
-    const handlePrevDay = () => {
-        const newDate = new Date(selectedDate);
-        newDate.setDate(selectedDate.getDate() - 1);
-        setSelectedDate(newDate);
-    };
+    // Fetch period data when navigating to non-current period
+    useEffect(() => {
+        if (periodOffset === 0) return;
+        let cancelled = false;
+        const fetchPeriodData = async () => {
+            const startDate = computePeriodStart(timeRange, periodOffset);
+            setLoadingData(true);
+            try {
+                if (timeRange === '1W') {
+                    const data = await api.getWeeklyTrends(startDate);
+                    if (!cancelled) setWeeklyData(data);
+                } else if (timeRange === '1M') {
+                    const data = await api.getMonthlyTrends(startDate);
+                    if (!cancelled) setMonthlyData(data);
+                } else if (timeRange === '3M') {
+                    const data = await api.getQuarterlyTrends(startDate);
+                    if (!cancelled) setQuarterlyData(data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch period data:', error);
+            } finally {
+                if (!cancelled) setLoadingData(false);
+            }
+        };
+        fetchPeriodData();
+        return () => { cancelled = true; };
+    }, [timeRange, periodOffset]);
 
-    const handleNextDay = () => {
-        const newDate = new Date(selectedDate);
-        newDate.setDate(selectedDate.getDate() + 1);
-        setSelectedDate(newDate);
-    };
+    // Compute available time ranges based on actual data
+    const availableRanges = useMemo(() => {
+        const ranges = ['1W'];
+        if (monthlyData?.daysTracked > 7) ranges.push('1M');
+        const quarterlyDays = quarterlyData?.weeks?.reduce((s, w) => s + w.daysTracked, 0) || 0;
+        if (quarterlyDays > 30) ranges.push('3M');
+        return ranges;
+    }, [monthlyData, quarterlyData]);
 
-    const isToday = (date) => isTodayUtil(date);
+    // Fall back if current timeRange is no longer valid
+    useEffect(() => {
+        if (!availableRanges.includes(timeRange)) {
+            setTimeRange(availableRanges[availableRanges.length - 1]);
+        }
+    }, [availableRanges, timeRange]);
 
-    if (loadingWeekly && !weeklyData) {
+    // Derive the right data based on timeRange
+    const activeData = useMemo(() => {
+        switch (timeRange) {
+            case '1W': return weeklyData;
+            case '1M': return monthlyData;
+            case '3M': return quarterlyData;
+            default: return weeklyData;
+        }
+    }, [timeRange, weeklyData, monthlyData, quarterlyData]);
+
+    // Get averages for the current time range
+    const averages = useMemo(() => {
+        if (timeRange === '3M' && quarterlyData?.weeks) {
+            // Compute averages from weekly buckets
+            const weeks = quarterlyData.weeks;
+            if (weeks.length === 0) return { calories: 0, protein: 0, carbs: 0, fat: 0 };
+            const totalDays = weeks.reduce((s, w) => s + w.daysTracked, 0) || 1;
+            const totals = weeks.reduce((acc, w) => ({
+                calories: acc.calories + (w.avgCalories * w.daysTracked),
+                protein: acc.protein + (w.avgProtein * w.daysTracked),
+                carbs: acc.carbs + (w.avgCarbs * w.daysTracked),
+                fat: acc.fat + (w.avgFat * w.daysTracked)
+            }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+            return {
+                calories: Math.round(totals.calories / totalDays),
+                protein: Math.round(totals.protein / totalDays),
+                carbs: Math.round(totals.carbs / totalDays),
+                fat: Math.round(totals.fat / totalDays)
+            };
+        }
+        return activeData?.averages || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    }, [timeRange, activeData, quarterlyData]);
+
+    // Previous period averages for delta comparison
+    const prevAverages = useMemo(() => {
+        if (timeRange === '1W' && weeklyData) {
+            // Weekly data already provides calorieDelta + prevAvgCalories
+            // We can reconstruct previous averages for calories
+            if (weeklyData.prevAvgCalories != null) {
+                return { calories: weeklyData.prevAvgCalories };
+            }
+        }
+        // For 1M and 3M we don't have previous-period data from backend yet
+        return null;
+    }, [timeRange, weeklyData]);
+
+    const goals = useMemo(() => {
+        return activeData?.goals || weeklyData?.goals || {
+            targetCalories: 2000, targetProtein: 120, targetCarbs: 250, targetFat: 65
+        };
+    }, [activeData, weeklyData]);
+
+    const periodLabel = useMemo(() => formatPeriodLabel(activeData?.startDate, activeData?.endDate), [activeData]);
+    const periodStart = useMemo(() => computePeriodStart(timeRange, periodOffset), [timeRange, periodOffset]);
+
+    if (loadingData && !weeklyData) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -126,99 +204,73 @@ export default function Insights() {
         );
     }
 
-    const goals = weeklyData?.goals || { targetCalories: 2000, targetProtein: 120, targetCarbs: 250, targetFat: 65 };
-
     return (
         <div className="space-y-4 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Kalli's Weekly Insight */}
-            <KalliInsightCard weekStart={selectedWeekStart} />
+            {/* Time Range Selector (only show when multiple ranges available) */}
+            {availableRanges.length > 1 && (
+                <div className="flex justify-center">
+                    <div className="bg-surface rounded-full p-1 border border-border inline-flex">
+                        {availableRanges.map(range => (
+                            <button
+                                key={range}
+                                onClick={() => setTimeRange(range)}
+                                className={cn(
+                                    "px-6 py-2 rounded-full text-sm font-mono font-bold transition-all",
+                                    timeRange === range
+                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                        : "text-primary/50 hover:text-primary/70"
+                                )}
+                            >
+                                {range}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-            {/* Summary Stats Row */}
-            <SummaryStats
-                averages={weeklyData?.averages}
-                goals={goals}
-                calorieDelta={weeklyData?.calorieDelta}
-                daysOnTarget={weeklyData?.daysOnTarget}
-                streak={weeklyData?.streak}
-            />
+            {/* Kalli's Insight (adapts to time range) */}
+            <KalliInsightCard timeRange={timeRange} periodStart={periodStart} />
 
-            {/* Weekly Calorie Chart */}
-            <WeeklyCalorieChart
-                days={weeklyData?.days || []}
-                goals={goals}
-                startDate={weeklyData?.startDate}
-                endDate={weeklyData?.endDate}
-                bestDay={weeklyData?.bestDay}
-                onPrev={handlePrevWeek}
-                onNext={handleNextWeek}
-                isCurrentWeek={isCurrentWeek()}
-            />
-
-            {/* Calorie Trend Chart */}
-            <CalorieTrendChart
+            {/* Trends Chart with Metric Switcher */}
+            <TrendsChart
+                timeRange={timeRange}
+                selectedMetric={selectedMetric}
+                onMetricChange={setSelectedMetric}
+                weeklyData={weeklyData}
                 monthlyData={monthlyData}
                 quarterlyData={quarterlyData}
                 goals={goals}
+                averages={averages}
+                prevAverages={prevAverages}
+                periodOffset={periodOffset}
+                onPeriodBack={() => setPeriodOffset(o => o - 1)}
+                onPeriodForward={() => setPeriodOffset(o => Math.min(0, o + 1))}
+                periodLabel={periodLabel}
             />
 
             {/* Macro Donut Chart */}
             <MacroDonutChart
-                averages={weeklyData?.averages}
+                averages={averages}
                 goals={goals}
             />
 
-            {/* Daily Log Section */}
-            <section className="space-y-4">
-                <div className="flex items-center justify-between px-2">
-                    <h3 className="font-serif font-bold text-xl text-primary">Daily Log</h3>
+            {/* Divider */}
+            <div className="h-px bg-border/50" />
 
-                    {/* Date Navigation */}
-                    <div className="flex items-center bg-surface rounded-full p-1 shadow-sm border border-border">
-                        <button
-                            onClick={handlePrevDay}
-                            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/5 text-primary/60 transition-colors"
-                        >
-                            <HiChevronLeft className="w-5 h-5" />
-                        </button>
+            {/* Achievements Section (decoupled from timeRange) */}
+            <div className="space-y-3">
+                <h3 className="font-serif font-bold text-lg text-primary px-1">Achievements</h3>
 
-                        <div className="flex items-center px-3 gap-2">
-                            <HiCalendarDays className="w-4 h-4 text-primary/40" />
-                            <span className="font-mono text-sm font-medium text-primary">
-                                {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </span>
-                        </div>
+                <StreakBanner
+                    stats={badgeData?.stats}
+                    loading={loadingBadges}
+                />
 
-                        <button
-                            onClick={handleNextDay}
-                            disabled={isToday(selectedDate)}
-                            className={cn(
-                                "w-8 h-8 flex items-center justify-center rounded-full transition-colors",
-                                isToday(selectedDate)
-                                    ? "text-primary/20 cursor-not-allowed"
-                                    : "hover:bg-primary/5 text-primary/60"
-                            )}
-                        >
-                            <HiChevronRight className="w-5 h-5" />
-                        </button>
-                    </div>
-                </div>
-
-                {loadingDaily ? (
-                    <div className="flex items-center justify-center py-12">
-                        <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                    </div>
-                ) : dailySummary?.meals && dailySummary.meals.length > 0 ? (
-                    <div className="bg-surface rounded-[2rem] shadow-card overflow-hidden divide-y divide-border">
-                        {dailySummary.meals.map((meal, index) => (
-                            <MealItem key={index} meal={meal} />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-12 bg-white/50 dark:bg-surface/50 rounded-[2rem] border border-dashed border-primary/10">
-                        <p className="font-sans text-primary/40">No meals logged for this day.</p>
-                    </div>
-                )}
-            </section>
+                <BadgesSection
+                    badgeData={badgeData}
+                    loading={loadingBadges}
+                />
+            </div>
         </div>
     );
 }

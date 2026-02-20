@@ -3,6 +3,7 @@ const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
+const { checkBadgeEligibility } = require('../services/badgeService');
 const { getLogger } = require('../logger');
 const { getTodayStr } = require('../utils/dateUtils');
 
@@ -392,7 +393,15 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
         totalCalories: Math.round(totals.calories)
     }, 'Food logged via AI tool');
 
-    return {
+    // Check for newly earned badges (non-blocking)
+    let newBadges = [];
+    try {
+        newBadges = await checkBadgeEligibility(userId);
+    } catch (err) {
+        getLogger().warn({ err }, 'Badge check failed after logFood (non-critical)');
+    }
+
+    const result = {
         success: true,
         message: `Logged ${createdIds.length} item(s) for ${meal}: ${Math.round(totals.calories)} cal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fat)}g fat.`,
         data: {
@@ -417,6 +426,13 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
             totalFat: Math.round(totals.fat)
         }
     };
+
+    if (newBadges.length > 0) {
+        result.newBadges = newBadges.map(b => ({ badgeId: b.id, name: b.name, icon: b.icon }));
+        result.message += ` New badge${newBadges.length > 1 ? 's' : ''} earned: ${newBadges.map(b => `${b.icon} ${b.name}`).join(', ')}!`;
+    }
+
+    return result;
 };
 
 const lookupNutrition = async (args) => {
@@ -591,10 +607,24 @@ const deleteFoodLog = async (args, userId) => {
         deletedItem: { name: data.name, meal: data.meal, calories: data.calories, date: data.date }
     }, 'Food log deleted via AI tool');
 
-    return {
+    // Re-check badges after deletion (a badge could theoretically be affected, but we only add, never revoke)
+    let newBadges = [];
+    try {
+        newBadges = await checkBadgeEligibility(userId);
+    } catch (err) {
+        getLogger().warn({ err }, 'Badge check failed after deleteFoodLog (non-critical)');
+    }
+
+    const result = {
         success: true,
         data: { id: logId, deleted: true, name: data.name, meal: data.meal, calories: data.calories }
     };
+
+    if (newBadges.length > 0) {
+        result.newBadges = newBadges.map(b => ({ badgeId: b.id, name: b.name, icon: b.icon }));
+    }
+
+    return result;
 };
 
 const getDailySummaryTool = async (args, userId, userTimezone) => {

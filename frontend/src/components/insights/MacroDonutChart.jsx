@@ -1,36 +1,32 @@
 import { useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { cn } from '../../utils/cn';
 import ChartInsight from './ChartInsight';
 
-const MACRO_COLORS = {
-    protein: 'var(--color-protein)',
-    carbs: 'var(--color-carbs)',
-    fat: 'var(--color-fat)'
-};
-
-const CustomTooltip = ({ active, payload }) => {
-    if (!active || !payload?.[0]) return null;
-    const { name, value, percent } = payload[0].payload;
-    return (
-        <div className="bg-primary text-white text-[10px] px-2.5 py-1.5 rounded-lg font-mono shadow-lg">
-            <span className="font-bold capitalize">{name}</span>: {Math.round(value)}g ({Math.round(percent)}%)
-        </div>
-    );
-};
+const MACRO_CONFIG = [
+    { key: 'protein', label: 'Protein', goalKey: 'targetProtein', color: 'var(--color-protein)', bgClass: 'bg-[var(--color-protein)]' },
+    { key: 'carbs', label: 'Carbs', goalKey: 'targetCarbs', color: 'var(--color-carbs)', bgClass: 'bg-[var(--color-carbs)]' },
+    { key: 'fat', label: 'Fat', goalKey: 'targetFat', color: 'var(--color-fat)', bgClass: 'bg-[var(--color-fat)]' }
+];
 
 export default function MacroDonutChart({ averages, goals }) {
-    const data = useMemo(() => {
-        const protein = averages?.protein || 0;
-        const carbs = averages?.carbs || 0;
-        const fat = averages?.fat || 0;
-        const total = protein + carbs + fat;
-        if (total === 0) return [];
-        return [
-            { name: 'protein', value: protein, percent: (protein / total) * 100 },
-            { name: 'carbs', value: carbs, percent: (carbs / total) * 100 },
-            { name: 'fat', value: fat, percent: (fat / total) * 100 },
-        ];
-    }, [averages]);
+    const macros = useMemo(() => {
+        if (!averages) return [];
+        return MACRO_CONFIG.map(m => {
+            const value = Math.round(averages[m.key] || 0);
+            const target = goals?.[m.goalKey] || 0;
+            const pct = target > 0 ? Math.min(150, Math.round((value / target) * 100)) : 0;
+            const onTarget = target > 0 && Math.abs(value - target) <= target * 0.1;
+            return { ...m, value, target, pct, onTarget };
+        });
+    }, [averages, goals]);
+
+    const score = useMemo(() => {
+        const onTargetCount = macros.filter(m => m.onTarget).length;
+        if (onTargetCount === 3) return { label: 'On Track', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' };
+        if (onTargetCount === 2) return { label: 'Almost', className: 'bg-primary/10 text-primary dark:bg-white/10' };
+        if (onTargetCount === 1) return { label: 'Getting There', className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+        return { label: 'Needs Work', className: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' };
+    }, [macros]);
 
     const insightText = useMemo(() => {
         if (!goals || !averages) return null;
@@ -38,19 +34,21 @@ export default function MacroDonutChart({ averages, goals }) {
             ? Math.round(((goals.targetProtein - averages.protein) / goals.targetProtein) * 100)
             : 0;
         if (proteinPct > 15) {
-            return `Protein is averaging ${proteinPct}% below target — adding eggs or Greek yogurt at breakfast would close most of this gap.`;
+            return `Protein is averaging ${proteinPct}% below target \u2014 adding eggs or Greek yogurt at breakfast would close most of this gap.`;
         }
         if (proteinPct < -15) {
-            return `Great protein intake — you're ${Math.abs(proteinPct)}% above your goal.`;
+            return `Great protein intake \u2014 you're ${Math.abs(proteinPct)}% above your goal.`;
         }
-        return `Macros are well balanced — protein, carbs, and fat are all close to target.`;
+        return `Macros are well balanced \u2014 protein, carbs, and fat are all close to target.`;
     }, [averages, goals]);
 
-    if (data.length === 0) {
+    const hasData = macros.some(m => m.value > 0);
+
+    if (!hasData) {
         return (
             <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
-                <h3 className="font-serif font-bold text-lg text-primary mb-4">Macro Balance</h3>
-                <div className="flex items-center justify-center h-[180px] text-primary/30 font-sans text-sm">
+                <h3 className="font-serif font-bold text-lg text-primary mb-4">Macros</h3>
+                <div className="flex items-center justify-center h-[120px] text-primary/30 font-sans text-sm">
                     No macro data yet
                 </div>
             </section>
@@ -59,48 +57,45 @@ export default function MacroDonutChart({ averages, goals }) {
 
     return (
         <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
-            <h3 className="font-serif font-bold text-lg text-primary mb-4">Macro Balance</h3>
+            <div className="flex items-center gap-2.5 mb-4">
+                <h3 className="font-serif font-bold text-lg text-primary">Macros</h3>
+                <span className={cn("font-mono text-sm font-bold px-2.5 py-0.5 rounded-full", score.className)}>
+                    {score.label}
+                </span>
+            </div>
 
-            <div className="flex items-center gap-4">
-                <div className="w-[140px] h-[140px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                                data={data}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={38}
-                                outerRadius={62}
-                                paddingAngle={3}
-                                dataKey="value"
-                            >
-                                {data.map((entry) => (
-                                    <Cell key={entry.name} fill={MACRO_COLORS[entry.name]} />
-                                ))}
-                            </Pie>
-                            <Tooltip content={<CustomTooltip />} />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* Legend */}
-                <div className="flex flex-col gap-2.5 flex-1">
-                    {data.map(macro => (
-                        <div key={macro.name} className="flex items-center gap-2">
-                            <div
-                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: MACRO_COLORS[macro.name] }}
-                            />
-                            <div className="flex-1">
-                                <span className="font-sans text-xs text-primary/70 capitalize">{macro.name}</span>
-                            </div>
-                            <div className="text-right">
-                                <span className="font-mono text-xs font-medium text-primary">{Math.round(macro.value)}g</span>
-                                <span className="font-mono text-[9px] text-primary/40 ml-1">{Math.round(macro.percent)}%</span>
+            <div className="flex flex-col gap-4">
+                {macros.map(macro => (
+                    <div key={macro.key}>
+                        <div className="flex items-baseline justify-between mb-1.5">
+                            <span className="font-sans text-sm font-medium text-primary">{macro.label}</span>
+                            <div className="flex items-baseline gap-1">
+                                <span className={cn(
+                                    "font-mono text-sm font-bold",
+                                    macro.onTarget ? "text-emerald-600 dark:text-emerald-400" : "text-primary"
+                                )}>
+                                    {macro.value}g
+                                </span>
+                                {macro.target > 0 && (
+                                    <span className="font-mono text-sm text-primary/40">/ {macro.target}g</span>
+                                )}
                             </div>
                         </div>
-                    ))}
-                </div>
+                        {macro.target > 0 && (
+                            <div className="relative h-2.5 bg-primary/8 dark:bg-white/8 rounded-full overflow-hidden">
+                                <div
+                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                                    style={{
+                                        width: `${Math.min(100, macro.pct)}%`,
+                                        backgroundColor: macro.color
+                                    }}
+                                />
+                                {/* Target marker at 100% */}
+                                <div className="absolute top-0 bottom-0 w-0.5 bg-primary/25 dark:bg-white/25" style={{ left: '100%' }} />
+                            </div>
+                        )}
+                    </div>
+                ))}
             </div>
 
             <ChartInsight text={insightText} />
