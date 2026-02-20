@@ -268,7 +268,7 @@ export default function Chat() {
                 {/* Processing indicator */}
                 <ProcessingIndicator
                     hasImage={sendingWithImage}
-                    isVisible={sending && !messages.some(m => m.status === 'sending')}
+                    isVisible={sending}
                 />
 
                 {error && (

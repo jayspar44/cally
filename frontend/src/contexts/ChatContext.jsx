@@ -150,6 +150,27 @@ export const ChatProvider = ({ children }) => {
         ));
 
         try {
+            // Check if the original request actually succeeded (backend saved to Firestore
+            // but the response never reached the frontend due to network drop)
+            const history = await api.getChatHistory(50);
+            const serverMessages = history.messages || [];
+            const matchingUserMsg = serverMessages.find(m =>
+                m.role === 'user' &&
+                m.content === failedMessage.content &&
+                Math.abs(new Date(m.timestamp) - new Date(failedMessage.timestamp)) < 120000
+            );
+
+            if (matchingUserMsg) {
+                // Find the assistant response that follows the matched user message
+                const userIdx = serverMessages.indexOf(matchingUserMsg);
+                const assistantMsg = serverMessages[userIdx + 1];
+                if (assistantMsg?.role === 'assistant') {
+                    // Original request succeeded — just load from history
+                    setMessages(serverMessages);
+                    return;
+                }
+            }
+
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const retryImages = failedMessage._retryImages || [];
             const onRetryUploadProgress = (progressEvent) => {

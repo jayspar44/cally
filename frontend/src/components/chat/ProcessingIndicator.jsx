@@ -2,18 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
 
 const TEXT_PHASES = [
-    { label: 'Thinking...', duration: 3000 },
-    { label: 'Analyzing your request...', duration: 5000 },
-    { label: 'Looking up nutrition info...', duration: 7000 },
-    { label: 'Almost done...', duration: null },
+    { label: 'Thinking...', duration: 4000 },
+    { label: 'Analyzing your request...', duration: 6000 },
+    { label: 'Looking up nutrition info...', duration: 8000 },
+    { label: 'Crunching the numbers...', duration: 10000 },
+    { label: 'Putting it all together...', duration: 12000 },
+    { label: 'Almost there...', duration: null },
 ];
 
 const IMAGE_PHASES = [
-    { label: 'Analyzing your photo...', duration: 5000 },
-    { label: 'Identifying foods...', duration: 7000 },
-    { label: 'Looking up nutrition details...', duration: 8000 },
-    { label: 'Logging your meal...', duration: 10000 },
-    { label: 'Wrapping up...', duration: null },
+    { label: 'Uploading photo...', duration: 3000 },
+    { label: 'Analyzing your photo...', duration: 6000 },
+    { label: 'Identifying foods...', duration: 8000 },
+    { label: 'Reading nutrition labels...', duration: 10000 },
+    { label: 'Looking up nutrition details...', duration: 12000 },
+    { label: 'Logging your meal...', duration: 15000 },
+    { label: 'Putting it all together...', duration: 15000 },
+    { label: 'Almost there...', duration: null },
 ];
 
 export default function ProcessingIndicator({ hasImage, isVisible }) {

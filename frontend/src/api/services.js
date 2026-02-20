@@ -39,7 +39,7 @@ export const api = {
             if (imageArray.length === 1) body.imageBase64 = imageArray[0];
         }
         const config = {
-            timeout: 120000,
+            timeout: 180000,
             ...(onUploadProgress ? { onUploadProgress } : {})
         };
         const response = await client.post('/chat/message', body, config);

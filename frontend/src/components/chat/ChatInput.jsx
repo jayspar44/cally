@@ -4,6 +4,28 @@ import { isNative, takePhoto } from '../../utils/camera';
 import { Send, Image, X, Loader2 } from 'lucide-react';
 
 const MAX_IMAGES = 5;
+const MAX_WIDTH = 1024;
+const JPEG_QUALITY = 0.9;
+
+function compressImage(file) {
+    return new Promise((resolve) => {
+        const img = new window.Image();
+        img.onload = () => {
+            const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+            resolve({
+                preview: dataUrl,
+                base64: dataUrl.split(',')[1]
+            });
+            URL.revokeObjectURL(img.src);
+        };
+        img.src = URL.createObjectURL(file);
+    });
+}
 
 export default function ChatInput({ onSend, sending, disabled, onImageChange }) {
     const [message, setMessage] = useState('');
@@ -100,18 +122,7 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
             return;
         }
 
-        const readPromises = filesToProcess.map(file => new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                resolve({
-                    preview: ev.target.result,
-                    base64: ev.target.result.split(',')[1]
-                });
-            };
-            reader.readAsDataURL(file);
-        }));
-
-        Promise.all(readPromises).then(results => {
+        Promise.all(filesToProcess.map(compressImage)).then(results => {
             addImages(
                 results.map(r => r.preview),
                 results.map(r => r.base64)

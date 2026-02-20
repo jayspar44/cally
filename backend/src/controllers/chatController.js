@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { db } = require('../services/firebase');
 const { processMessage, processImageMessage } = require('../services/geminiService');
 
-const SERVER_TIMEOUT_MS = 90000;
+const SERVER_TIMEOUT_MS = 150000;
 
 const checkRecentlyCreatedLogs = async (userId, idempotencyKey) => {
     const snapshot = await db.collection('users').doc(userId)

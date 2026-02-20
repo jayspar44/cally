@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/dateUtils';
 import FoodLogCard from './FoodLogCard';
 
-import { Trash2, Loader2, AlertCircle, RotateCcw, Sparkles } from 'lucide-react';
+import { Trash2, AlertCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 // Strip <details>...</details> HTML blocks that Gemini sometimes includes in responses
@@ -119,10 +119,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                     isFailed ? 'text-red-500 dark:text-red-400' : 'text-primary/50 dark:text-primary/30'
                 )}>
                     {isSending ? (
-                        <>
-                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                            <span>Sending</span>
-                        </>
+                        <span className="text-primary/30 dark:text-primary/20">Sending</span>
                     ) : isFailed ? (
                         <button
                             onClick={() => onRetry?.(message.id)}
