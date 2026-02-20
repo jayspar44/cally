@@ -31,6 +31,10 @@ export function useViewportHeight() {
       // keyboardWillShow received — stale IME insets from another app.
       if (Capacitor.isNativePlatform() && !keyboardExpected && height < lastFullHeight * 0.85) {
         window.dispatchEvent(new CustomEvent('ghost-keyboard'));
+        // Fallback: if no handler makes the ghost real, force-dismiss
+        setTimeout(() => {
+          Keyboard.hide().catch(() => {});
+        }, 500);
         setViewportHeight(height);
         document.body.classList.add('keyboard-visible');
         return;
@@ -50,6 +54,12 @@ export function useViewportHeight() {
       keyboardExpected = false;
       document.documentElement.style.setProperty('--keyboard-height', '0px');
       document.body.classList.remove('keyboard-visible');
+
+      // Dismiss any lingering keyboard from another app
+      if (Capacitor.isNativePlatform()) {
+        Keyboard.hide().catch(() => {});
+      }
+
       window.scrollTo(0, 0);
 
       // Give the native onResume() IME hide + requestApplyInsets time
