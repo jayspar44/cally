@@ -46,7 +46,7 @@ export default function TrendsChart({
             return weeklyData.days.map(day => ({
                 ...day,
                 displayValue: day[selectedMetric] || 0,
-                dayLabel: formatDateDisplay(day.date, { weekday: 'narrow' }),
+                dayLabel: formatDateDisplay(day.date, { weekday: 'short' }).slice(0, 2),
                 label: formatDateDisplay(day.date, { month: 'short', day: 'numeric' }),
                 isToday: isTodayUtil(day.date),
                 hasData: (day.meals || day.calories) > 0,

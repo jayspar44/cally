@@ -15,8 +15,11 @@ export default function MacroDonutChart({ averages, goals }) {
             const value = Math.round(averages[m.key] || 0);
             const target = goals?.[m.goalKey] || 0;
             const pct = target > 0 ? Math.min(150, Math.round((value / target) * 100)) : 0;
-            const onTarget = target > 0 && Math.abs(value - target) <= target * 0.1;
-            return { ...m, value, target, pct, onTarget };
+            const diffPct = target > 0 ? Math.round(((value - target) / target) * 100) : 0;
+            const onTarget = target > 0 && Math.abs(diffPct) <= 10;
+            const isOver = diffPct > 10;
+            const isUnder = diffPct < -10;
+            return { ...m, value, target, pct, diffPct, onTarget, isOver, isUnder };
         });
     }, [averages, goals]);
 
@@ -30,17 +33,39 @@ export default function MacroDonutChart({ averages, goals }) {
 
     const insightText = useMemo(() => {
         if (!goals || !averages) return null;
-        const proteinPct = goals.targetProtein > 0
-            ? Math.round(((goals.targetProtein - averages.protein) / goals.targetProtein) * 100)
-            : 0;
-        if (proteinPct > 15) {
-            return `Protein is averaging ${proteinPct}% below target \u2014 adding eggs or Greek yogurt at breakfast would close most of this gap.`;
+
+        // Find the macro with the largest absolute deviation from target
+        let worstMacro = null;
+        let worstAbsDiff = 0;
+        for (const m of macros) {
+            if (m.target <= 0) continue;
+            const absDiff = Math.abs(m.diffPct);
+            if (absDiff > worstAbsDiff) {
+                worstAbsDiff = absDiff;
+                worstMacro = m;
+            }
         }
-        if (proteinPct < -15) {
-            return `Great protein intake \u2014 you're ${Math.abs(proteinPct)}% above your goal.`;
+
+        if (!worstMacro || worstAbsDiff <= 15) {
+            return `Macros are well balanced \u2014 protein, carbs, and fat are all close to target.`;
         }
-        return `Macros are well balanced \u2014 protein, carbs, and fat are all close to target.`;
-    }, [averages, goals]);
+
+        if (worstMacro.isOver) {
+            const tips = {
+                fat: 'lighter cooking methods or smaller cheese portions would help',
+                carbs: 'swapping refined carbs for veggies or protein would help',
+                protein: 'you could scale back protein shakes or lean meat portions'
+            };
+            return `${worstMacro.label} is averaging ${worstAbsDiff}% over target \u2014 ${tips[worstMacro.key] || 'adjusting portions would help'}.`;
+        }
+
+        const tips = {
+            protein: 'adding eggs or Greek yogurt at breakfast would close most of this gap',
+            carbs: 'adding whole grains or fruit could help fill this gap',
+            fat: 'nuts, avocado, or olive oil could help fill this gap'
+        };
+        return `${worstMacro.label} is averaging ${worstAbsDiff}% below target \u2014 ${tips[worstMacro.key] || 'adjusting portions would help'}.`;
+    }, [averages, goals, macros]);
 
     const hasData = macros.some(m => m.value > 0);
 
@@ -69,20 +94,36 @@ export default function MacroDonutChart({ averages, goals }) {
                     <div key={macro.key}>
                         <div className="flex items-baseline justify-between mb-1.5">
                             <span className="font-sans text-sm font-medium text-primary">{macro.label}</span>
-                            <div className="flex items-baseline gap-1">
+                            <div className="flex items-baseline gap-1.5">
                                 <span className={cn(
                                     "font-mono text-sm font-bold",
-                                    macro.onTarget ? "text-emerald-600 dark:text-emerald-400" : "text-primary"
+                                    macro.onTarget
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : "text-amber-600 dark:text-amber-400"
                                 )}>
                                     {macro.value}g
                                 </span>
                                 {macro.target > 0 && (
                                     <span className="font-mono text-sm text-primary/40">/ {macro.target}g</span>
                                 )}
+                                {macro.target > 0 && (
+                                    <span className={cn(
+                                        "font-mono text-xs font-bold",
+                                        macro.onTarget
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : "text-amber-600 dark:text-amber-400"
+                                    )}>
+                                        {macro.onTarget
+                                            ? '\u2713'
+                                            : `${macro.diffPct > 0 ? '+' : ''}${macro.diffPct}%`
+                                        }
+                                    </span>
+                                )}
                             </div>
                         </div>
                         {macro.target > 0 && (
                             <div className="relative h-2.5 bg-primary/8 dark:bg-white/8 rounded-full overflow-hidden">
+                                {/* Base segment: up to 100% */}
                                 <div
                                     className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
                                     style={{
@@ -90,6 +131,18 @@ export default function MacroDonutChart({ averages, goals }) {
                                         backgroundColor: macro.color
                                     }}
                                 />
+                                {/* Overflow segment: past 100%, reduced opacity */}
+                                {macro.pct > 100 && (
+                                    <div
+                                        className="absolute inset-y-0 rounded-r-full transition-all duration-500"
+                                        style={{
+                                            left: '100%',
+                                            width: `${Math.min(30, macro.pct - 100)}%`,
+                                            backgroundColor: macro.color,
+                                            opacity: 0.5
+                                        }}
+                                    />
+                                )}
                                 {/* Target marker at 100% */}
                                 <div className="absolute top-0 bottom-0 w-0.5 bg-primary/25 dark:bg-white/25" style={{ left: '100%' }} />
                             </div>

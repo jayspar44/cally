@@ -232,10 +232,14 @@ const getWeeklyTrends = async (req, res) => {
 
         const prevLogs = prevSnapshot.docs.map(doc => doc.data());
         const prevDates = new Set(prevLogs.map(l => l.date));
-        const prevDaysWithData = prevDates.size || 1;
+        const prevDaysWithData = prevDates.size;
         const prevTotals = aggregateMacros(prevLogs);
-        const prevAvgCalories = Math.round(prevTotals.calories / prevDaysWithData);
-        const calorieDelta = averages.calories - prevAvgCalories;
+        const prevAvgCalories = prevDaysWithData > 0
+            ? Math.round(prevTotals.calories / prevDaysWithData)
+            : null;
+        const calorieDelta = prevAvgCalories != null
+            ? averages.calories - prevAvgCalories
+            : null;
 
         req.log.info({
             action: 'insights.getWeeklyTrends',
@@ -585,9 +589,18 @@ const getAISummary = async (req, res) => {
         const avgCarbs = Math.round(totalCarbs / daysTracked);
         const avgFat = Math.round(totalFat / daysTracked);
 
-        const RANGE_PROMPTS = {
-            '1W': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight. Focus on ACUTE adjustments and yesterday/today specifics. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+        // Build per-day summary for weekly prompt
+        const dailyBreakdown = Object.keys(byDate).sort().map(date => {
+            const dayName = parseLocalDate(date).toLocaleDateString('en-US', { weekday: 'short' });
+            const dayFoods = logs.filter(l => l.date === date).map(l => l.name);
+            const uniqueFoods = [...new Set(dayFoods)].slice(0, 4).join(', ');
+            return `${dayName} ${date}: ${Math.round(byDate[date].calories)} cal — ${uniqueFoods}`;
+        }).join('\n');
 
+        const RANGE_PROMPTS = {
+            '1W': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight. Focus on ACUTE adjustments. Reference specific days by name (e.g. 'Tuesday's pizza') — NEVER say 'yesterday' or 'today' since the user may read this days later. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+
+Today: ${todayStr}
 Period: ${startStr} to ${endStr} (this week)
 Days tracked: ${daysTracked}/${totalDaysInPeriod}
 Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
@@ -597,11 +610,21 @@ Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
+Daily breakdown:
+${dailyBreakdown}
+
 Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`,
 
-            '1M': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized monthly insight. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+            '1M': (() => {
+                const sortedDates = Object.keys(byDate).sort();
+                const firstLogDate = sortedDates[0] || startStr;
+                const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
+                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized monthly insight. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
 
+Today: ${todayStr}
 Period: ${startStr} to ${endStr} (last 30 days)
+First log date in period: ${firstLogDate}
+Last log date in period: ${lastLogDate}
 Days tracked: ${daysTracked}/${totalDaysInPeriod}
 Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
 Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
@@ -610,11 +633,19 @@ Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Keep it to 2-3 sentences max. Focus on pattern-level observations.`,
+Keep it to 2-3 sentences max. Focus on pattern-level observations.`;
+            })(),
 
-            '3M': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized quarterly insight. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations.
+            '3M': (() => {
+                const sortedDates = Object.keys(byDate).sort();
+                const firstLogDate = sortedDates[0] || startStr;
+                const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
+                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized quarterly insight. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
 
+Today: ${todayStr}
 Period: ${startStr} to ${endStr} (last 3 months)
+First log date in period: ${firstLogDate}
+Last log date in period: ${lastLogDate}
 Days tracked: ${daysTracked}/${totalDaysInPeriod}
 Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
 Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
@@ -623,7 +654,8 @@ Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`
+Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`;
+            })()
         };
 
         const prompt = RANGE_PROMPTS[range];

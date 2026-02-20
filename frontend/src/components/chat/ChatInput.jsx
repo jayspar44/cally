@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { isNative, takePhoto } from '../../utils/camera';
 import { Send, Image, X, Loader2 } from 'lucide-react';
@@ -11,6 +11,14 @@ export default function ChatInput({ onSend, sending, disabled, onImageChange }) 
     const [imageBase64s, setImageBase64s] = useState([]);
     const fileInputRef = useRef(null);
     const textAreaRef = useRef(null);
+
+    useEffect(() => {
+        const handleGhostKeyboard = () => {
+            textAreaRef.current?.focus();
+        };
+        window.addEventListener('ghost-keyboard', handleGhostKeyboard);
+        return () => window.removeEventListener('ghost-keyboard', handleGhostKeyboard);
+    }, []);
 
     const addImages = (previews, base64s) => {
         setImagePreviews(prev => {
