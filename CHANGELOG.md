@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/jayspar44/cally/compare/v0.2.4...v0.3.0) (2026-02-20)
+
+
+### Features
+
+* add trends chart navigation, redesign database page, and add badge streaks 750c7eb
+* per-metric chart colors, AI cache invalidation, persist insight context, and database search UX dac6f60
+* redesign insights page, add multi-photo chat, and dedicated macro colors f20d5c7, closes #3A7CA5
+
+
+### Bug Fixes
+
+* change prod app ID to com.getkalli.app f549e4c
+
 ### [0.2.4](https://github.com/jayspar44/cally/compare/v0.2.3...v0.2.4) (2026-02-19)
 
 
