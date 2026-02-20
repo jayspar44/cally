@@ -15,7 +15,7 @@
             "overlay": true
         },
         "SystemBars": {
-            "insetsHandling": "disable"
+            "insetsHandling": "css"
         }
     }
 }
