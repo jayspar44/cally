@@ -171,7 +171,7 @@ const buildChatHistory = (messages) => {
     }));
 };
 
-const processMessage = async (message, chatHistory, userProfile, userId, userTimezone) => {
+const processMessage = async (message, chatHistory, userProfile, userId, userTimezone, idempotencyKey) => {
     try {
         const modelName = MODELS.flash;
 
@@ -230,7 +230,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
-                const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
+                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey);
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
@@ -285,9 +285,11 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
     }
 };
 
-const processImageMessage = async (message, imageBase64, chatHistory, userProfile, userId, userTimezone) => {
+const processImageMessage = async (message, images, chatHistory, userProfile, userId, userTimezone, idempotencyKey) => {
     const modelName = MODELS.pro;
-    getLogger().info({ modelName, hasMessage: !!message }, 'Processing image message');
+    // Support both single imageBase64 string (legacy) and array of images
+    const imageArray = Array.isArray(images) ? images : [images];
+    getLogger().info({ modelName, hasMessage: !!message, imageCount: imageArray.length }, 'Processing image message');
 
     try {
         const enhancedContext = await buildEnhancedContext(userId, userTimezone);
@@ -295,12 +297,14 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
 
         const parts = [];
         parts.push({ text: enhancedContext + userText });
-        parts.push({
-            inlineData: {
-                mimeType: 'image/jpeg',
-                data: imageBase64
-            }
-        });
+        for (const img of imageArray) {
+            parts.push({
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: img
+                }
+            });
+        }
 
         const contents = [
             ...buildChatHistory(chatHistory.slice(0, -1)),
@@ -340,7 +344,7 @@ const processImageMessage = async (message, imageBase64, chatHistory, userProfil
                 getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
-                const toolResult = await executeTool(call.name, call.args, userId, userTimezone);
+                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey);
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);

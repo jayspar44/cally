@@ -54,7 +54,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                                 <circle cx="8.5" cy="8.5" r="1.5" />
                                 <polyline points="21 15 16 10 5 21" strokeWidth="2" />
                             </svg>
-                            <span>Image Attached</span>
+                            <span>{(message.imageCount || 1) > 1 ? `${message.imageCount} Images Attached` : 'Image Attached'}</span>
                         </div>
                     )}
 

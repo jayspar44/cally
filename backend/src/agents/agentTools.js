@@ -197,11 +197,11 @@ const toolDeclarations = [
     }
 ];
 
-const executeTool = async (toolName, args, userId, userTimezone) => {
+const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey) => {
     try {
         switch (toolName) {
             case 'logFood':
-                return await logFood(args, userId, userTimezone);
+                return await logFood(args, userId, userTimezone, idempotencyKey);
             case 'lookupNutrition':
                 return await lookupNutrition(args);
             case 'updateFoodLog':
@@ -225,7 +225,7 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
     }
 };
 
-const logFood = async (args, userId, userTimezone) => {
+const logFood = async (args, userId, userTimezone, idempotencyKey) => {
     let { date, meal, items, originalMessage, nutritionSource } = args;
 
     if (!meal && args.mealType) meal = args.mealType;
@@ -243,9 +243,6 @@ const logFood = async (args, userId, userTimezone) => {
     if (!date) {
         date = getTodayStr(userTimezone);
     }
-
-    const batch = db.batch();
-    const createdIds = [];
 
     if ((!items || items.length === 0) && args.foodName) {
         getLogger().info('Detected flat food arguments, converting to items array');
@@ -266,6 +263,91 @@ const logFood = async (args, userId, userTimezone) => {
         items = [];
     }
 
+    // Idempotency check: if this key was already used, return early
+    if (idempotencyKey) {
+        const existingSnapshot = await db.collection('users').doc(userId)
+            .collection('foodLogs')
+            .where('idempotencyKey', '==', idempotencyKey)
+            .limit(1)
+            .get();
+
+        if (!existingSnapshot.empty) {
+            getLogger().info({ idempotencyKey }, 'Duplicate logFood call detected, returning cached result');
+            const existingDocs = existingSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const totals = existingDocs.reduce((acc, doc) => ({
+                calories: acc.calories + (doc.calories || 0),
+                protein: acc.protein + (doc.protein || 0),
+                carbs: acc.carbs + (doc.carbs || 0),
+                fat: acc.fat + (doc.fat || 0)
+            }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+            return {
+                success: true,
+                deduplicated: true,
+                message: `Already logged ${existingDocs.length} item(s) for this request.`,
+                data: {
+                    date: existingDocs[0].date,
+                    meal: existingDocs[0].meal,
+                    items: existingDocs.map(item => ({
+                        id: item.id, name: item.name, quantity: item.quantity,
+                        unit: item.unit, calories: item.calories, protein: item.protein,
+                        carbs: item.carbs, fat: item.fat, meal: item.meal, date: item.date
+                    })),
+                    count: existingDocs.length,
+                    totalCalories: Math.round(totals.calories),
+                    totalProtein: Math.round(totals.protein),
+                    totalCarbs: Math.round(totals.carbs),
+                    totalFat: Math.round(totals.fat)
+                }
+            };
+        }
+    }
+
+    // Time-window duplicate check: same date + meal + name within 60s
+    for (const item of items) {
+        const recentSnapshot = await db.collection('users').doc(userId)
+            .collection('foodLogs')
+            .where('date', '==', date)
+            .where('meal', '==', meal)
+            .where('name', '==', item.name)
+            .limit(5)
+            .get();
+
+        // Find the most recent doc and check if it's within the 60s window
+        let mostRecentDoc = null;
+        let mostRecentTime = 0;
+        for (const doc of recentSnapshot.docs) {
+            const ts = doc.data().createdAt?.toDate?.()?.getTime() || 0;
+            if (ts > mostRecentTime) { mostRecentTime = ts; mostRecentDoc = doc; }
+        }
+
+        if (mostRecentDoc && mostRecentTime > 0) {
+            if ((Date.now() - mostRecentTime) < 60000) {
+                getLogger().warn({
+                    item: item.name, date, meal, secondsAgo: Math.round((Date.now() - mostRecentTime) / 1000)
+                }, 'Possible duplicate food log within 60s window — skipping');
+                return {
+                    success: true,
+                    deduplicated: true,
+                    message: `"${item.name}" was already logged for ${meal} moments ago. Skipping to avoid duplicate.`,
+                    data: {
+                        date, meal, items: [{ id: mostRecentDoc.id, name: item.name,
+                            quantity: item.quantity, unit: item.unit, calories: item.calories,
+                            protein: item.protein, carbs: item.carbs, fat: item.fat, meal, date }],
+                        count: 1,
+                        totalCalories: Math.round(item.calories || 0),
+                        totalProtein: Math.round(item.protein || 0),
+                        totalCarbs: Math.round(item.carbs || 0),
+                        totalFat: Math.round(item.fat || 0)
+                    }
+                };
+            }
+        }
+    }
+
+    const batch = db.batch();
+    const createdIds = [];
+
     for (const item of items) {
         const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
 
@@ -284,7 +366,8 @@ const logFood = async (args, userId, userTimezone) => {
             nutritionSource: nutritionSource || 'ai_estimate',
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp()
+            updatedAt: FieldValue.serverTimestamp(),
+            ...(idempotencyKey ? { idempotencyKey } : {})
         };
 
         batch.set(docRef, foodLogItem);

@@ -63,7 +63,7 @@ export default function MealItem({ meal }) {
                                     {Math.round(item.calories)} cal
                                 </span>
                                 <div className="flex gap-2 mt-0.5 justify-end">
-                                    <span className="font-mono text-[10px] text-primary/65">P {Math.round(item.protein || 0)}g</span>
+                                    <span className="font-mono text-[10px] text-protein/65">P {Math.round(item.protein || 0)}g</span>
                                     <span className="font-mono text-[10px] text-carbs/80">C {Math.round(item.carbs || 0)}g</span>
                                     <span className="font-mono text-[10px] text-fat/80">F {Math.round(item.fat || 0)}g</span>
                                 </div>

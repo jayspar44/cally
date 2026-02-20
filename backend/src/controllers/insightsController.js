@@ -1,6 +1,9 @@
 const { db } = require('../services/firebase');
 const { toDateStr, parseLocalDate, getTodayStr } = require('../utils/dateUtils');
 const { getGoalsForDate, snapshotGoals, getUserSettings } = require('../services/goalsService');
+const { GoogleGenAI } = require('@google/genai');
+
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -119,17 +122,27 @@ const getDailySummary = async (req, res) => {
 const getWeeklyTrends = async (req, res) => {
     try {
         const userId = req.user.uid;
+        const { weekStart: weekStartParam } = req.query;
 
-        req.log.info({ action: 'insights.getWeeklyTrends' }, 'Fetching weekly trends');
+        req.log.info({ action: 'insights.getWeeklyTrends', weekStart: weekStartParam }, 'Fetching weekly trends');
 
         const settings = await getUserSettings(userId);
         const todayStr = getTodayStr(settings.timezone);
-        const endDate = parseLocalDate(todayStr);
-        const startDate = parseLocalDate(todayStr);
-        startDate.setDate(startDate.getDate() - 6);
+
+        // If weekStart is provided, use that week; otherwise use current week (last 7 days ending today)
+        let startDate, endDate;
+        if (weekStartParam && /^\d{4}-\d{2}-\d{2}$/.test(weekStartParam)) {
+            startDate = parseLocalDate(weekStartParam);
+            endDate = parseLocalDate(weekStartParam);
+            endDate.setDate(endDate.getDate() + 6);
+        } else {
+            endDate = parseLocalDate(todayStr);
+            startDate = parseLocalDate(todayStr);
+            startDate.setDate(startDate.getDate() - 6);
+        }
 
         const startStr = toDateStr(startDate);
-        const endStr = todayStr;
+        const endStr = toDateStr(endDate);
 
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
@@ -175,6 +188,55 @@ const getWeeklyTrends = async (req, res) => {
 
         const goals = await getGoalsForDate(userId, todayStr, settings);
 
+        // Compute daysOnTarget (within 10% of calorie goal)
+        const calorieTarget = goals.targetCalories;
+        const daysOnTarget = days.filter(d =>
+            d.meals > 0 && Math.abs(d.calories - calorieTarget) <= calorieTarget * 0.1
+        ).length;
+
+        // Compute streak (consecutive days with data, ending at today or most recent tracked day)
+        let streak = 0;
+        const sortedDatesDesc = [...days].reverse();
+        for (const day of sortedDatesDesc) {
+            if (day.meals > 0) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        // Compute one-liner insights
+        const daysWithFood = days.filter(d => d.meals > 0);
+        let bestDay = null, worstDay = null;
+        if (daysWithFood.length > 0) {
+            bestDay = daysWithFood.reduce((best, d) =>
+                Math.abs(d.calories - calorieTarget) < Math.abs(best.calories - calorieTarget) ? d : best
+            );
+            worstDay = daysWithFood.reduce((worst, d) =>
+                Math.abs(d.calories - calorieTarget) > Math.abs(worst.calories - calorieTarget) ? d : worst
+            );
+        }
+
+        // Previous week comparison
+        const prevStartDate = new Date(startDate);
+        prevStartDate.setDate(prevStartDate.getDate() - 7);
+        const prevEndDate = new Date(startDate);
+        prevEndDate.setDate(prevEndDate.getDate() - 1);
+        const prevStartStr = toDateStr(prevStartDate);
+        const prevEndStr = toDateStr(prevEndDate);
+
+        const prevSnapshot = await foodLogsRef
+            .where('date', '>=', prevStartStr)
+            .where('date', '<=', prevEndStr)
+            .get();
+
+        const prevLogs = prevSnapshot.docs.map(doc => doc.data());
+        const prevDates = new Set(prevLogs.map(l => l.date));
+        const prevDaysWithData = prevDates.size || 1;
+        const prevTotals = aggregateMacros(prevLogs);
+        const prevAvgCalories = Math.round(prevTotals.calories / prevDaysWithData);
+        const calorieDelta = averages.calories - prevAvgCalories;
+
         req.log.info({
             action: 'insights.getWeeklyTrends',
             daysTracked: daysWithData,
@@ -188,7 +250,13 @@ const getWeeklyTrends = async (req, res) => {
             totals,
             averages,
             goals,
-            daysTracked: daysWithData
+            daysTracked: daysWithData,
+            daysOnTarget,
+            streak,
+            calorieDelta,
+            prevAvgCalories,
+            bestDay: bestDay ? { date: bestDay.date, calories: Math.round(bestDay.calories) } : null,
+            worstDay: worstDay ? { date: worstDay.date, calories: Math.round(worstDay.calories) } : null,
         });
     } catch (error) {
         req.log.error({ err: error }, 'Failed to get weekly trends');
@@ -218,6 +286,29 @@ const getMonthlyTrends = async (req, res) => {
 
         const logs = snapshot.docs.map(doc => doc.data());
 
+        // Build daily granularity for trend chart
+        const endDate = parseLocalDate(todayStr);
+        const byDate = {};
+        for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            const dateStr = toDateStr(d);
+            byDate[dateStr] = { calories: 0, protein: 0, carbs: 0, fat: 0, tracked: false };
+        }
+
+        logs.forEach(log => {
+            if (byDate[log.date]) {
+                byDate[log.date].calories += log.calories || 0;
+                byDate[log.date].protein += log.protein || 0;
+                byDate[log.date].carbs += log.carbs || 0;
+                byDate[log.date].fat += log.fat || 0;
+                byDate[log.date].tracked = true;
+            }
+        });
+
+        const days = Object.entries(byDate)
+            .map(([date, data]) => ({ date, ...data }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        // Also compute weekly buckets for backward compat
         const weeks = [{}, {}, {}, {}, {}];
         logs.forEach(log => {
             const logDate = parseLocalDate(log.date);
@@ -236,14 +327,14 @@ const getMonthlyTrends = async (req, res) => {
 
         const weeklyData = weeks
             .map((w, i) => {
-                const days = w.daysSet ? w.daysSet.size : 0;
+                const dayCount = w.daysSet ? w.daysSet.size : 0;
                 return {
                     week: i + 1,
-                    avgCalories: days > 0 ? Math.round(w.calories / days) : 0,
-                    avgProtein: days > 0 ? Math.round(w.protein / days) : 0,
-                    avgCarbs: days > 0 ? Math.round(w.carbs / days) : 0,
-                    avgFat: days > 0 ? Math.round(w.fat / days) : 0,
-                    daysTracked: days
+                    avgCalories: dayCount > 0 ? Math.round(w.calories / dayCount) : 0,
+                    avgProtein: dayCount > 0 ? Math.round(w.protein / dayCount) : 0,
+                    avgCarbs: dayCount > 0 ? Math.round(w.carbs / dayCount) : 0,
+                    avgFat: dayCount > 0 ? Math.round(w.fat / dayCount) : 0,
+                    daysTracked: dayCount
                 };
             })
             .filter(w => w.daysTracked > 0);
@@ -258,6 +349,8 @@ const getMonthlyTrends = async (req, res) => {
             fat: Math.round(totals.fat / daysWithData)
         };
 
+        const goals = await getGoalsForDate(userId, todayStr, settings);
+
         req.log.info({
             action: 'insights.getMonthlyTrends',
             daysTracked: daysWithData,
@@ -267,9 +360,11 @@ const getMonthlyTrends = async (req, res) => {
         res.json({
             startDate: startStr,
             endDate: endStr,
+            days,
             weeks: weeklyData,
             totals,
             averages,
+            goals,
             daysTracked: daysWithData
         });
     } catch (error) {
@@ -278,8 +373,181 @@ const getMonthlyTrends = async (req, res) => {
     }
 };
 
+const getQuarterlyTrends = async (req, res) => {
+    try {
+        const userId = req.user.uid;
+
+        req.log.info({ action: 'insights.getQuarterlyTrends' }, 'Fetching quarterly trends');
+
+        const settings = await getUserSettings(userId);
+        const todayStr = getTodayStr(settings.timezone);
+        const startDate = parseLocalDate(todayStr);
+        startDate.setDate(startDate.getDate() - 89);
+
+        const startStr = toDateStr(startDate);
+        const endStr = todayStr;
+
+        const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
+        const snapshot = await foodLogsRef
+            .where('date', '>=', startStr)
+            .where('date', '<=', endStr)
+            .get();
+
+        const logs = snapshot.docs.map(doc => doc.data());
+
+        // Group into ~13 weekly buckets
+        const buckets = [];
+        for (let i = 0; i < 13; i++) {
+            const bucketStart = new Date(startDate);
+            bucketStart.setDate(bucketStart.getDate() + (i * 7));
+            const bucketEnd = new Date(bucketStart);
+            bucketEnd.setDate(bucketEnd.getDate() + 6);
+
+            buckets.push({
+                weekStart: toDateStr(bucketStart),
+                weekEnd: toDateStr(bucketEnd > parseLocalDate(todayStr) ? parseLocalDate(todayStr) : bucketEnd),
+                calories: 0, protein: 0, carbs: 0, fat: 0,
+                daysTracked: new Set()
+            });
+        }
+
+        logs.forEach(log => {
+            const logDate = parseLocalDate(log.date);
+            const daysSinceStart = Math.floor((logDate - startDate) / (1000 * 60 * 60 * 24));
+            const bucketIndex = Math.min(12, Math.floor(daysSinceStart / 7));
+
+            buckets[bucketIndex].calories += log.calories || 0;
+            buckets[bucketIndex].protein += log.protein || 0;
+            buckets[bucketIndex].carbs += log.carbs || 0;
+            buckets[bucketIndex].fat += log.fat || 0;
+            buckets[bucketIndex].daysTracked.add(log.date);
+        });
+
+        const weeks = buckets.map(b => {
+            const days = b.daysTracked.size;
+            return {
+                weekStart: b.weekStart,
+                weekEnd: b.weekEnd,
+                avgCalories: days > 0 ? Math.round(b.calories / days) : 0,
+                avgProtein: days > 0 ? Math.round(b.protein / days) : 0,
+                avgCarbs: days > 0 ? Math.round(b.carbs / days) : 0,
+                avgFat: days > 0 ? Math.round(b.fat / days) : 0,
+                daysTracked: days
+            };
+        }).filter(w => w.daysTracked > 0);
+
+        const goals = await getGoalsForDate(userId, todayStr, settings);
+
+        res.json({ startDate: startStr, endDate: endStr, weeks, goals });
+    } catch (error) {
+        req.log.error({ err: error }, 'Failed to get quarterly trends');
+        res.status(500).json({ error: 'Failed to get quarterly trends' });
+    }
+};
+
+const getAISummary = async (req, res) => {
+    try {
+        const userId = req.user.uid;
+        const { week: weekParam } = req.query;
+
+        req.log.info({ action: 'insights.getAISummary', week: weekParam }, 'Fetching AI summary');
+
+        const settings = await getUserSettings(userId);
+        const todayStr = getTodayStr(settings.timezone);
+
+        // Determine week start
+        let weekStart;
+        if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
+            weekStart = weekParam;
+        } else {
+            const wsDate = parseLocalDate(todayStr);
+            wsDate.setDate(wsDate.getDate() - 6);
+            weekStart = toDateStr(wsDate);
+        }
+
+        const weekEnd = parseLocalDate(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekEndStr = toDateStr(weekEnd);
+
+        // Check cache
+        const cacheRef = db.collection('users').doc(userId)
+            .collection('weeklyInsights').doc(weekStart);
+        const cacheDoc = await cacheRef.get();
+
+        if (cacheDoc.exists) {
+            return res.json({ insight: cacheDoc.data().insight, weekStart, cached: true });
+        }
+
+        // Fetch week's data
+        const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
+        const snapshot = await foodLogsRef
+            .where('date', '>=', weekStart)
+            .where('date', '<=', weekEndStr)
+            .get();
+
+        const logs = snapshot.docs.map(doc => doc.data());
+
+        if (logs.length === 0) {
+            return res.json({ insight: null, weekStart, noData: true });
+        }
+
+        const goals = await getGoalsForDate(userId, todayStr, settings);
+
+        // Compute stats for Gemini
+        const byDate = {};
+        logs.forEach(log => {
+            if (!byDate[log.date]) byDate[log.date] = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+            byDate[log.date].calories += log.calories || 0;
+            byDate[log.date].protein += log.protein || 0;
+            byDate[log.date].carbs += log.carbs || 0;
+            byDate[log.date].fat += log.fat || 0;
+        });
+
+        const daysTracked = Object.keys(byDate).length;
+        const totalCals = Object.values(byDate).reduce((s, d) => s + d.calories, 0);
+        const totalProtein = Object.values(byDate).reduce((s, d) => s + d.protein, 0);
+        const avgCalories = Math.round(totalCals / daysTracked);
+        const avgProtein = Math.round(totalProtein / daysTracked);
+
+        const prompt = `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight for the user based on this data. Be warm, specific, and actionable. Use Kalli's conversational voice (contractions, casual tone, no filler affirmations).
+
+Week: ${weekStart} to ${weekEndStr}
+Days tracked: ${daysTracked}/7
+Average daily calories: ${avgCalories} (goal: ${goals.targetCalories})
+Average daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
+Total items logged: ${logs.length}
+Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
+
+Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`;
+
+        const result = await genAI.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: { maxOutputTokens: 256, temperature: 0.8 }
+        });
+
+        const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text || '';
+
+        // Cache the result
+        await cacheRef.set({
+            insight,
+            weekStart,
+            weekEnd: weekEndStr,
+            generatedAt: new Date(),
+            stats: { daysTracked, avgCalories, avgProtein }
+        });
+
+        res.json({ insight, weekStart, cached: false });
+    } catch (error) {
+        req.log.error({ err: error }, 'Failed to get AI summary');
+        res.status(500).json({ error: 'Failed to generate insight' });
+    }
+};
+
 module.exports = {
     getDailySummary,
     getWeeklyTrends,
-    getMonthlyTrends
+    getMonthlyTrends,
+    getQuarterlyTrends,
+    getAISummary
 };

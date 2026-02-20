@@ -1,29 +1,72 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/services';
 import { cn } from '../utils/cn';
-import { toDateStr, isToday as isTodayUtil, formatDateDisplay } from '../utils/dateUtils';
+import { toDateStr, isToday as isTodayUtil, parseLocalDate } from '../utils/dateUtils';
 import MealItem from '../components/ui/MealItem';
+import KalliInsightCard from '../components/insights/KalliInsightCard';
+import SummaryStats from '../components/insights/SummaryStats';
+import WeeklyCalorieChart from '../components/insights/WeeklyCalorieChart';
+import CalorieTrendChart from '../components/insights/CalorieTrendChart';
+import MacroDonutChart from '../components/insights/MacroDonutChart';
 import { HiChevronLeft, HiChevronRight, HiCalendarDays } from 'react-icons/hi2';
 
+const getDefaultWeekStart = () => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    d.setDate(d.getDate() - 6);
+    return toDateStr(d);
+};
+
 export default function Insights() {
-    const [weeklyTrends, setWeeklyTrends] = useState(null);
-    const [loading, setLoading] = useState(true);
+    // Week navigation
+    const [selectedWeekStart, setSelectedWeekStart] = useState(getDefaultWeekStart);
+    const [weeklyData, setWeeklyData] = useState(null);
+    const [loadingWeekly, setLoadingWeekly] = useState(true);
+
+    // Trend data
+    const [monthlyData, setMonthlyData] = useState(null);
+    const [quarterlyData, setQuarterlyData] = useState(null);
 
     // Daily Log State
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [dailySummary, setDailySummary] = useState(null);
     const [loadingDaily, setLoadingDaily] = useState(false);
 
-    // Fetch Weekly Trends (Initial Load)
+    const isCurrentWeek = useCallback(() => {
+        const defaultStart = getDefaultWeekStart();
+        return selectedWeekStart === defaultStart;
+    }, [selectedWeekStart]);
+
+    // Fetch weekly data when week changes
+    useEffect(() => {
+        let cancelled = false;
+        const fetchWeekly = async () => {
+            setLoadingWeekly(true);
+            try {
+                const data = await api.getWeeklyTrends(selectedWeekStart);
+                if (!cancelled) setWeeklyData(data);
+            } catch (error) {
+                console.error('Failed to fetch weekly trends:', error);
+            } finally {
+                if (!cancelled) setLoadingWeekly(false);
+            }
+        };
+        fetchWeekly();
+        return () => { cancelled = true; };
+    }, [selectedWeekStart]);
+
+    // Fetch monthly and quarterly (once on mount)
     useEffect(() => {
         const fetchTrends = async () => {
             try {
-                const weekly = await api.getWeeklyTrends();
-                setWeeklyTrends(weekly);
+                const [monthly, quarterly] = await Promise.all([
+                    api.getMonthlyTrends(),
+                    api.getQuarterlyTrends()
+                ]);
+                setMonthlyData(monthly);
+                setQuarterlyData(quarterly);
             } catch (error) {
-                console.error('Failed to fetch insights:', error);
-            } finally {
-                setLoading(false);
+                console.error('Failed to fetch trends:', error);
             }
         };
         fetchTrends();
@@ -31,21 +74,35 @@ export default function Insights() {
 
     // Fetch Daily Summary when selectedDate changes
     useEffect(() => {
+        let cancelled = false;
         const fetchDaily = async () => {
             setLoadingDaily(true);
             try {
                 const dateStr = toDateStr(selectedDate);
-
                 const data = await api.getDailySummary(dateStr);
-                setDailySummary(data);
+                if (!cancelled) setDailySummary(data);
             } catch (error) {
                 console.error('Failed to fetch daily summary:', error);
             } finally {
-                setLoadingDaily(false);
+                if (!cancelled) setLoadingDaily(false);
             }
         };
         fetchDaily();
+        return () => { cancelled = true; };
     }, [selectedDate]);
+
+    const handlePrevWeek = () => {
+        const current = parseLocalDate(selectedWeekStart);
+        current.setDate(current.getDate() - 7);
+        setSelectedWeekStart(toDateStr(current));
+    };
+
+    const handleNextWeek = () => {
+        if (isCurrentWeek()) return;
+        const current = parseLocalDate(selectedWeekStart);
+        current.setDate(current.getDate() + 7);
+        setSelectedWeekStart(toDateStr(current));
+    };
 
     const handlePrevDay = () => {
         const newDate = new Date(selectedDate);
@@ -61,7 +118,7 @@ export default function Insights() {
 
     const isToday = (date) => isTodayUtil(date);
 
-    if (loading) {
+    if (loadingWeekly && !weeklyData) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -69,114 +126,46 @@ export default function Insights() {
         );
     }
 
-    const goals = weeklyTrends?.goals || { targetCalories: 2000 };
-    // Defensively handle null weeklyTrends
-    const days = weeklyTrends?.days || [];
-    const averages = weeklyTrends?.averages || { calories: 0 };
-    const daysTracked = weeklyTrends?.daysTracked || 0;
+    const goals = weeklyData?.goals || { targetCalories: 2000, targetProtein: 120, targetCarbs: 250, targetFat: 65 };
 
     return (
         <div className="space-y-4 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Weekly Overview Card */}
-            <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 sm:p-6 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30 relative overflow-hidden group">
-                {/* Decorative background gradient */}
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-accent/5 rounded-full blur-3xl group-hover:bg-accent/10 transition-colors duration-1000" />
+            {/* Kalli's Weekly Insight */}
+            <KalliInsightCard weekStart={selectedWeekStart} />
 
-                <div className="flex justify-between items-start mb-6 relative">
-                    <div>
-                        <h2 className="font-serif font-bold text-2xl text-primary mb-1">Weekly Pulse</h2>
-                        <p className="font-sans text-xs text-primary/55 font-medium tracking-wide uppercase">Last 7 Days</p>
-                    </div>
-                    <div className="text-right">
-                        <span className="font-serif font-bold text-3xl text-primary block leading-none tracking-tight">
-                            {Math.round(averages.calories)}
-                        </span>
-                        <span className="font-mono text-[9px] uppercase tracking-widest text-primary/55 font-bold block mt-1">
-                            Avg Cals
-                        </span>
-                    </div>
-                </div>
+            {/* Summary Stats Row */}
+            <SummaryStats
+                averages={weeklyData?.averages}
+                goals={goals}
+                calorieDelta={weeklyData?.calorieDelta}
+                daysOnTarget={weeklyData?.daysOnTarget}
+                streak={weeklyData?.streak}
+            />
 
-                {/* Days Grid */}
-                <div className="flex justify-between items-end gap-2 mb-5 h-28 relative z-10">
-                    {days.map((day, index) => {
-                        const rawPercent = goals.targetCalories > 0 ? (day.calories / goals.targetCalories) * 100 : 0;
-                        const GOAL_SCALE = 0.8;
-                        const heightPercent = Math.min(100, rawPercent * GOAL_SCALE);
-                        const isOver = rawPercent > 100;
-                        const isToday = isTodayUtil(day.date);
-                        const hasData = day.calories > 0;
+            {/* Weekly Calorie Chart */}
+            <WeeklyCalorieChart
+                days={weeklyData?.days || []}
+                goals={goals}
+                startDate={weeklyData?.startDate}
+                endDate={weeklyData?.endDate}
+                bestDay={weeklyData?.bestDay}
+                onPrev={handlePrevWeek}
+                onNext={handleNextWeek}
+                isCurrentWeek={isCurrentWeek()}
+            />
 
-                        return (
-                            <div key={index} className="flex flex-col items-center gap-3 flex-1 h-full justify-end group/bar cursor-default">
-                                {/* Tooltip (Hover) */}
-                                <div className="absolute mb-2 opacity-0 group-hover/bar:opacity-100 transition-opacity bg-primary text-white text-[10px] px-2 py-1 rounded-lg -translate-y-full font-mono whitespace-nowrap z-20 pointer-events-none">
-                                    {Math.round(day.calories)} cal{isOver ? ` (${Math.round(rawPercent)}%)` : ''}
-                                </div>
+            {/* Calorie Trend Chart */}
+            <CalorieTrendChart
+                monthlyData={monthlyData}
+                quarterlyData={quarterlyData}
+                goals={goals}
+            />
 
-                                {/* Bar area */}
-                                <div className="relative w-full max-w-[40px] h-full">
-                                    {/* Ghost bar — target silhouette (80% = goal line) */}
-                                    <div
-                                        className="absolute bottom-0 left-0 w-full rounded-[1rem] bg-primary/[0.06] dark:bg-white/[0.04]"
-                                        style={{ height: `${GOAL_SCALE * 100}%` }}
-                                    />
-
-                                    {/* Actual bar — proportional height, extends above ghost when over target */}
-                                    <div
-                                        className={cn(
-                                            "absolute bottom-0 left-0 w-full rounded-[1rem] transition-all duration-1000 ease-[cubic-bezier(0.25,0.1,0.25,1)]",
-                                            isToday ? "bg-accent" : "bg-primary"
-                                        )}
-                                        style={{
-                                            height: `${heightPercent}%`,
-                                            opacity: hasData ? 1 : 0
-                                        }}
-                                    />
-
-                                    {/* Goal marker line — only when over target */}
-                                    {isOver && hasData && (
-                                        <div
-                                            className="absolute left-0 w-full h-0.5 bg-black/15 dark:bg-white/15 z-10"
-                                            style={{ bottom: `${GOAL_SCALE * 100}%` }}
-                                        />
-                                    )}
-                                </div>
-
-                                {/* Day Label */}
-                                <span className={cn(
-                                    "font-mono text-[10px] uppercase transition-colors",
-                                    isToday ? "text-accent font-bold" : "text-primary/55"
-                                )}>
-                                    {formatDateDisplay(day.date, { weekday: 'narrow' })}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Stats Footer */}
-                <div className="flex justify-start items-center gap-6 pt-6 border-t border-dashed border-primary/10 relative z-10">
-                    <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-                        <span className="font-sans text-xs text-primary/70 font-medium">
-                            <span className="text-primary font-bold">{daysTracked}</span> Days Tracked
-                        </span>
-                    </div>
-                    <div className="w-px h-3 bg-primary/10" />
-                    <span className="font-sans text-sm text-primary/70">
-                        Goal: <span className="font-mono text-primary font-medium">{goals.targetCalories}</span>
-                    </span>
-                </div>
-            </section>
-
-            {/* Placeholder for Future Charts */}
-            <section className="bg-white/50 dark:bg-surface/50 border border-white/40 dark:border-border/30 rounded-[2rem] p-6 flex items-center justify-center min-h-[100px]">
-                <div className="text-center">
-                    <span className="font-serif text-lg text-primary/40 block mb-1">More Insights Coming Soon</span>
-                    <span className="font-sans text-xs text-primary/30">Detailed macro analysis in next update</span>
-                </div>
-            </section>
+            {/* Macro Donut Chart */}
+            <MacroDonutChart
+                averages={weeklyData?.averages}
+                goals={goals}
+            />
 
             {/* Daily Log Section */}
             <section className="space-y-4">

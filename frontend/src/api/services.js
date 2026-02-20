@@ -27,10 +27,21 @@ export const api = {
         return response.data;
     },
 
-    sendMessage: async (message, imageBase64 = null, userTimezone = null, onUploadProgress = null) => {
+    sendMessage: async (message, images = null, userTimezone = null, onUploadProgress = null, isRetry = false) => {
         logger.debug('Sending message to Cally');
-        const config = onUploadProgress ? { onUploadProgress } : {};
-        const response = await client.post('/chat/message', { message, imageBase64, userTimezone }, config);
+        // Support both single string (legacy) and array
+        const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
+        const body = { message, userTimezone, isRetry };
+        if (imageArray.length > 0) {
+            body.images = imageArray;
+            // Backward compat: also send imageBase64 if single image
+            if (imageArray.length === 1) body.imageBase64 = imageArray[0];
+        }
+        const config = {
+            timeout: 120000,
+            ...(onUploadProgress ? { onUploadProgress } : {})
+        };
+        const response = await client.post('/chat/message', body, config);
         return response.data;
     },
 
@@ -85,13 +96,25 @@ export const api = {
         return response.data;
     },
 
-    getWeeklyTrends: async () => {
-        const response = await client.get('/insights/weekly');
+    getWeeklyTrends: async (weekStart = null) => {
+        const params = weekStart ? { weekStart } : {};
+        const response = await client.get('/insights/weekly', { params });
         return response.data;
     },
 
     getMonthlyTrends: async () => {
         const response = await client.get('/insights/monthly');
+        return response.data;
+    },
+
+    getQuarterlyTrends: async () => {
+        const response = await client.get('/insights/quarterly');
+        return response.data;
+    },
+
+    getAISummary: async (weekStart = null) => {
+        const params = weekStart ? { week: weekStart } : {};
+        const response = await client.get('/insights/ai-summary', { params });
         return response.data;
     },
 

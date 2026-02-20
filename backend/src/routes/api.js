@@ -5,7 +5,7 @@ const { verifyToken } = require('../controllers/authController');
 const { updateProfile, getProfile, getRecommendedTargets } = require('../controllers/userController');
 const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
-const { getDailySummary, getWeeklyTrends, getMonthlyTrends } = require('../controllers/insightsController');
+const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
 
 const serverStartTime = new Date().toISOString();
 
@@ -36,5 +36,7 @@ router.delete('/food/logs/:id', deleteLog);
 router.get('/insights/daily/:date', getDailySummary);
 router.get('/insights/weekly', getWeeklyTrends);
 router.get('/insights/monthly', getMonthlyTrends);
+router.get('/insights/quarterly', getQuarterlyTrends);
+router.get('/insights/ai-summary', getAISummary);
 
 module.exports = router;

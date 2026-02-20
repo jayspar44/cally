@@ -19,6 +19,9 @@ function classifyError(err) {
     if (err.code === 'ECONNABORTED') {
         return 'Request timed out. Try again.';
     }
+    if (err.response?.status === 504) {
+        return 'That took too long. Try a simpler message or fewer photos.';
+    }
     if (err.response?.status >= 500) {
         return 'Something went wrong. Try again.';
     }
@@ -53,8 +56,12 @@ export const ChatProvider = ({ children }) => {
         }
     }, [loading]);
 
-    const sendMessage = useCallback(async (messageText, imageBase64 = null, onUploadSuccess = null) => {
-        if (sending || (!messageText?.trim() && !imageBase64)) return;
+    const sendMessage = useCallback(async (messageText, images = null, onUploadSuccess = null) => {
+        // Support both single string (legacy) and array of base64 strings
+        const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
+        const hasImages = imageArray.length > 0;
+
+        if (sending || (!messageText?.trim() && !hasImages)) return;
 
         setSending(true);
         setError(null);
@@ -63,10 +70,11 @@ export const ChatProvider = ({ children }) => {
             id: `temp-${Date.now()}`,
             role: 'user',
             content: messageText || '',
-            imageData: !!imageBase64,
+            imageData: hasImages,
+            imageCount: imageArray.length,
             timestamp: new Date().toISOString(),
             status: 'sending',
-            _retryImageBase64: imageBase64 || null
+            _retryImages: hasImages ? imageArray : null
         };
 
         setMessages(prev => [...prev, tempUserMessage]);
@@ -76,7 +84,6 @@ export const ChatProvider = ({ children }) => {
 
             const onUploadProgress = (progressEvent) => {
                 if (progressEvent.loaded === progressEvent.total) {
-                    // Upload complete — mark message as delivered, triggers "Kalli is thinking..."
                     setMessages(prev => prev.map(m =>
                         m.id === tempUserMessage.id
                             ? { ...m, status: undefined }
@@ -86,7 +93,7 @@ export const ChatProvider = ({ children }) => {
                 }
             };
 
-            const response = await api.sendMessage(messageText, imageBase64, userTimezone, onUploadProgress);
+            const response = await api.sendMessage(messageText, imageArray, userTimezone, onUploadProgress);
 
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== tempUserMessage.id);
@@ -96,7 +103,8 @@ export const ChatProvider = ({ children }) => {
                         id: response.userMessageId,
                         role: 'user',
                         content: messageText || '',
-                        imageData: !!imageBase64,
+                        imageData: hasImages,
+                        imageCount: imageArray.length,
                         timestamp: new Date().toISOString()
                     },
                     {
@@ -105,6 +113,7 @@ export const ChatProvider = ({ children }) => {
                         content: response.response,
                         timestamp: new Date().toISOString(),
                         foodLog: response.foodLog,
+                        partialSuccess: response.partialSuccess || false,
                         profileUpdated: (response.toolsUsed || []).includes('updateUserProfile')
                     }
                 ];
@@ -140,7 +149,7 @@ export const ChatProvider = ({ children }) => {
 
         try {
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const imageBase64 = failedMessage._retryImageBase64 || null;
+            const retryImages = failedMessage._retryImages || [];
             const onRetryUploadProgress = (progressEvent) => {
                 if (progressEvent.loaded === progressEvent.total) {
                     setMessages(prev => prev.map(m =>
@@ -151,7 +160,7 @@ export const ChatProvider = ({ children }) => {
                 }
             };
 
-            const response = await api.sendMessage(failedMessage.content, imageBase64, userTimezone, onRetryUploadProgress);
+            const response = await api.sendMessage(failedMessage.content, retryImages, userTimezone, onRetryUploadProgress, true);
 
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== messageId);
@@ -161,7 +170,8 @@ export const ChatProvider = ({ children }) => {
                         id: response.userMessageId,
                         role: 'user',
                         content: failedMessage.content,
-                        imageData: !!imageBase64,
+                        imageData: retryImages.length > 0,
+                        imageCount: retryImages.length,
                         timestamp: new Date().toISOString()
                     },
                     {
@@ -170,6 +180,7 @@ export const ChatProvider = ({ children }) => {
                         content: response.response,
                         timestamp: new Date().toISOString(),
                         foodLog: response.foodLog,
+                        partialSuccess: response.partialSuccess || false,
                         profileUpdated: (response.toolsUsed || []).includes('updateUserProfile')
                     }
                 ];
