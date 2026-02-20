@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.3](https://github.com/jayspar44/cally/compare/v0.3.2...v0.3.3) (2026-02-20)
+
+
+### Bug Fixes
+
+* compress gallery images and add chat processing status phases 0420a03
+* improve earned badge visual distinction with checkmark overlay 0d86f0d
+
 ### [0.3.2](https://github.com/jayspar44/cally/compare/v0.3.1...v0.3.2) (2026-02-20)
 
 
