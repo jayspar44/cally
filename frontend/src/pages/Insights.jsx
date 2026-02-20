@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../api/services';
 import { cn } from '../utils/cn';
 import { parseLocalDate, toDateStr } from '../utils/dateUtils';
@@ -14,6 +14,7 @@ export default function Insights() {
     const [selectedMetric, setSelectedMetric] = useState('calories');
 
     const [periodOffset, setPeriodOffset] = useState(0);
+    const hasNavigatedRef = useRef(false);
 
     // Data stores (one fetch per range type, cached in state)
     const [weeklyData, setWeeklyData] = useState(null);
@@ -26,7 +27,7 @@ export default function Insights() {
     const [loadingBadges, setLoadingBadges] = useState(true);
 
     // Reset offset when timeRange changes
-    useEffect(() => { setPeriodOffset(0); }, [timeRange]);
+    useEffect(() => { setPeriodOffset(0); hasNavigatedRef.current = false; }, [timeRange]);
 
     // Fetch all trend data on mount
     useEffect(() => {
@@ -97,9 +98,10 @@ export default function Insights() {
         return `${start.toLocaleDateString('en-US', fmt)} – ${end.toLocaleDateString('en-US', fmt)}`;
     }
 
-    // Fetch period data when navigating to non-current period
+    // Fetch period data when navigating to a different period
     useEffect(() => {
-        if (periodOffset === 0) return;
+        if (periodOffset !== 0) hasNavigatedRef.current = true;
+        if (periodOffset === 0 && !hasNavigatedRef.current) return;
         let cancelled = false;
         const fetchPeriodData = async () => {
             const startDate = computePeriodStart(timeRange, periodOffset);

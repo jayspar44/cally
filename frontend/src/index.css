@@ -28,12 +28,15 @@
   --color-fat: #7B4FBF;
   /* Royal Violet */
 
-  /* Chart Colors */
-  --color-chart-bar: #284136;
-  --color-chart-bar-today: #4A8068;
-  --color-chart-over: #D97706;
-  --color-chart-area: #284136;
-  --color-chart-area-fill: rgba(40, 65, 54, 0.1);
+  /* Per-metric chart shades (today highlight / over-target) */
+  --color-calories-today: #4A8068;
+  --color-calories-over: #2E5040;
+  --color-protein-today: #5A9CC5;
+  --color-protein-over: #2868A0;
+  --color-carbs-today: #E8B84A;
+  --color-carbs-over: #C07808;
+  --color-fat-today: #9B70DF;
+  --color-fat-over: #6238A8;
   --color-chart-goal: #9CA3AF;
 
   --color-surface: #FFFFFF;
@@ -77,12 +80,15 @@ html.dark {
   --color-carbs: #F0B840;
   --color-fat: #B088E3;
 
-  /* Chart Colors (Dark) */
-  --color-chart-bar: #E2E5E1;
-  --color-chart-bar-today: #7BC4A0;
-  --color-chart-over: #F59E0B;
-  --color-chart-area: #E2E5E1;
-  --color-chart-area-fill: rgba(226, 229, 225, 0.1);
+  /* Per-metric chart shades (Dark) */
+  --color-calories-today: #A8D4B8;
+  --color-calories-over: #CDD1CA;
+  --color-protein-today: #90C8F0;
+  --color-protein-over: #4890C0;
+  --color-carbs-today: #F5D070;
+  --color-carbs-over: #D09820;
+  --color-fat-today: #C8A8F3;
+  --color-fat-over: #8860C0;
   --color-chart-goal: #6B7280;
 
   --color-surface: #1C1D1D;

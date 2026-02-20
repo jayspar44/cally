@@ -56,7 +56,7 @@ export const ChatProvider = ({ children }) => {
         }
     }, [loading]);
 
-    const sendMessage = useCallback(async (messageText, images = null, onUploadSuccess = null) => {
+    const sendMessage = useCallback(async (messageText, images = null, onUploadSuccess = null, metadata = null) => {
         // Support both single string (legacy) and array of base64 strings
         const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
         const hasImages = imageArray.length > 0;
@@ -74,7 +74,8 @@ export const ChatProvider = ({ children }) => {
             imageCount: imageArray.length,
             timestamp: new Date().toISOString(),
             status: 'sending',
-            _retryImages: hasImages ? imageArray : null
+            _retryImages: hasImages ? imageArray : null,
+            ...(metadata || {})
         };
 
         setMessages(prev => [...prev, tempUserMessage]);
@@ -93,7 +94,7 @@ export const ChatProvider = ({ children }) => {
                 }
             };
 
-            const response = await api.sendMessage(messageText, imageArray, userTimezone, onUploadProgress);
+            const response = await api.sendMessage(messageText, imageArray, userTimezone, onUploadProgress, false, metadata);
 
             setMessages(prev => {
                 const filtered = prev.filter(m => m.id !== tempUserMessage.id);
@@ -105,7 +106,8 @@ export const ChatProvider = ({ children }) => {
                         content: messageText || '',
                         imageData: hasImages,
                         imageCount: imageArray.length,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        ...(metadata || {})
                     },
                     {
                         id: response.assistantMessageId,

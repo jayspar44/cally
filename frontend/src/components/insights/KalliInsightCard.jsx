@@ -55,7 +55,7 @@ export default function KalliInsightCard({ timeRange = '1W', periodStart = null 
 
     const handleChatAboutThis = () => {
         navigate('/chat', {
-            state: { prefillMessage: `Tell me more about my nutrition insight: ${insight}` }
+            state: { insightContext: { text: insight, range: timeRange } }
         });
     };
 

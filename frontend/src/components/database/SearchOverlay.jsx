@@ -41,7 +41,7 @@ export default function SearchOverlay({ onClose, onNavigateToDate }) {
     const displayed = filtered.slice(0, 50);
 
     return (
-        <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-background flex flex-col" style={{ top: 'calc(env(safe-area-inset-top) + 4.5rem)' }}>
             <div className="flex items-center gap-3 p-4 border-b border-border/50">
                 <button onClick={onClose} className="p-2 rounded-xl text-primary/50 hover:text-primary hover:bg-primary/5 transition-colors">
                     <X className="w-5 h-5" />

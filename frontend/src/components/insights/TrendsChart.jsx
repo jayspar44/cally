@@ -9,10 +9,10 @@ import { formatDateDisplay, isToday as isTodayUtil } from '../../utils/dateUtils
 import ChartInsight from './ChartInsight';
 
 const METRIC_CONFIG = {
-    calories: { label: 'Calories', unit: 'cal', color: 'var(--color-calories)', goalKey: 'targetCalories' },
-    protein: { label: 'Protein', unit: 'g', color: 'var(--color-protein)', goalKey: 'targetProtein' },
-    carbs: { label: 'Carbs', unit: 'g', color: 'var(--color-carbs)', goalKey: 'targetCarbs' },
-    fat: { label: 'Fat', unit: 'g', color: 'var(--color-fat)', goalKey: 'targetFat' }
+    calories: { label: 'Calories', unit: 'cal', color: 'var(--color-calories)', todayColor: 'var(--color-calories-today)', overColor: 'var(--color-calories-over)', goalKey: 'targetCalories' },
+    protein: { label: 'Protein', unit: 'g', color: 'var(--color-protein)', todayColor: 'var(--color-protein-today)', overColor: 'var(--color-protein-over)', goalKey: 'targetProtein' },
+    carbs: { label: 'Carbs', unit: 'g', color: 'var(--color-carbs)', todayColor: 'var(--color-carbs-today)', overColor: 'var(--color-carbs-over)', goalKey: 'targetCarbs' },
+    fat: { label: 'Fat', unit: 'g', color: 'var(--color-fat)', todayColor: 'var(--color-fat-today)', overColor: 'var(--color-fat-over)', goalKey: 'targetFat' }
 };
 
 const METRICS = ['calories', 'protein', 'carbs', 'fat'];
@@ -248,8 +248,8 @@ export default function TrendsChart({
                                             key={index}
                                             fill={
                                                 !entry.hasData ? 'transparent'
-                                                    : entry.isOver ? 'var(--color-chart-over)'
-                                                        : entry.isToday ? 'var(--color-chart-bar-today)'
+                                                    : entry.isOver ? config.overColor
+                                                        : entry.isToday ? config.todayColor
                                                             : config.color
                                             }
                                             opacity={entry.hasData ? 1 : 0.1}

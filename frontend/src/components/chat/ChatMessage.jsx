@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/dateUtils';
 import FoodLogCard from './FoodLogCard';
 
-import { Trash2, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
+import { Trash2, Loader2, AlertCircle, RotateCcw, Sparkles } from 'lucide-react';
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 // Strip <details>...</details> HTML blocks that Gemini sometimes includes in responses
@@ -13,11 +13,30 @@ const stripDetailsBlocks = (content) => {
     return content.replace(/<details>[\s\S]*?<\/details>/gi, '').trim();
 };
 
+const RANGE_LABELS = { '1W': 'weekly', '1M': 'monthly', '3M': 'quarterly' };
+
 export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
     const isUser = message.role === 'user';
     const isSending = message.status === 'sending';
     const isFailed = message.status === 'failed';
     const { developerMode } = useUserPreferences();
+
+    // Render context pill instead of user bubble for insight follow-ups
+    if (message.insightContext) {
+        const { text, range } = message.insightContext;
+        const truncated = text.length > 120 ? text.slice(0, 120) + '…' : text;
+        return (
+            <div className="flex justify-center my-4">
+                <div className="max-w-[85%] bg-accent/5 border border-accent/15 rounded-xl px-4 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                        <Sparkles className="w-3 h-3 text-accent" />
+                        <span className="font-sans text-xs font-semibold text-accent">From your {RANGE_LABELS[range] || 'weekly'} insight</span>
+                    </div>
+                    <p className="font-sans text-xs text-primary/60 leading-relaxed">{truncated}</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={cn(
@@ -83,7 +102,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                                 onDelete();
                             }}
                             className={cn(
-                                "absolute -top-2 w-6 h-6 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200",
+                                "absolute -top-2 w-6 h-6 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200",
                                 isUser ? "-left-2" : "-right-2"
                             )}
                             title="Delete Message (Dev Mode)"

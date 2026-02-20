@@ -15,7 +15,7 @@ const checkRecentlyCreatedLogs = async (userId, idempotencyKey) => {
 const sendMessage = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { message, imageBase64, images } = req.body;
+        const { message, imageBase64, images, metadata: reqMetadata } = req.body;
         const idempotencyKey = crypto.randomUUID();
 
         // Support images[] array with fallback to single imageBase64
@@ -48,7 +48,8 @@ const sendMessage = async (req, res) => {
             imageData: hasImages,
             imageCount: imageArray.length,
             timestamp: new Date(),
-            metadata: {}
+            metadata: {},
+            ...(reqMetadata?.insightContext ? { insightContext: reqMetadata.insightContext } : {})
         };
         const userMsgDoc = await chatHistoryRef.add(userMessage);
 

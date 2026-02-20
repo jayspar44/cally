@@ -17,6 +17,7 @@ export default function Chat() {
     const navigate = useNavigate();
     const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
     const [onboardingTriggered, setOnboardingTriggered] = useState(false);
+    const [insightTriggered, setInsightTriggered] = useState(false);
     const messagesEndRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
     const [sendingWithImage, setSendingWithImage] = useState(false);
@@ -45,6 +46,20 @@ export default function Chat() {
             sendMessage(needsOnboarding ? "Hey Kalli, I'd like to get started!" : "I'd like to update my profile information");
         }
     }, [location.state, initialized, onboardingTriggered, needsOnboarding, navigate, sendMessage]);
+
+    // Handle "Chat about this" from Insights page
+    useEffect(() => {
+        if (location.state?.insightContext && initialized && !insightTriggered && !sending) {
+            setInsightTriggered(true);
+            const { text, range } = location.state.insightContext;
+            navigate('/chat', { replace: true, state: {} });
+
+            const rangeLabel = { '1W': 'weekly', '1M': 'monthly', '3M': 'quarterly' }[range] || 'weekly';
+            const message = `[The user tapped "Chat about this" on their ${rangeLabel} nutrition insight. Here's the insight they want to discuss further: "${text}"]`;
+
+            sendMessage(message, null, null, { insightContext: { text, range } });
+        }
+    }, [location.state, initialized, insightTriggered, sending, navigate, sendMessage]);
 
     // Auto-trigger onboarding for new users with no chat history
     useEffect(() => {

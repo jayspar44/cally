@@ -105,9 +105,9 @@ export default function Database() {
                             <MealSection key={group.meal} meal={group.meal} items={group.items} totalCalories={group.totalCalories} onEditItem={handleEdit} />
                         ))}
                     </div>
-                    <button onClick={() => setShowSearch(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-border/40 text-primary/40 hover:text-primary/60 hover:border-border/60 transition-colors">
+                    <button onClick={() => setShowSearch(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-accent/15 border border-accent/20 text-accent hover:bg-accent/20 active:scale-[0.98] transition-all shadow-sm">
                         <Search className="w-4 h-4" />
-                        <span className="font-sans text-sm">Search all logs</span>
+                        <span className="font-sans text-sm font-medium">Search all logs</span>
                     </button>
                 </>
             )}

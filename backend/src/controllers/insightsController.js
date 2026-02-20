@@ -531,18 +531,7 @@ const getAISummary = async (req, res) => {
             totalDaysInPeriod = 90;
         }
 
-        // Cache key: range + period identifier
-        const cacheKey = `${range}_${periodIdentifier}`;
-        const cacheRef = db.collection('users').doc(userId)
-            .collection('weeklyInsights').doc(cacheKey);
-        const cacheDoc = await cacheRef.get();
-
-        const refresh = req.query.refresh === 'true';
-        if (!refresh && cacheDoc.exists) {
-            return res.json({ insight: cacheDoc.data().insight, range, periodIdentifier, cached: true });
-        }
-
-        // Fetch data for the range
+        // Fetch food logs first (needed for cache fingerprint + generation)
         const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
         const snapshot = await foodLogsRef
             .where('date', '>=', startStr)
@@ -553,6 +542,25 @@ const getAISummary = async (req, res) => {
 
         if (logs.length === 0) {
             return res.json({ insight: null, range, periodIdentifier, noData: true });
+        }
+
+        // Data fingerprint: count + total calories — invalidates cache on add/delete/edit
+        const totalCalsForHash = Math.round(logs.reduce((s, l) => s + (l.calories || 0), 0));
+        const dataFingerprint = `${logs.length}_${totalCalsForHash}`;
+
+        // Cache key: range + period identifier
+        const cacheKey = `${range}_${periodIdentifier}`;
+        const cacheRef = db.collection('users').doc(userId)
+            .collection('weeklyInsights').doc(cacheKey);
+        const cacheDoc = await cacheRef.get();
+
+        const refresh = req.query.refresh === 'true';
+        if (!refresh && cacheDoc.exists) {
+            const cachedData = cacheDoc.data();
+            if (cachedData.dataFingerprint === dataFingerprint) {
+                return res.json({ insight: cachedData.insight, range, periodIdentifier, cached: true });
+            }
+            req.log.info({ cachedFingerprint: cachedData.dataFingerprint, currentFingerprint: dataFingerprint }, 'AI summary cache invalidated — food log data changed');
         }
 
         const goals = await getGoalsForDate(userId, todayStr, settings);
@@ -628,11 +636,12 @@ Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`
 
         const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
 
-        // Cache the result
+        // Cache the result with data fingerprint for invalidation
         await cacheRef.set({
             insight,
             range,
             periodIdentifier,
+            dataFingerprint,
             startDate: startStr,
             endDate: endStr,
             generatedAt: new Date(),

@@ -27,11 +27,12 @@ export const api = {
         return response.data;
     },
 
-    sendMessage: async (message, images = null, userTimezone = null, onUploadProgress = null, isRetry = false) => {
+    sendMessage: async (message, images = null, userTimezone = null, onUploadProgress = null, isRetry = false, metadata = null) => {
         logger.debug('Sending message to Cally');
         // Support both single string (legacy) and array
         const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
         const body = { message, userTimezone, isRetry };
+        if (metadata) body.metadata = metadata;
         if (imageArray.length > 0) {
             body.images = imageArray;
             // Backward compat: also send imageBase64 if single image
