@@ -4,7 +4,7 @@ import { api } from '../api/services';
 import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Plus } from 'lucide-react';
 import { cn } from '../utils/cn';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
@@ -166,6 +166,18 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      {/* Log Food CTA */}
+      <button
+        onClick={() => {
+          navigate('/chat');
+          setTimeout(() => window.dispatchEvent(new CustomEvent('ghost-keyboard')), 100);
+        }}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-accent text-white font-sans font-semibold text-sm shadow-sm hover:bg-accent/90 active:scale-[0.98] transition-all"
+      >
+        <Plus className="w-4.5 h-4.5" />
+        Log something
+      </button>
     </div>
   );
 }

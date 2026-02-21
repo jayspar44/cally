@@ -13,7 +13,7 @@ const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 
 const toolDeclarations = [
     {
         name: 'logFood',
-        description: 'Log a NEW food entry to the user\'s food log. Use ONLY when the user tells you what they ate and you need to create a new record. The nutrition values you pass MUST match what you quoted to the user. NEVER use this to correct or adjust an existing entry — use updateFoodLog instead.',
+        description: 'Log a NEW food entry. IMPORTANT: Pass food data in the "items" array parameter — do NOT use "foods", "foodItems", or flat arguments. Example: items: [{ name: "Scrambled eggs", quantity: 2, unit: "large", calories: 182, protein: 12, carbs: 2, fat: 14 }]. NEVER use this to correct or adjust an existing entry — use updateFoodLog instead.',
         parameters: {
             type: 'object',
             properties: {
@@ -50,7 +50,7 @@ const toolDeclarations = [
                         },
                         required: ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat']
                     },
-                    description: 'Array of individual food items with nutrition info'
+                    description: 'REQUIRED. Array of food item objects. Each object must have: name, quantity, unit, calories, protein, carbs, fat. Do NOT pass food data as flat arguments or under other keys like "foods" or "foodItems" — use this "items" array.'
                 },
                 nutritionSource: {
                     type: 'string',
@@ -198,11 +198,11 @@ const toolDeclarations = [
     }
 ];
 
-const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey) => {
+const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey, options = {}) => {
     try {
         switch (toolName) {
             case 'logFood':
-                return await logFood(args, userId, userTimezone, idempotencyKey);
+                return await logFood(args, userId, userTimezone, idempotencyKey, options);
             case 'lookupNutrition':
                 return await lookupNutrition(args);
             case 'updateFoodLog':
@@ -226,7 +226,7 @@ const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey)
     }
 };
 
-const logFood = async (args, userId, userTimezone, idempotencyKey) => {
+const logFood = async (args, userId, userTimezone, idempotencyKey, options = {}) => {
     let { date, meal, items, originalMessage, nutritionSource } = args;
 
     if (!meal && args.mealType) meal = args.mealType;
@@ -245,10 +245,21 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
         date = getTodayStr(userTimezone);
     }
 
-    if ((!items || items.length === 0) && args.foodName) {
+    // Normalize: accept foods, foodItems, or flat args in addition to items
+    if ((!items || items.length === 0) && (args.foods || args.foodItems)) {
+        const altArray = args.foods || args.foodItems;
+        if (Array.isArray(altArray) && altArray.length > 0) {
+            getLogger().info({ key: args.foods ? 'foods' : 'foodItems' },
+                'Detected alternative array key, normalizing to items');
+            items = altArray;
+        }
+    }
+
+    // Flat-arg fallback: accept both foodName and name
+    if ((!items || items.length === 0) && (args.foodName || args.name)) {
         getLogger().info('Detected flat food arguments, converting to items array');
         items = [{
-            name: args.foodName,
+            name: args.foodName || args.name,
             quantity: args.quantity || 1,
             unit: args.unit || 'serving',
             calories: args.calories || 0,
@@ -259,9 +270,12 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
         }];
     }
 
-    if (!items || !Array.isArray(items)) {
-        getLogger().warn({ args }, 'logFood called without valid items array');
-        items = [];
+    if (!items || !Array.isArray(items) || items.length === 0) {
+        getLogger().warn({ args: Object.keys(args) }, 'logFood called without valid items array');
+        return {
+            success: false,
+            error: 'No valid items provided. Call logFood with an "items" array containing objects with name, quantity, unit, calories, protein, carbs, fat fields.'
+        };
     }
 
     // Idempotency check: if this key was already used, return early
@@ -364,7 +378,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
             carbs: item.carbs || 0,
             fat: item.fat || 0,
             originalMessage: originalMessage || '',
-            source: 'chat',
+            source: options.source || 'chat',
             nutritionSource: nutritionSource || 'ai_estimate',
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),

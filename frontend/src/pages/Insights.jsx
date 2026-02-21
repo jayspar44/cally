@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/services';
 import { cn } from '../utils/cn';
 import { parseLocalDate, toDateStr } from '../utils/dateUtils';
+import { BarChart3, Plus } from 'lucide-react';
 import KalliInsightCard from '../components/insights/KalliInsightCard';
 import TrendsChart from '../components/insights/TrendsChart';
 import MacroDonutChart from '../components/insights/MacroDonutChart';
@@ -9,6 +11,7 @@ import StreakBanner from '../components/insights/StreakBanner';
 import BadgesSection from '../components/insights/BadgesSection';
 
 export default function Insights() {
+    const navigate = useNavigate();
     // Global state
     const [timeRange, setTimeRange] = useState('1W');
     const [selectedMetric, setSelectedMetric] = useState('calories');
@@ -202,6 +205,34 @@ export default function Insights() {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
                 <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            </div>
+        );
+    }
+
+    const hasData = (weeklyData?.daysTracked > 0)
+        || (monthlyData?.daysTracked > 0)
+        || (quarterlyData?.weeks?.some(w => w.daysTracked > 0));
+
+    if (!hasData) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 animate-in fade-in duration-700">
+                <div className="w-16 h-16 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-5">
+                    <BarChart3 className="w-8 h-8 text-accent" />
+                </div>
+                <h2 className="font-serif font-black text-2xl text-primary mb-2 text-center">No insights yet</h2>
+                <p className="font-sans text-primary/60 text-sm text-center max-w-xs leading-snug mb-6">
+                    Log your first meal and your trends, averages, and achievements will show up here.
+                </p>
+                <button
+                    onClick={() => {
+                        navigate('/chat');
+                        setTimeout(() => window.dispatchEvent(new CustomEvent('ghost-keyboard')), 100);
+                    }}
+                    className="flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl bg-accent text-white font-sans font-semibold text-sm shadow-sm hover:bg-accent/90 active:scale-95 transition-all"
+                >
+                    <Plus className="w-4.5 h-4.5" />
+                    Log something
+                </button>
             </div>
         );
     }

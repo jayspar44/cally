@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 const router = express.Router();
 const pkg = require('../../package.json');
 const { verifyToken } = require('../controllers/authController');
@@ -11,7 +12,7 @@ const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, 
 const aiRateLimit = rateLimit({
     windowMs: 60 * 1000,
     max: 10,
-    keyGenerator: (req) => req.user?.uid || req.ip,
+    keyGenerator: (req) => req.user?.uid || ipKeyGenerator(req.ip),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many AI requests, please try again in a minute.' }
