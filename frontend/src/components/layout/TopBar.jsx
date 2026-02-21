@@ -4,12 +4,12 @@ import { cn } from '../../utils/cn';
 import { HiUser, HiCalendarDays } from 'react-icons/hi2';
 import { Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 const PAGE_TITLES = {
     '/': 'Kalli',
     '/database': 'Food Log',
+    '/search': 'Search',
     '/insights': 'Insights',
     '/settings': 'Settings',
 };
@@ -20,18 +20,6 @@ export default function TopBar() {
     const { user } = useAuth();
     const { developerMode } = useUserPreferences();
     const [scrolled, setScrolled] = useState(false);
-    const [searchOpen, setSearchOpen] = useState(false);
-
-    useEffect(() => {
-        const onOpen = () => setSearchOpen(true);
-        const onClose = () => setSearchOpen(false);
-        window.addEventListener('open-database-search', onOpen);
-        window.addEventListener('close-database-search', onClose);
-        return () => {
-            window.removeEventListener('open-database-search', onOpen);
-            window.removeEventListener('close-database-search', onClose);
-        };
-    }, []);
 
     useEffect(() => {
         const container = document.getElementById('layout-container');
@@ -46,6 +34,7 @@ export default function TopBar() {
     }, []);
 
     const title = PAGE_TITLES[location.pathname] || 'Kalli';
+    const isSearch = location.pathname === '/search';
     const isDatabase = location.pathname === '/database';
     const isSettings = location.pathname === '/settings';
 
@@ -88,14 +77,14 @@ export default function TopBar() {
                     </div>
 
                     <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('open-database-search'))}
+                        onClick={() => navigate('/search')}
                         className={cn(
                             "relative w-9 h-9 rounded-full border flex items-center justify-center shadow-sm active:scale-95 transition-all",
-                            searchOpen ? "bg-accent/10 border-accent/30" : "bg-surface border-border"
+                            isSearch ? "bg-accent/10 border-accent/30" : "bg-surface border-border"
                         )}
                         title="Search logs"
                     >
-                        <Search className={cn("w-4.5 h-4.5 transition-colors", searchOpen ? "text-accent" : "text-primary")} />
+                        <Search className={cn("w-4.5 h-4.5 transition-colors", isSearch ? "text-accent" : "text-primary")} />
                     </button>
 
                     <button

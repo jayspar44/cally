@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Search } from 'lucide-react';
-import { api } from '../../api/services';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Search } from 'lucide-react';
+import { api } from '../api/services';
 
-export default function SearchOverlay({ onClose, onNavigateToDate }) {
+export default function SearchLogs() {
+    const navigate = useNavigate();
     const [query, setQuery] = useState('');
     const [allLogs, setAllLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -41,10 +43,10 @@ export default function SearchOverlay({ onClose, onNavigateToDate }) {
     const displayed = filtered.slice(0, 50);
 
     return (
-        <div className="fixed inset-0 z-40 bg-background flex flex-col" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 4.5rem)' }}>
+        <div className="flex flex-col -mx-4 sm:-mx-6 min-h-full">
             <div className="flex items-center gap-3 p-4 border-b border-border/50">
-                <button onClick={onClose} className="p-2 rounded-xl text-primary/50 hover:text-primary hover:bg-primary/5 transition-colors">
-                    <X className="w-5 h-5" />
+                <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-primary/50 hover:text-primary hover:bg-primary/5 transition-colors">
+                    <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/30" />
@@ -72,7 +74,7 @@ export default function SearchOverlay({ onClose, onNavigateToDate }) {
                         {displayed.map((log, i) => (
                             <button
                                 key={log.id || i}
-                                onClick={() => { if (log.date) onNavigateToDate(log.date); onClose(); }}
+                                onClick={() => navigate(`/database?date=${log.date}`)}
                                 className="w-full flex items-center justify-between p-4 hover:bg-primary/5 active:bg-primary/8 transition-colors text-left"
                             >
                                 <div className="flex-1 min-w-0 pr-3">

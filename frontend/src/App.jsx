@@ -7,6 +7,7 @@ import Insights from './pages/Insights';
 import Database from './pages/Database';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import SearchLogs from './pages/SearchLogs';
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -45,6 +46,7 @@ function AppContent() {
         <Route path="chat" element={<Chat />} />
         <Route path="insights" element={<Insights />} />
         <Route path="database" element={<Database />} />
+        <Route path="search" element={<SearchLogs />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

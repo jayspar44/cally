@@ -1,36 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import TopBar from './TopBar';
 import FloatingCapsuleNav from './FloatingCapsuleNav';
-import SearchOverlay from '../database/SearchOverlay';
 
 export function Layout() {
     const location = useLocation();
-    const navigate = useNavigate();
     const isChatPage = location.pathname === '/chat';
-    const isDatabase = location.pathname === '/database';
-    const [showSearch, setShowSearch] = useState(false);
-
-    useEffect(() => {
-        const handler = () => setShowSearch(true);
-        window.addEventListener('open-database-search', handler);
-        return () => window.removeEventListener('open-database-search', handler);
-    }, []);
-
-    const handleCloseSearch = useCallback(() => {
-        setShowSearch(false);
-        window.dispatchEvent(new CustomEvent('close-database-search'));
-    }, []);
-
-    const handleNavigateToDate = useCallback((date) => {
-        if (isDatabase) {
-            window.dispatchEvent(new CustomEvent('database-set-date', { detail: date }));
-        } else {
-            navigate(`/database?date=${date}`);
-        }
-        setShowSearch(false);
-        window.dispatchEvent(new CustomEvent('close-database-search'));
-    }, [isDatabase, navigate]);
 
     return (
         <div className="fixed inset-0 bg-background text-foreground font-sans selection:bg-accent/20 overflow-hidden">
@@ -52,9 +26,6 @@ export function Layout() {
 
             <TopBar />
             <FloatingCapsuleNav />
-            {showSearch && (
-                <SearchOverlay onClose={handleCloseSearch} onNavigateToDate={handleNavigateToDate} />
-            )}
         </div>
     );
 }
