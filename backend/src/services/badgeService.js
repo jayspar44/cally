@@ -235,9 +235,11 @@ const checkBadgeEligibility = async (userId) => {
         if (allLogs.length === 0) return [];
 
         // Build helper data structures
-        const logDates = new Set(allLogs.map(l => l.date));
+        const logDates = new Set();
         const byDate = {};
         allLogs.forEach(log => {
+            if (!log.date) return;
+            logDates.add(log.date);
             if (!byDate[log.date]) byDate[log.date] = { calories: 0, protein: 0, carbs: 0, fat: 0, meals: new Set(), sources: [] };
             byDate[log.date].calories += log.calories || 0;
             byDate[log.date].protein += log.protein || 0;
@@ -248,6 +250,7 @@ const checkBadgeEligibility = async (userId) => {
         });
 
         const sortedDates = [...logDates].sort();
+        const dateIndexMap = new Map(sortedDates.map((d, i) => [d, i]));
         const { current: currentStreak } = computeStreak(logDates, timezone);
 
         const newBadges = [];
@@ -281,8 +284,7 @@ const checkBadgeEligibility = async (userId) => {
                     for (const dateStr of sortedDates) {
                         const d = byDate[dateStr];
                         if (Math.abs(d.calories - target) <= target * 0.1) {
-                            // Check consecutive
-                            if (run === 0 || isConsecutive(sortedDates[sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                            if (run === 0 || isConsecutive(sortedDates[dateIndexMap.get(dateStr) - 1], dateStr)) {
                                 run++;
                             } else {
                                 run = 1;
@@ -305,20 +307,22 @@ const checkBadgeEligibility = async (userId) => {
                 }
 
                 case 'balanced_week': {
-                    // Check any 7-day window for 5+ days all macros on target
+                    // Check any 7-day window for 5+ days all macros on target (O(n) sliding window)
                     for (let i = 0; i <= sortedDates.length - 5; i++) {
                         const windowStart = parseLocalDate(sortedDates[i]);
                         const windowEnd = new Date(windowStart);
                         windowEnd.setDate(windowEnd.getDate() + 6);
                         const windowEndStr = toDateStr(windowEnd);
 
-                        const windowDates = sortedDates.filter(d => d >= sortedDates[i] && d <= windowEndStr);
-                        const balancedDays = windowDates.filter(d => {
-                            const day = byDate[d];
-                            return isWithinPct(day.protein, goals.targetProtein, 0.1) &&
+                        let balancedDays = 0;
+                        for (let j = i; j < sortedDates.length && sortedDates[j] <= windowEndStr; j++) {
+                            const day = byDate[sortedDates[j]];
+                            if (isWithinPct(day.protein, goals.targetProtein, 0.1) &&
                                 isWithinPct(day.carbs, goals.targetCarbs, 0.1) &&
-                                isWithinPct(day.fat, goals.targetFat, 0.1);
-                        }).length;
+                                isWithinPct(day.fat, goals.targetFat, 0.1)) {
+                                balancedDays++;
+                            }
+                        }
 
                         if (balancedDays >= req.target) { earned = true; break; }
                     }
@@ -330,7 +334,7 @@ const checkBadgeEligibility = async (userId) => {
                     for (const dateStr of sortedDates) {
                         const d = byDate[dateStr];
                         if (isWithinPct(d.protein, goals.targetProtein, 0.1)) {
-                            if (run === 0 || isConsecutive(sortedDates[sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                            if (run === 0 || isConsecutive(sortedDates[dateIndexMap.get(dateStr) - 1], dateStr)) {
                                 run++;
                             } else {
                                 run = 1;
@@ -378,7 +382,7 @@ const checkBadgeEligibility = async (userId) => {
                     for (const dateStr of sortedDates) {
                         const d = byDate[dateStr];
                         if (Math.abs(d.calories - target) <= target * 0.05) {
-                            if (run === 0 || isConsecutive(sortedDates[sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                            if (run === 0 || isConsecutive(sortedDates[dateIndexMap.get(dateStr) - 1], dateStr)) {
                                 run++;
                             } else {
                                 run = 1;
@@ -431,9 +435,11 @@ const getUserBadges = async (userId) => {
     const allLogsSnapshot = await foodLogsRef.orderBy('date', 'desc').limit(5000).get();
     const allLogs = allLogsSnapshot.docs.map(d => d.data());
 
-    const logDates = new Set(allLogs.map(l => l.date));
+    const logDates = new Set();
     const byDate = {};
     allLogs.forEach(log => {
+        if (!log.date) return;
+        logDates.add(log.date);
         if (!byDate[log.date]) byDate[log.date] = { calories: 0, protein: 0, carbs: 0, fat: 0, meals: new Set(), sources: [] };
         byDate[log.date].calories += log.calories || 0;
         byDate[log.date].protein += log.protein || 0;
@@ -445,6 +451,7 @@ const getUserBadges = async (userId) => {
 
     const { current: currentStreak, best: bestStreak } = computeStreak(logDates, timezone);
     const sortedDates = [...logDates].sort();
+    const dateIndexMap = new Map(sortedDates.map((d, i) => [d, i]));
 
     const calorieStreak = computeCurrentTargetStreak(byDate, sortedDates, timezone,
         d => Math.abs(d.calories - goals.targetCalories) <= goals.targetCalories * 0.1
@@ -467,7 +474,7 @@ const getUserBadges = async (userId) => {
             });
         } else {
             const prog = computeProgress(badge, {
-                allLogs, byDate, logDates, currentStreak, goals, sortedDates
+                allLogs, byDate, logDates, currentStreak, goals, sortedDates, dateIndexMap
             });
             if (prog) {
                 progress.push({
@@ -504,7 +511,7 @@ function computeProgress(badge, ctx) {
             for (const dateStr of ctx.sortedDates) {
                 const d = ctx.byDate[dateStr];
                 if (Math.abs(d.calories - target) <= target * 0.1) {
-                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.dateIndexMap.get(dateStr) - 1], dateStr)) {
                         run++;
                     } else { run = 1; }
                     best = Math.max(best, run);
@@ -517,7 +524,7 @@ function computeProgress(badge, ctx) {
             for (const dateStr of ctx.sortedDates) {
                 const d = ctx.byDate[dateStr];
                 if (isWithinPct(d.protein, ctx.goals.targetProtein, 0.1)) {
-                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.dateIndexMap.get(dateStr) - 1], dateStr)) {
                         run++;
                     } else { run = 1; }
                     best = Math.max(best, run);
@@ -535,7 +542,7 @@ function computeProgress(badge, ctx) {
             for (const dateStr of ctx.sortedDates) {
                 const d = ctx.byDate[dateStr];
                 if (Math.abs(d.calories - target) <= target * 0.05) {
-                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.sortedDates.indexOf(dateStr) - 1], dateStr)) {
+                    if (run === 0 || isConsecutive(ctx.sortedDates[ctx.dateIndexMap.get(dateStr) - 1], dateStr)) {
                         run++;
                     } else { run = 1; }
                     best = Math.max(best, run);

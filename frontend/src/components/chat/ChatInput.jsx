@@ -8,8 +8,9 @@ const MAX_WIDTH = 1024;
 const JPEG_QUALITY = 0.9;
 
 function compressImage(file) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const img = new window.Image();
+        const objectUrl = URL.createObjectURL(file);
         img.onload = () => {
             const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
             const canvas = document.createElement('canvas');
@@ -21,9 +22,13 @@ function compressImage(file) {
                 preview: dataUrl,
                 base64: dataUrl.split(',')[1]
             });
-            URL.revokeObjectURL(img.src);
+            URL.revokeObjectURL(objectUrl);
         };
-        img.src = URL.createObjectURL(file);
+        img.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('Failed to load image'));
+        };
+        img.src = objectUrl;
     });
 }
 

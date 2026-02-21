@@ -70,9 +70,10 @@ const sendMessage = async (req, res) => {
             ? processImageMessage(message, imageArray, chatHistory, userProfile, userId, req.body.userTimezone, idempotencyKey)
             : processMessage(message, chatHistory, userProfile, userId, req.body.userTimezone, idempotencyKey);
 
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('SERVER_TIMEOUT')), SERVER_TIMEOUT_MS)
-        );
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('SERVER_TIMEOUT')), SERVER_TIMEOUT_MS);
+        });
 
         let response;
         try {
@@ -82,6 +83,9 @@ const sendMessage = async (req, res) => {
                 req.log.warn({ idempotencyKey }, 'Chat processing timed out');
                 return res.status(504).json({ error: 'Processing took too long. Try a simpler message or fewer photos.' });
             }
+
+            // Allow Firestore writes to propagate before checking
+            await new Promise(r => setTimeout(r, 500));
 
             // Partial-success recovery: check if food was logged despite the error
             const recentLogs = await checkRecentlyCreatedLogs(userId, idempotencyKey);
@@ -113,6 +117,8 @@ const sendMessage = async (req, res) => {
                 });
             }
             throw processingError;
+        } finally {
+            clearTimeout(timeoutId);
         }
 
         const assistantMessage = {

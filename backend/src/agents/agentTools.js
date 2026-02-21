@@ -305,6 +305,9 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
     }
 
     // Time-window duplicate check: same date + meal + name within 60s
+    // Filter out duplicate items instead of returning early for the entire batch
+    const newItems = [];
+    const skippedItems = [];
     for (const item of items) {
         const recentSnapshot = await db.collection('users').doc(userId)
             .collection('foodLogs')
@@ -314,37 +317,35 @@ const logFood = async (args, userId, userTimezone, idempotencyKey) => {
             .limit(5)
             .get();
 
-        // Find the most recent doc and check if it's within the 60s window
-        let mostRecentDoc = null;
         let mostRecentTime = 0;
         for (const doc of recentSnapshot.docs) {
             const ts = doc.data().createdAt?.toDate?.()?.getTime() || 0;
-            if (ts > mostRecentTime) { mostRecentTime = ts; mostRecentDoc = doc; }
+            if (ts > mostRecentTime) { mostRecentTime = ts; }
         }
 
-        if (mostRecentDoc && mostRecentTime > 0) {
-            if ((Date.now() - mostRecentTime) < 60000) {
-                getLogger().warn({
-                    item: item.name, date, meal, secondsAgo: Math.round((Date.now() - mostRecentTime) / 1000)
-                }, 'Possible duplicate food log within 60s window — skipping');
-                return {
-                    success: true,
-                    deduplicated: true,
-                    message: `"${item.name}" was already logged for ${meal} moments ago. Skipping to avoid duplicate.`,
-                    data: {
-                        date, meal, items: [{ id: mostRecentDoc.id, name: item.name,
-                            quantity: item.quantity, unit: item.unit, calories: item.calories,
-                            protein: item.protein, carbs: item.carbs, fat: item.fat, meal, date }],
-                        count: 1,
-                        totalCalories: Math.round(item.calories || 0),
-                        totalProtein: Math.round(item.protein || 0),
-                        totalCarbs: Math.round(item.carbs || 0),
-                        totalFat: Math.round(item.fat || 0)
-                    }
-                };
-            }
+        if (mostRecentTime > 0 && (Date.now() - mostRecentTime) < 60000) {
+            getLogger().warn({
+                item: item.name, date, meal, secondsAgo: Math.round((Date.now() - mostRecentTime) / 1000)
+            }, 'Possible duplicate food log within 60s window — skipping item');
+            skippedItems.push(item);
+        } else {
+            newItems.push(item);
         }
     }
+
+    if (newItems.length === 0 && skippedItems.length > 0) {
+        const names = skippedItems.map(i => i.name).join(', ');
+        return {
+            success: true,
+            deduplicated: true,
+            message: `${names} already logged for ${meal} moments ago. Skipping to avoid duplicate.`,
+            data: { date, meal, items: [], count: 0,
+                totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 }
+        };
+    }
+
+    // Continue with non-duplicate items only
+    items = newItems;
 
     const batch = db.batch();
     const createdIds = [];

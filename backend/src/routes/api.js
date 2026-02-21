@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const pkg = require('../../package.json');
 const { verifyToken } = require('../controllers/authController');
@@ -6,6 +7,15 @@ const { updateProfile, getProfile, getRecommendedTargets, getBadges } = require(
 const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
 const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
+
+const aiRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    keyGenerator: (req) => req.user?.uid || req.ip,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many AI requests, please try again in a minute.' }
+});
 
 const serverStartTime = new Date().toISOString();
 
@@ -38,6 +48,6 @@ router.get('/insights/daily/:date', getDailySummary);
 router.get('/insights/weekly', getWeeklyTrends);
 router.get('/insights/monthly', getMonthlyTrends);
 router.get('/insights/quarterly', getQuarterlyTrends);
-router.get('/insights/ai-summary', getAISummary);
+router.get('/insights/ai-summary', aiRateLimit, getAISummary);
 
 module.exports = router;
