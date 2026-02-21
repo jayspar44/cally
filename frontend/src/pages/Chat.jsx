@@ -4,6 +4,7 @@ import { useChat } from '../contexts/ChatContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import ChatMessage from '../components/chat/ChatMessage';
 import ChatInput from '../components/chat/ChatInput';
+import ProcessingIndicator from '../components/chat/ProcessingIndicator';
 import FoodEditModal from '../components/common/FoodEditModal';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
@@ -16,8 +17,10 @@ export default function Chat() {
     const navigate = useNavigate();
     const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
     const [onboardingTriggered, setOnboardingTriggered] = useState(false);
+    const [insightTriggered, setInsightTriggered] = useState(false);
     const messagesEndRef = useRef(null);
     const [editingFoodLog, setEditingFoodLog] = useState(null);
+    const [sendingWithImage, setSendingWithImage] = useState(false);
     const errorTimerRef = useRef(null);
 
     useEffect(() => {
@@ -43,6 +46,20 @@ export default function Chat() {
             sendMessage(needsOnboarding ? "Hey Kalli, I'd like to get started!" : "I'd like to update my profile information");
         }
     }, [location.state, initialized, onboardingTriggered, needsOnboarding, navigate, sendMessage]);
+
+    // Handle "Chat about this" from Insights page
+    useEffect(() => {
+        if (location.state?.insightContext && initialized && !insightTriggered && !sending) {
+            setInsightTriggered(true);
+            const { text, range } = location.state.insightContext;
+            navigate('/chat', { replace: true, state: {} });
+
+            const rangeLabel = { '1W': 'weekly', '1M': 'monthly', '3M': 'quarterly' }[range] || 'weekly';
+            const message = `[The user tapped "Chat about this" on their ${rangeLabel} nutrition insight. Here's the insight they want to discuss further: "${text}"]`;
+
+            sendMessage(message, null, null, { insightContext: { text, range } });
+        }
+    }, [location.state, initialized, insightTriggered, sending, navigate, sendMessage]);
 
     // Auto-trigger onboarding for new users with no chat history
     useEffect(() => {
@@ -155,6 +172,16 @@ export default function Chat() {
         return () => vv.removeEventListener('resize', handleResize);
     }, []);
 
+    const handleSendMessage = async (text, images, onUploadSuccess) => {
+        const hasImages = Array.isArray(images) ? images.length > 0 : !!images;
+        setSendingWithImage(hasImages);
+        try {
+            return await sendMessage(text, images, onUploadSuccess);
+        } finally {
+            setSendingWithImage(false);
+        }
+    };
+
     const handleImageChange = (hasImage) => {
         if (hasImage) {
             setTimeout(() => scrollToBottom('smooth'), 350);
@@ -239,16 +266,10 @@ export default function Chat() {
                 ))}
 
                 {/* Processing indicator */}
-                {sending && !messages.some(m => m.status === 'sending') && (
-                    <div className="flex items-center gap-2.5 px-4 mb-5 animate-in fade-in duration-300">
-                        <div className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:0ms]" />
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:150ms]" />
-                            <span className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-delay:300ms]" />
-                        </div>
-                        <span className="text-sm text-primary/60">Kalli is thinking...</span>
-                    </div>
-                )}
+                <ProcessingIndicator
+                    hasImage={sendingWithImage}
+                    isVisible={sending}
+                />
 
                 {error && (
                     <div className="mx-auto max-w-sm bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-sm px-4 py-2.5 rounded-xl text-center mb-4 border border-red-100 dark:border-red-500/20 flex items-center justify-center gap-2">
@@ -272,7 +293,7 @@ export default function Chat() {
                 style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom))' }}
             >
                 <ChatInput
-                    onSend={sendMessage}
+                    onSend={handleSendMessage}
                     sending={sending}
                     disabled={loading}
                     onImageChange={handleImageChange}

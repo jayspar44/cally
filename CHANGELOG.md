@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.4](https://github.com/jayspar44/cally/compare/v0.3.3...v0.3.4) (2026-02-21)
+
+
+### Bug Fixes
+
+* address code review HIGH priority issues 9156b34
+* lower global API rate limit from 1000 to 100 req/15min 88e31ac
+
+### [0.3.3](https://github.com/jayspar44/cally/compare/v0.3.2...v0.3.3) (2026-02-20)
+
+
+### Bug Fixes
+
+* compress gallery images and add chat processing status phases 0420a03
+* improve earned badge visual distinction with checkmark overlay 0d86f0d
+
+### [0.3.2](https://github.com/jayspar44/cally/compare/v0.3.1...v0.3.2) (2026-02-20)
+
+
+### Bug Fixes
+
+* insights accuracy, macros UX, and ghost keyboard handling eea6b9b
+
+### [0.3.1](https://github.com/jayspar44/cally/compare/v0.3.0...v0.3.1) (2026-02-20)
+
+
+### Bug Fixes
+
+* enable SystemBars insets handling to fix ghost keyboard ([#5](undefined/undefined/undefined/issues/5)) 7cdbd0d
+
+## [0.3.0](https://github.com/jayspar44/cally/compare/v0.2.4...v0.3.0) (2026-02-20)
+
+
+### Features
+
+* add trends chart navigation, redesign database page, and add badge streaks 750c7eb
+* per-metric chart colors, AI cache invalidation, persist insight context, and database search UX dac6f60
+* redesign insights page, add multi-photo chat, and dedicated macro colors f20d5c7, closes #3A7CA5
+
+
+### Bug Fixes
+
+* change prod app ID to com.getkalli.app f549e4c
+
 ### [0.2.4](https://github.com/jayspar44/cally/compare/v0.2.3...v0.2.4) (2026-02-19)
 
 

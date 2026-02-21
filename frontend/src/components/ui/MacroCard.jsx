@@ -1,10 +1,10 @@
 export default function MacroCard({ label, current, progress, color }) {
     const colorMap = {
         protein: {
-            ring: 'stroke-[var(--color-primary)]',
-            text: 'text-primary',
-            bg: 'text-primary/10',
-            glow: 'drop-shadow-[0_0_6px_rgba(40,65,54,0.35)]'
+            ring: 'stroke-[var(--color-protein)]',
+            text: 'text-protein',
+            bg: 'text-protein/10',
+            glow: 'drop-shadow-[0_0_6px_rgba(58,124,165,0.35)]'
         },
         carbs: {
             ring: 'stroke-[var(--color-carbs)]',

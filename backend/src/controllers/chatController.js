@@ -1,20 +1,42 @@
+const crypto = require('crypto');
 const { db } = require('../services/firebase');
 const { processMessage, processImageMessage } = require('../services/geminiService');
+
+const SERVER_TIMEOUT_MS = 150000;
+
+const checkRecentlyCreatedLogs = async (userId, idempotencyKey) => {
+    const snapshot = await db.collection('users').doc(userId)
+        .collection('foodLogs')
+        .where('idempotencyKey', '==', idempotencyKey)
+        .get();
+    return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+};
 
 const sendMessage = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { message, imageBase64 } = req.body;
+        const { message, imageBase64, images, metadata: reqMetadata } = req.body;
+        const idempotencyKey = crypto.randomUUID();
+
+        // Support images[] array with fallback to single imageBase64
+        const imageArray = images && images.length > 0 ? images : (imageBase64 ? [imageBase64] : []);
+        const hasImages = imageArray.length > 0;
 
         req.log.info({
             action: 'chat.sendMessage',
-            hasImage: !!imageBase64,
+            hasImages,
+            imageCount: imageArray.length,
             messageLength: message?.length || 0,
-            messagePreview: message?.substring(0, 200) || ''
+            messagePreview: message?.substring(0, 200) || '',
+            idempotencyKey
         }, 'Processing chat message');
 
-        if (!message && !imageBase64) {
+        if (!message && !hasImages) {
             return res.status(400).json({ error: 'Message or image required' });
+        }
+
+        if (imageArray.length > 5) {
+            return res.status(400).json({ error: 'Maximum 5 images per message' });
         }
 
         const userRef = db.collection('users').doc(userId);
@@ -23,9 +45,11 @@ const sendMessage = async (req, res) => {
         const userMessage = {
             role: 'user',
             content: message || '',
-            imageData: !!imageBase64,
+            imageData: hasImages,
+            imageCount: imageArray.length,
             timestamp: new Date(),
-            metadata: {}
+            metadata: {},
+            ...(reqMetadata?.insightContext ? { insightContext: reqMetadata.insightContext } : {})
         };
         const userMsgDoc = await chatHistoryRef.add(userMessage);
 
@@ -41,9 +65,61 @@ const sendMessage = async (req, res) => {
         const userDoc = await userRef.get();
         const userProfile = userDoc.exists ? userDoc.data() : {};
 
-        const response = imageBase64
-            ? await processImageMessage(message, imageBase64, chatHistory, userProfile, userId, req.body.userTimezone)
-            : await processMessage(message, chatHistory, userProfile, userId, req.body.userTimezone);
+        // Process with server-side timeout
+        const processPromise = hasImages
+            ? processImageMessage(message, imageArray, chatHistory, userProfile, userId, req.body.userTimezone, idempotencyKey)
+            : processMessage(message, chatHistory, userProfile, userId, req.body.userTimezone, idempotencyKey);
+
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('SERVER_TIMEOUT')), SERVER_TIMEOUT_MS);
+        });
+
+        let response;
+        try {
+            response = await Promise.race([processPromise, timeoutPromise]);
+        } catch (processingError) {
+            if (processingError.message === 'SERVER_TIMEOUT') {
+                req.log.warn({ idempotencyKey }, 'Chat processing timed out');
+                return res.status(504).json({ error: 'Processing took too long. Try a simpler message or fewer photos.' });
+            }
+
+            // Allow Firestore writes to propagate before checking
+            await new Promise(r => setTimeout(r, 500));
+
+            // Partial-success recovery: check if food was logged despite the error
+            const recentLogs = await checkRecentlyCreatedLogs(userId, idempotencyKey);
+            if (recentLogs.length > 0) {
+                req.log.info({
+                    idempotencyKey,
+                    logsRecovered: recentLogs.length,
+                    error: processingError.message
+                }, 'Partial success recovery — food logged but response generation failed');
+
+                const itemNames = recentLogs.map(l => l.name).join(', ');
+                const totalCals = recentLogs.reduce((s, l) => s + (l.calories || 0), 0);
+                const partialText = `I logged your food (${itemNames} — ${Math.round(totalCals)} cal total), but had trouble generating my full response. Your food log is saved!`;
+
+                const assistantMsg = {
+                    role: 'assistant',
+                    content: partialText,
+                    timestamp: new Date(),
+                    metadata: { partialSuccess: true, idempotencyKey }
+                };
+                const assistantMsgDoc = await chatHistoryRef.add(assistantMsg);
+
+                return res.json({
+                    userMessageId: userMsgDoc.id,
+                    assistantMessageId: assistantMsgDoc.id,
+                    response: partialText,
+                    partialSuccess: true,
+                    toolsUsed: ['logFood']
+                });
+            }
+            throw processingError;
+        } finally {
+            clearTimeout(timeoutId);
+        }
 
         const assistantMessage = {
             role: 'assistant',

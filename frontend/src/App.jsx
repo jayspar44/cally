@@ -15,7 +15,7 @@ import { UserPreferencesProvider } from './contexts/UserPreferencesContext';
 import { ConnectionProvider, useConnection } from './contexts/ConnectionContext';
 import { setConnectionStatusCallback } from './api/client';
 import { getEnvironment } from './utils/appConfig';
-import { setupKeyboardListeners } from './utils/keyboard';
+import { useViewportHeight } from './utils/keyboard';
 
 function AppContent() {
   const { setApiConnectionStatus } = useConnection();
@@ -52,9 +52,7 @@ function AppContent() {
 }
 
 function App() {
-  useEffect(() => {
-    return setupKeyboardListeners();
-  }, []);
+  useViewportHeight();
 
   return (
     <AuthProvider>

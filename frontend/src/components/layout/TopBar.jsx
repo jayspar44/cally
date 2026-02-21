@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../utils/cn';
-import { HiUser, HiCalendarDays, HiCircleStack } from 'react-icons/hi2';
+import { HiUser, HiCalendarDays } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
@@ -33,6 +33,8 @@ export default function TopBar() {
     }, []);
 
     const title = PAGE_TITLES[location.pathname] || 'Kalli';
+    const isDatabase = location.pathname === '/database';
+    const isSettings = location.pathname === '/settings';
 
     return (
         <header
@@ -74,20 +76,26 @@ export default function TopBar() {
 
                     <button
                         onClick={() => navigate('/database')}
-                        className="relative w-9 h-9 rounded-full bg-surface border border-border flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-transform group"
+                        className={cn(
+                            "relative w-9 h-9 rounded-full border flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-all group",
+                            isDatabase ? "bg-accent/10 border-accent/30" : "bg-surface border-border"
+                        )}
                         title="Food Log"
                     >
-                        <HiCircleStack className="w-5 h-5 text-primary group-hover:text-accent transition-colors" />
+                        <HiCalendarDays className={cn("w-5 h-5 transition-colors", isDatabase ? "text-accent" : "text-primary group-hover:text-accent")} />
                     </button>
 
                     <button
                         onClick={() => navigate('/settings')}
-                        className="relative w-9 h-9 rounded-full bg-surface border border-border flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-transform"
+                        className={cn(
+                            "relative w-9 h-9 rounded-full border flex items-center justify-center shadow-sm overflow-hidden active:scale-95 transition-all",
+                            isSettings ? "bg-accent/10 border-accent/30" : "bg-surface border-border"
+                        )}
                     >
                         {user?.photoURL ? (
                             <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
                         ) : (
-                            <HiUser className="w-5 h-5 text-primary" />
+                            <HiUser className={cn("w-5 h-5 transition-colors", isSettings ? "text-accent" : "text-primary")} />
                         )}
                     </button>
                 </div>

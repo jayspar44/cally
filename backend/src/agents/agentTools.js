@@ -3,6 +3,7 @@ const { FieldValue } = require('firebase-admin/firestore');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
+const { checkBadgeEligibility } = require('../services/badgeService');
 const { getLogger } = require('../logger');
 const { getTodayStr } = require('../utils/dateUtils');
 
@@ -197,11 +198,11 @@ const toolDeclarations = [
     }
 ];
 
-const executeTool = async (toolName, args, userId, userTimezone) => {
+const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey) => {
     try {
         switch (toolName) {
             case 'logFood':
-                return await logFood(args, userId, userTimezone);
+                return await logFood(args, userId, userTimezone, idempotencyKey);
             case 'lookupNutrition':
                 return await lookupNutrition(args);
             case 'updateFoodLog':
@@ -225,7 +226,7 @@ const executeTool = async (toolName, args, userId, userTimezone) => {
     }
 };
 
-const logFood = async (args, userId, userTimezone) => {
+const logFood = async (args, userId, userTimezone, idempotencyKey) => {
     let { date, meal, items, originalMessage, nutritionSource } = args;
 
     if (!meal && args.mealType) meal = args.mealType;
@@ -243,9 +244,6 @@ const logFood = async (args, userId, userTimezone) => {
     if (!date) {
         date = getTodayStr(userTimezone);
     }
-
-    const batch = db.batch();
-    const createdIds = [];
 
     if ((!items || items.length === 0) && args.foodName) {
         getLogger().info('Detected flat food arguments, converting to items array');
@@ -266,6 +264,92 @@ const logFood = async (args, userId, userTimezone) => {
         items = [];
     }
 
+    // Idempotency check: if this key was already used, return early
+    if (idempotencyKey) {
+        const existingSnapshot = await db.collection('users').doc(userId)
+            .collection('foodLogs')
+            .where('idempotencyKey', '==', idempotencyKey)
+            .limit(1)
+            .get();
+
+        if (!existingSnapshot.empty) {
+            getLogger().info({ idempotencyKey }, 'Duplicate logFood call detected, returning cached result');
+            const existingDocs = existingSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            const totals = existingDocs.reduce((acc, doc) => ({
+                calories: acc.calories + (doc.calories || 0),
+                protein: acc.protein + (doc.protein || 0),
+                carbs: acc.carbs + (doc.carbs || 0),
+                fat: acc.fat + (doc.fat || 0)
+            }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+            return {
+                success: true,
+                deduplicated: true,
+                message: `Already logged ${existingDocs.length} item(s) for this request.`,
+                data: {
+                    date: existingDocs[0].date,
+                    meal: existingDocs[0].meal,
+                    items: existingDocs.map(item => ({
+                        id: item.id, name: item.name, quantity: item.quantity,
+                        unit: item.unit, calories: item.calories, protein: item.protein,
+                        carbs: item.carbs, fat: item.fat, meal: item.meal, date: item.date
+                    })),
+                    count: existingDocs.length,
+                    totalCalories: Math.round(totals.calories),
+                    totalProtein: Math.round(totals.protein),
+                    totalCarbs: Math.round(totals.carbs),
+                    totalFat: Math.round(totals.fat)
+                }
+            };
+        }
+    }
+
+    // Time-window duplicate check: same date + meal + name within 60s
+    // Filter out duplicate items instead of returning early for the entire batch
+    const newItems = [];
+    const skippedItems = [];
+    for (const item of items) {
+        const recentSnapshot = await db.collection('users').doc(userId)
+            .collection('foodLogs')
+            .where('date', '==', date)
+            .where('meal', '==', meal)
+            .where('name', '==', item.name)
+            .limit(5)
+            .get();
+
+        let mostRecentTime = 0;
+        for (const doc of recentSnapshot.docs) {
+            const ts = doc.data().createdAt?.toDate?.()?.getTime() || 0;
+            if (ts > mostRecentTime) { mostRecentTime = ts; }
+        }
+
+        if (mostRecentTime > 0 && (Date.now() - mostRecentTime) < 60000) {
+            getLogger().warn({
+                item: item.name, date, meal, secondsAgo: Math.round((Date.now() - mostRecentTime) / 1000)
+            }, 'Possible duplicate food log within 60s window — skipping item');
+            skippedItems.push(item);
+        } else {
+            newItems.push(item);
+        }
+    }
+
+    if (newItems.length === 0 && skippedItems.length > 0) {
+        const names = skippedItems.map(i => i.name).join(', ');
+        return {
+            success: true,
+            deduplicated: true,
+            message: `${names} already logged for ${meal} moments ago. Skipping to avoid duplicate.`,
+            data: { date, meal, items: [], count: 0,
+                totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0 }
+        };
+    }
+
+    // Continue with non-duplicate items only
+    items = newItems;
+
+    const batch = db.batch();
+    const createdIds = [];
+
     for (const item of items) {
         const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
 
@@ -284,7 +368,8 @@ const logFood = async (args, userId, userTimezone) => {
             nutritionSource: nutritionSource || 'ai_estimate',
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp()
+            updatedAt: FieldValue.serverTimestamp(),
+            ...(idempotencyKey ? { idempotencyKey } : {})
         };
 
         batch.set(docRef, foodLogItem);
@@ -309,7 +394,15 @@ const logFood = async (args, userId, userTimezone) => {
         totalCalories: Math.round(totals.calories)
     }, 'Food logged via AI tool');
 
-    return {
+    // Check for newly earned badges (non-blocking)
+    let newBadges = [];
+    try {
+        newBadges = await checkBadgeEligibility(userId);
+    } catch (err) {
+        getLogger().warn({ err }, 'Badge check failed after logFood (non-critical)');
+    }
+
+    const result = {
         success: true,
         message: `Logged ${createdIds.length} item(s) for ${meal}: ${Math.round(totals.calories)} cal, ${Math.round(totals.protein)}g protein, ${Math.round(totals.carbs)}g carbs, ${Math.round(totals.fat)}g fat.`,
         data: {
@@ -334,6 +427,13 @@ const logFood = async (args, userId, userTimezone) => {
             totalFat: Math.round(totals.fat)
         }
     };
+
+    if (newBadges.length > 0) {
+        result.newBadges = newBadges.map(b => ({ badgeId: b.id, name: b.name, icon: b.icon }));
+        result.message += ` New badge${newBadges.length > 1 ? 's' : ''} earned: ${newBadges.map(b => `${b.icon} ${b.name}`).join(', ')}!`;
+    }
+
+    return result;
 };
 
 const lookupNutrition = async (args) => {
@@ -508,10 +608,24 @@ const deleteFoodLog = async (args, userId) => {
         deletedItem: { name: data.name, meal: data.meal, calories: data.calories, date: data.date }
     }, 'Food log deleted via AI tool');
 
-    return {
+    // Re-check badges after deletion (a badge could theoretically be affected, but we only add, never revoke)
+    let newBadges = [];
+    try {
+        newBadges = await checkBadgeEligibility(userId);
+    } catch (err) {
+        getLogger().warn({ err }, 'Badge check failed after deleteFoodLog (non-critical)');
+    }
+
+    const result = {
         success: true,
         data: { id: logId, deleted: true, name: data.name, meal: data.meal, calories: data.calories }
     };
+
+    if (newBadges.length > 0) {
+        result.newBadges = newBadges.map(b => ({ badgeId: b.id, name: b.name, icon: b.icon }));
+    }
+
+    return result;
 };
 
 const getDailySummaryTool = async (args, userId, userTimezone) => {

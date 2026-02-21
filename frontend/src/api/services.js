@@ -27,10 +27,22 @@ export const api = {
         return response.data;
     },
 
-    sendMessage: async (message, imageBase64 = null, userTimezone = null, onUploadProgress = null) => {
+    sendMessage: async (message, images = null, userTimezone = null, onUploadProgress = null, isRetry = false, metadata = null) => {
         logger.debug('Sending message to Cally');
-        const config = onUploadProgress ? { onUploadProgress } : {};
-        const response = await client.post('/chat/message', { message, imageBase64, userTimezone }, config);
+        // Support both single string (legacy) and array
+        const imageArray = Array.isArray(images) ? images : (images ? [images] : []);
+        const body = { message, userTimezone, isRetry };
+        if (metadata) body.metadata = metadata;
+        if (imageArray.length > 0) {
+            body.images = imageArray;
+            // Backward compat: also send imageBase64 if single image
+            if (imageArray.length === 1) body.imageBase64 = imageArray[0];
+        }
+        const config = {
+            timeout: 180000,
+            ...(onUploadProgress ? { onUploadProgress } : {})
+        };
+        const response = await client.post('/chat/message', body, config);
         return response.data;
     },
 
@@ -85,13 +97,38 @@ export const api = {
         return response.data;
     },
 
-    getWeeklyTrends: async () => {
-        const response = await client.get('/insights/weekly');
+    getWeeklyTrends: async (weekStart = null) => {
+        const params = weekStart ? { weekStart } : {};
+        const response = await client.get('/insights/weekly', { params });
         return response.data;
     },
 
-    getMonthlyTrends: async () => {
-        const response = await client.get('/insights/monthly');
+    getMonthlyTrends: async (monthStart = null) => {
+        const params = monthStart ? { monthStart } : {};
+        const response = await client.get('/insights/monthly', { params });
+        return response.data;
+    },
+
+    getQuarterlyTrends: async (quarterStart = null) => {
+        const params = quarterStart ? { quarterStart } : {};
+        const response = await client.get('/insights/quarterly', { params });
+        return response.data;
+    },
+
+    getAISummary: async (range = '1W', periodStart = null, { refresh = false } = {}) => {
+        const params = { range };
+        if (periodStart) {
+            if (range === '1W') params.week = periodStart;
+            else if (range === '1M') params.monthStart = periodStart;
+            else if (range === '3M') params.quarterStart = periodStart;
+        }
+        if (refresh) params.refresh = 'true';
+        const response = await client.get('/insights/ai-summary', { params });
+        return response.data;
+    },
+
+    getUserBadges: async () => {
+        const response = await client.get('/user/badges');
         return response.data;
     },
 
