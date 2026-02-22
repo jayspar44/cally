@@ -325,7 +325,9 @@ export default function Settings() {
                                 <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Weight</label>
                                 <div className="flex gap-2">
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         value={biometricsForm.weight}
                                         onChange={e => setBiometricsForm({...biometricsForm, weight: e.target.value})}
                                         placeholder="168"
@@ -348,7 +350,9 @@ export default function Settings() {
                                         <>
                                             <div className="flex items-center gap-1 flex-1">
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     value={biometricsForm.heightFeet}
                                                     onChange={e => setBiometricsForm({...biometricsForm, heightFeet: e.target.value})}
                                                     placeholder="5"
@@ -358,12 +362,12 @@ export default function Settings() {
                                             </div>
                                             <div className="flex items-center gap-1 flex-1">
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     value={biometricsForm.heightInches}
                                                     onChange={e => setBiometricsForm({...biometricsForm, heightInches: e.target.value})}
                                                     placeholder="11"
-                                                    min="0"
-                                                    max="11"
                                                     className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
                                                 />
                                                 <span className="text-xs text-primary/40 font-mono">in</span>
@@ -371,7 +375,9 @@ export default function Settings() {
                                         </>
                                     ) : (
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={biometricsForm.heightCm}
                                             onChange={e => setBiometricsForm({...biometricsForm, heightCm: e.target.value})}
                                             placeholder="180"
@@ -393,7 +399,9 @@ export default function Settings() {
                             <div className="space-y-1">
                                 <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Age</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     value={biometricsForm.age}
                                     onChange={e => setBiometricsForm({...biometricsForm, age: e.target.value})}
                                     placeholder="30"
@@ -533,7 +541,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Calories</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetCalories}
                                 onChange={e => setNutritionForm({...nutritionForm, targetCalories: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -542,7 +552,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Protein (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetProtein}
                                 onChange={e => setNutritionForm({...nutritionForm, targetProtein: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -551,7 +563,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Carbs (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetCarbs}
                                 onChange={e => setNutritionForm({...nutritionForm, targetCarbs: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -560,7 +574,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Fat (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetFat}
                                 onChange={e => setNutritionForm({...nutritionForm, targetFat: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
