@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 import { HiUser, HiCalendarDays } from 'react-icons/hi2';
+import { Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-
 import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 const PAGE_TITLES = {
     '/': 'Kalli',
     '/database': 'Food Log',
+    '/search': 'Search',
     '/insights': 'Insights',
     '/settings': 'Settings',
 };
@@ -33,6 +34,7 @@ export default function TopBar() {
     }, []);
 
     const title = PAGE_TITLES[location.pathname] || 'Kalli';
+    const isSearch = location.pathname === '/search';
     const isDatabase = location.pathname === '/database';
     const isSettings = location.pathname === '/settings';
 
@@ -73,6 +75,17 @@ export default function TopBar() {
                             {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                     </div>
+
+                    <button
+                        onClick={() => navigate('/search')}
+                        className={cn(
+                            "relative w-9 h-9 rounded-full border flex items-center justify-center shadow-sm active:scale-95 transition-all",
+                            isSearch ? "bg-accent/10 border-accent/30" : "bg-surface border-border"
+                        )}
+                        title="Search logs"
+                    >
+                        <Search className={cn("w-4.5 h-4.5 transition-colors", isSearch ? "text-accent" : "text-primary")} />
+                    </button>
 
                     <button
                         onClick={() => navigate('/database')}

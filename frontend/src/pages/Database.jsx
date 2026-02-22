@@ -1,23 +1,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/services';
 import { toDateStr } from '../utils/dateUtils';
-import { Search } from 'lucide-react';
 import DateNavigator from '../components/database/DateNavigator';
 import DailySummaryBar from '../components/database/DailySummaryBar';
 import MealSection from '../components/database/MealSection';
 import FoodEditModal from '../components/common/FoodEditModal';
-import SearchOverlay from '../components/database/SearchOverlay';
 
 const ALL_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 export default function Database() {
-    const [selectedDate, setSelectedDate] = useState(toDateStr());
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [selectedDate, setSelectedDate] = useState(() => searchParams.get('date') || toDateStr());
     const [summary, setSummary] = useState(null);
     const [foodLogs, setFoodLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedLog, setSelectedLog] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [showSearch, setShowSearch] = useState(false);
 
     const fetchDayData = useCallback(async () => {
         setLoading(true);
@@ -45,6 +44,20 @@ export default function Database() {
     }, [selectedDate]);
 
     useEffect(() => { fetchDayData(); }, [fetchDayData]);
+
+    // Clear ?date= param after consuming it
+    useEffect(() => {
+        if (searchParams.has('date')) {
+            setSearchParams({}, { replace: true });
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Listen for date navigation from global search overlay
+    useEffect(() => {
+        const handler = (e) => setSelectedDate(e.detail);
+        window.addEventListener('database-set-date', handler);
+        return () => window.removeEventListener('database-set-date', handler);
+    }, []);
 
     const mealGroups = useMemo(() => {
         const groups = {};
@@ -105,16 +118,9 @@ export default function Database() {
                             <MealSection key={group.meal} meal={group.meal} items={group.items} totalCalories={group.totalCalories} onEditItem={handleEdit} />
                         ))}
                     </div>
-                    <button onClick={() => setShowSearch(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-accent/15 border border-accent/20 text-accent hover:bg-accent/20 active:scale-[0.98] transition-all shadow-sm">
-                        <Search className="w-4 h-4" />
-                        <span className="font-sans text-sm font-medium">Search all logs</span>
-                    </button>
                 </>
             )}
             <FoodEditModal isOpen={isEditModalOpen} onClose={() => { setIsEditModalOpen(false); setSelectedLog(null); }} onSave={handleSave} onDelete={handleDelete} initialData={selectedLog} />
-            {showSearch && (
-                <SearchOverlay onClose={() => setShowSearch(false)} onNavigateToDate={(date) => { setSelectedDate(date); setShowSearch(false); }} />
-            )}
         </div>
     );
 }

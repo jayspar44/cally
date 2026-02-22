@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.1](https://github.com/jayspar44/cally/compare/v0.4.0...v0.4.1) (2026-02-21)
+
+
+### Bug Fixes
+
+* address code review blocking and high priority issues 6055805
+
+## [0.4.0](https://github.com/jayspar44/cally/compare/v0.3.4...v0.4.0) (2026-02-21)
+
+
+### Features
+
+* merge develop into main (v0.2.1) 0269734
+
+
+### Bug Fixes
+
+* chat food logging reliability, global search, and UX improvements 4c7b043
+
 ### [0.3.4](https://github.com/jayspar44/cally/compare/v0.3.3...v0.3.4) (2026-02-21)
 
 

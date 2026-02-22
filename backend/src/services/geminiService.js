@@ -19,6 +19,7 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 - Proactive — don't wait to be asked. Notice patterns, offer insights, suggest strategies
 - Encouraging and non-judgmental. Celebrate real wins, reframe struggles as learning moments
 - Naturally verbose when it adds value (detailed breakdowns for complex meals), concise when it doesn't (simple single items)
+- Your first priority is **accurate food logging** — every food item the user mentions must be logged, updated, or deleted correctly via the food tools (\`logFood\`, \`updateFoodLog\`, \`deleteFoodLog\`, \`searchFoodLogs\`). Once you've ensured the log is accurate, your second priority is being an effective nutrition coach — weaving insights, encouragement, and strategy into your responses.
 
 ## Conversational Tone — NOT Transactional
 **This is critical.** Your responses should feel like talking to a coach, not reading a system report. Tools (logFood, getDailySummary, etc.) operate silently behind the scenes — weave results into natural language.
@@ -85,6 +86,11 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 
 ## Important Rules
 - Always use the tools provided to log food — don't just describe nutrition
+- **logFood format**: Always pass food data in the \`items\` array parameter. Example: \`{ date: "2026-02-21", meal: "breakfast", items: [{ name: "Eggs", quantity: 2, unit: "large", calories: 148, protein: 12, carbs: 1, fat: 10 }], nutritionSource: "ai_estimate" }\`
+- **logFood anti-patterns — NEVER DO THESE**:
+    - Flat args: \`{ name: "Eggs", calories: 148, ... }\` (missing items array)
+    - Wrong key: \`{ foods: [...] }\` or \`{ foodItems: [...] }\` (must be \`items\`)
+    - Only use the \`items\` key. Any other format will cause a silent failure and the food will NOT be saved.
 - **NEVER claim you have logged, are logging, or will log food unless you actually call the logFood tool in the same response.** If you haven't called logFood, do NOT say "I've logged that" — the user will see no confirmation card and think the app is broken. Either call the tool or tell the user what you plan to log and ask for confirmation first.
 - Be precise with nutrition estimates. For complex, restaurant, or unfamiliar foods, use lookupNutrition before quoting values. Your training data is reliable for common whole foods.
 - If unsure about a food, ask for clarification rather than guessing wrong
@@ -152,15 +158,29 @@ When user asks to update profile/body stats/goals:
 
 const mergeFoodLogs = (existing, incoming) => {
     if (!existing) return incoming;
+
+    // Deduplicate items by id (if available) or name+meal+calories
+    const existingIds = new Set(existing.items.map(i => i.id).filter(Boolean));
+    const existingKeys = new Set(existing.items.map(i => `${i.name}|${i.meal || ''}|${i.calories}`));
+
+    const newItems = incoming.items.filter(item => {
+        if (item.id && existingIds.has(item.id)) return false;
+        if (!item.id) {
+            const key = `${item.name}|${item.meal || ''}|${item.calories}`;
+            if (existingKeys.has(key)) return false;
+        }
+        return true;
+    });
+
     return {
         date: existing.date,
         meal: existing.meal === incoming.meal ? existing.meal : 'mixed',
-        items: [...existing.items, ...incoming.items],
-        count: existing.count + incoming.count,
-        totalCalories: existing.totalCalories + incoming.totalCalories,
-        totalProtein: existing.totalProtein + incoming.totalProtein,
-        totalCarbs: existing.totalCarbs + incoming.totalCarbs,
-        totalFat: existing.totalFat + incoming.totalFat,
+        items: [...existing.items, ...newItems],
+        count: existing.count + newItems.length,
+        totalCalories: existing.totalCalories + newItems.reduce((s, i) => s + (i.calories || 0), 0),
+        totalProtein: existing.totalProtein + newItems.reduce((s, i) => s + (i.protein || 0), 0),
+        totalCarbs: existing.totalCarbs + newItems.reduce((s, i) => s + (i.carbs || 0), 0),
+        totalFat: existing.totalFat + newItems.reduce((s, i) => s + (i.fat || 0), 0),
     };
 };
 
@@ -344,7 +364,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
-                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey);
+                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo' });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
