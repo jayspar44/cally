@@ -114,6 +114,16 @@ ios/
 .firebase/
 
 
+# Playwright plugin (screenshots, traces)
+page-*.png
+page-*.jpeg
+playwright-report/
+test-results/
+
+# Superpowers plugin (plans, worktrees)
+.plans/
+.worktrees/
+
 # Backend temporary files
 backend/debug_data.js
 backend/debug_output.txt
