@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
-import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
+import { LogOut, Sun, User, Info, ChevronRight, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
 import { getVersionString, getEnvironment, getBackendInfo, getBuildVersionCode } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
@@ -240,22 +240,13 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingName ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={nameInput}
-                                onChange={(e) => setNameInput(e.target.value)}
-                                className="w-32 px-3 py-1.5 text-sm bg-primary/5 border border-transparent rounded-lg focus:border-primary/20 outline-none font-sans text-primary"
-                                autoFocus
-                            />
-                            <button
-                                onClick={handleSaveName}
-                                disabled={savingName}
-                                className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                            >
-                                <Check className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <input
+                            type="text"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            className="w-32 px-3 py-1.5 text-sm bg-primary/5 border border-transparent rounded-lg focus:border-primary/20 outline-none font-sans text-primary"
+                            autoFocus
+                        />
                     ) : (
                         <button
                             onClick={() => {
@@ -271,6 +262,16 @@ export default function Settings() {
                         </button>
                     )}
                 </div>
+
+                {editingName && (
+                    <button
+                        onClick={handleSaveName}
+                        disabled={savingName}
+                        className="w-full mt-3 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                        {savingName ? 'Saving...' : 'Save'}
+                    </button>
+                )}
 
                 <div className="h-px bg-border/50 my-2" />
 
@@ -301,13 +302,7 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingBiometrics ? (
-                        <button
-                            onClick={handleSaveBiometrics}
-                            disabled={savingBiometrics}
-                            className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                        >
-                            <Check className="w-4 h-4" />
-                        </button>
+                        <span className="px-3 py-1.5 font-serif font-bold text-primary/40 text-sm">Editing...</span>
                     ) : (
                         <button
                             onClick={() => setEditingBiometrics(true)}
@@ -451,6 +446,13 @@ export default function Settings() {
                                 </select>
                             </div>
                         </div>
+                        <button
+                            onClick={handleSaveBiometrics}
+                            disabled={savingBiometrics}
+                            className="w-full mt-4 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            {savingBiometrics ? 'Saving...' : 'Save'}
+                        </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-3 gap-2 pt-4">
@@ -519,13 +521,7 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingNutrition ? (
-                        <button
-                            onClick={handleSaveNutrition}
-                            disabled={savingNutrition}
-                            className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                        >
-                            <Check className="w-4 h-4" />
-                        </button>
+                        <span className="px-3 py-1.5 font-serif font-bold text-primary/40 text-sm">Editing...</span>
                     ) : (
                         <button
                             onClick={() => setEditingNutrition(true)}
@@ -582,6 +578,13 @@ export default function Settings() {
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
                             />
                         </div>
+                        <button
+                            onClick={handleSaveNutrition}
+                            disabled={savingNutrition}
+                            className="col-span-2 w-full mt-2 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            {savingNutrition ? 'Saving...' : 'Save'}
+                        </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-4 gap-2 pt-4">
