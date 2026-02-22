@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search } from 'lucide-react';
 import { api } from '../api/services';
+import { logger } from '../utils/logger';
 
 export default function SearchLogs() {
     const navigate = useNavigate();
@@ -24,7 +25,7 @@ export default function SearchLogs() {
                     setAllLogs(flat.sort((a, b) => (b.date || '').localeCompare(a.date || '')));
                 }
             } catch (error) {
-                console.error('Failed to fetch logs for search:', error);
+                logger.error('Failed to fetch logs for search:', error);
             } finally {
                 if (!cancelled) setLoading(false);
             }
