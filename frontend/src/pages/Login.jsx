@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { logger } from '../utils/logger';
 import { getVersionString } from '../utils/appConfig';
 import { MobileContainer } from '../components/layout/MobileContainer';
@@ -67,18 +67,13 @@ const Login = () => {
 
                 <div className="w-full max-w-sm z-10">
                     {/* Header */}
-                    <div className="text-center mb-12 space-y-4">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-primary to-primary/80 text-white shadow-xl shadow-primary/20 rotate-[-6deg] mb-4">
-                            <Sparkles className="w-8 h-8" />
-                        </div>
-                        <div>
-                            <h1 className="text-4xl font-serif font-black text-primary tracking-tight mb-2">
-                                Kalli
-                            </h1>
-                            <p className="text-primary/60 font-sans text-lg text-balance">
-                                Your gourmet AI nutrition companion.
-                            </p>
-                        </div>
+                    <div className="text-center mb-12 space-y-3">
+                        <h1 className="text-5xl font-serif font-black text-primary tracking-tight">
+                            Kalli
+                        </h1>
+                        <p className="text-primary/60 font-sans text-lg text-balance">
+                            Your gourmet AI nutrition companion.
+                        </p>
                     </div>
 
                     {/* Card */}
@@ -89,13 +84,14 @@ const Login = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                        <form onSubmit={handleSubmit} method="post" action="#" className="flex flex-col gap-5">
                             <div className="space-y-1.5">
-                                <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Email</label>
+                                <label htmlFor="email" className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Email</label>
                                 <input
+                                    id="email"
                                     type="email"
                                     name="email"
-                                    autoComplete="email"
+                                    autoComplete="username"
                                     placeholder="hello@example.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -104,8 +100,9 @@ const Login = () => {
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Password</label>
+                                <label htmlFor="password" className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Password</label>
                                 <input
+                                    id="password"
                                     type="password"
                                     name="password"
                                     autoComplete={isSignup ? 'new-password' : 'current-password'}
