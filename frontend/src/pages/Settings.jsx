@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
-import { LogOut, Sun, User, Info, ChevronRight, Check, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
+import { LogOut, Sun, User, Info, ChevronRight, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
 import { getVersionString, getEnvironment, getBackendInfo, getBuildVersionCode } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
@@ -240,22 +240,13 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingName ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={nameInput}
-                                onChange={(e) => setNameInput(e.target.value)}
-                                className="w-32 px-3 py-1.5 text-sm bg-primary/5 border border-transparent rounded-lg focus:border-primary/20 outline-none font-sans text-primary"
-                                autoFocus
-                            />
-                            <button
-                                onClick={handleSaveName}
-                                disabled={savingName}
-                                className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                            >
-                                <Check className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <input
+                            type="text"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value)}
+                            className="w-32 px-3 py-1.5 text-sm bg-primary/5 border border-transparent rounded-lg focus:border-primary/20 outline-none font-sans text-primary"
+                            autoFocus
+                        />
                     ) : (
                         <button
                             onClick={() => {
@@ -271,6 +262,16 @@ export default function Settings() {
                         </button>
                     )}
                 </div>
+
+                {editingName && (
+                    <button
+                        onClick={handleSaveName}
+                        disabled={savingName}
+                        className="w-full mt-3 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                        {savingName ? 'Saving...' : 'Save'}
+                    </button>
+                )}
 
                 <div className="h-px bg-border/50 my-2" />
 
@@ -301,13 +302,7 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingBiometrics ? (
-                        <button
-                            onClick={handleSaveBiometrics}
-                            disabled={savingBiometrics}
-                            className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                        >
-                            <Check className="w-4 h-4" />
-                        </button>
+                        <span className="px-3 py-1.5 font-serif font-bold text-primary/40 text-sm">Editing...</span>
                     ) : (
                         <button
                             onClick={() => setEditingBiometrics(true)}
@@ -325,7 +320,9 @@ export default function Settings() {
                                 <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Weight</label>
                                 <div className="flex gap-2">
                                     <input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         value={biometricsForm.weight}
                                         onChange={e => setBiometricsForm({...biometricsForm, weight: e.target.value})}
                                         placeholder="168"
@@ -348,7 +345,9 @@ export default function Settings() {
                                         <>
                                             <div className="flex items-center gap-1 flex-1">
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     value={biometricsForm.heightFeet}
                                                     onChange={e => setBiometricsForm({...biometricsForm, heightFeet: e.target.value})}
                                                     placeholder="5"
@@ -358,12 +357,12 @@ export default function Settings() {
                                             </div>
                                             <div className="flex items-center gap-1 flex-1">
                                                 <input
-                                                    type="number"
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
                                                     value={biometricsForm.heightInches}
                                                     onChange={e => setBiometricsForm({...biometricsForm, heightInches: e.target.value})}
                                                     placeholder="11"
-                                                    min="0"
-                                                    max="11"
                                                     className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
                                                 />
                                                 <span className="text-xs text-primary/40 font-mono">in</span>
@@ -371,7 +370,9 @@ export default function Settings() {
                                         </>
                                     ) : (
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={biometricsForm.heightCm}
                                             onChange={e => setBiometricsForm({...biometricsForm, heightCm: e.target.value})}
                                             placeholder="180"
@@ -393,7 +394,9 @@ export default function Settings() {
                             <div className="space-y-1">
                                 <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Age</label>
                                 <input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     value={biometricsForm.age}
                                     onChange={e => setBiometricsForm({...biometricsForm, age: e.target.value})}
                                     placeholder="30"
@@ -443,6 +446,13 @@ export default function Settings() {
                                 </select>
                             </div>
                         </div>
+                        <button
+                            onClick={handleSaveBiometrics}
+                            disabled={savingBiometrics}
+                            className="w-full mt-4 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            {savingBiometrics ? 'Saving...' : 'Save'}
+                        </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-3 gap-2 pt-4">
@@ -511,13 +521,7 @@ export default function Settings() {
                         </div>
                     </div>
                     {editingNutrition ? (
-                        <button
-                            onClick={handleSaveNutrition}
-                            disabled={savingNutrition}
-                            className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                        >
-                            <Check className="w-4 h-4" />
-                        </button>
+                        <span className="px-3 py-1.5 font-serif font-bold text-primary/40 text-sm">Editing...</span>
                     ) : (
                         <button
                             onClick={() => setEditingNutrition(true)}
@@ -533,7 +537,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Calories</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetCalories}
                                 onChange={e => setNutritionForm({...nutritionForm, targetCalories: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -542,7 +548,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Protein (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetProtein}
                                 onChange={e => setNutritionForm({...nutritionForm, targetProtein: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -551,7 +559,9 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Carbs (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetCarbs}
                                 onChange={e => setNutritionForm({...nutritionForm, targetCarbs: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
@@ -560,12 +570,21 @@ export default function Settings() {
                         <div className="space-y-1">
                             <label className="text-[10px] uppercase font-bold text-primary/40 tracking-wider">Fat (g)</label>
                             <input
-                                type="number"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={nutritionForm.targetFat}
                                 onChange={e => setNutritionForm({...nutritionForm, targetFat: e.target.value})}
                                 className="w-full px-3 py-2 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20"
                             />
                         </div>
+                        <button
+                            onClick={handleSaveNutrition}
+                            disabled={savingNutrition}
+                            className="col-span-2 w-full mt-2 py-2.5 text-sm font-sans font-medium bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                            {savingNutrition ? 'Saving...' : 'Save'}
+                        </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-4 gap-2 pt-4">

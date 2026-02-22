@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](https://github.com/jayspar44/cally/compare/v0.4.1...v0.4.2) (2026-02-22)
+
+
+### Bug Fixes
+
+* add autocomplete attributes to login inputs for password managers 7e1cf26
+* improve login form for password manager compatibility 6abee0c
+* replace check icon with Save button in settings forms 9985941
+* use inputMode numeric to prevent Android keyboard dismissal 2dcde1a
+* use logger instead of console.error in SearchLogs e8f9048
+
 ### [0.4.1](https://github.com/jayspar44/cally/compare/v0.4.0...v0.4.1) (2026-02-21)
 
 
