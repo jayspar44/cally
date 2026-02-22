@@ -252,10 +252,12 @@ npm run aab:prod                   # prodRelease AAB
 
 ### Branch Protection
 
-| Branch | Requires PR | Direct Push | Force Push |
-|--------|-------------|-------------|------------|
-| `main` | Yes | Blocked | Blocked |
-| `develop` | No | Allowed | Blocked |
+| Branch | Requires PR | Direct Push | Force Push | Merge Strategy |
+|--------|-------------|-------------|------------|----------------|
+| `main` | Yes | Blocked | Blocked | **Merge commit only** (no squash) |
+| `develop` | No | Allowed | Blocked | — |
+
+**NEVER squash merge to `main`** — always use regular merge (`gh pr merge --merge`) to preserve individual commit history on main.
 
 ## Security
 
