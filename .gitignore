@@ -120,9 +120,10 @@ page-*.jpeg
 playwright-report/
 test-results/
 
-# Superpowers plugin (plans, worktrees)
+# Superpowers plugin (plans, worktrees, pocket)
 .plans/
 .worktrees/
+.claude-pocket/
 
 # Backend temporary files
 backend/debug_data.js
