@@ -94,6 +94,8 @@ const Login = () => {
                                 <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Email</label>
                                 <input
                                     type="email"
+                                    name="email"
+                                    autoComplete="email"
                                     placeholder="hello@example.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -105,6 +107,8 @@ const Login = () => {
                                 <label className="pl-4 text-xs font-bold text-primary/40 uppercase tracking-widest">Password</label>
                                 <input
                                     type="password"
+                                    name="password"
+                                    autoComplete={isSignup ? 'new-password' : 'current-password'}
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
