@@ -38,6 +38,13 @@ export const UserPreferencesProvider = ({ children }) => {
                         if (data.settings) setSettings(data.settings);
                         if (data.biometrics) setBiometrics(data.biometrics);
                         if (data.registeredDate) setRegisteredDate(data.registeredDate);
+
+                        // Sync browser timezone to backend if it differs
+                        const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        if (browserTz && data.settings?.timezone !== browserTz) {
+                            api.updateUserProfile({ settings: { timezone: browserTz } }).catch(() => {});
+                            setSettings(prev => ({ ...prev, timezone: browserTz }));
+                        }
                     }
                 } catch (error) {
                     logger.error('Failed to load user profile', error);

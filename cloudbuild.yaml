@@ -17,7 +17,7 @@ steps:
           --source . \
           --region us-central1 \
           --allow-unauthenticated \
-          --set-secrets="FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+          --set-secrets="FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,USDA_API_KEY=USDA_API_KEY:latest" \
           --set-env-vars="NODE_ENV=${_ENV}" \
           --set-env-vars="^@^ALLOWED_ORIGINS=https://cally-658-dev.web.app,https://cally-658.web.app,capacitor://localhost,https://localhost"
 

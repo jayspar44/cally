@@ -34,7 +34,6 @@ const updateProfile = async (req, res) => {
             userData.registeredDate = toDateStr();
             userData.settings = {
                 ...DEFAULT_SETTINGS,
-                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
             };
         }
 

@@ -63,7 +63,7 @@ const toolDeclarations = [
     },
     {
         name: 'lookupNutrition',
-        description: 'Look up nutrition information for a food item. Use this when you need accurate nutrition data for a specific food.',
+        description: 'Look up nutrition information for a food item from the USDA database. You SHOULD call this for ALL foods before logging — it returns authoritative USDA data when available, with common foods as fallback. Only skip this for trivial items (plain water, black coffee, a single piece of common fruit).',
         parameters: {
             type: 'object',
             properties: {
@@ -453,15 +453,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
 const lookupNutrition = async (args) => {
     const { foodName } = args;
 
-    const quickResult = quickLookup(foodName);
-    if (quickResult) {
-        return {
-            success: true,
-            source: 'common_foods',
-            data: quickResult
-        };
-    }
-
+    // USDA first — most authoritative source
     const usdaResults = await searchFoods(foodName, 3);
     if (usdaResults.length > 0) {
         return {
@@ -472,9 +464,20 @@ const lookupNutrition = async (args) => {
         };
     }
 
+    // Common foods fallback
+    const quickResult = quickLookup(foodName);
+    if (quickResult) {
+        return {
+            success: true,
+            source: 'common_foods',
+            data: quickResult
+        };
+    }
+
     return {
         success: false,
-        error: `No nutrition data found for "${foodName}". Please estimate based on your knowledge.`
+        source: 'none',
+        error: `No nutrition data found for "${foodName}". Estimate based on your knowledge and use nutritionSource "ai_estimate" when logging.`
     };
 };
 

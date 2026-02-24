@@ -255,10 +255,11 @@ export default function Chat() {
                     </div>
                 )}
 
-                {messages.map((message) => (
+                {messages.map((message, index) => (
                     <ChatMessage
                         key={message.id}
                         message={message}
+                        isLastMessage={index === messages.length - 1}
                         onEditLog={(log) => setEditingFoodLog(log)}
                         onDelete={() => handleDeleteMessage(message.id)}
                         onRetry={retryMessage}

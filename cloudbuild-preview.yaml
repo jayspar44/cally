@@ -27,7 +27,7 @@ steps:
           --allow-unauthenticated \
           --tag pr-${_PR_NUMBER} \
           --no-traffic \
-          --set-secrets="FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest" \
+          --set-secrets="FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,USDA_API_KEY=USDA_API_KEY:latest" \
           --set-env-vars="NODE_ENV=dev" \
           --set-env-vars="^@^ALLOWED_ORIGINS=https://cally-658-dev.web.app,https://cally-658.web.app,capacitor://localhost,https://localhost"
 

@@ -9,10 +9,46 @@ const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 const MODELS = {
     flash: 'gemini-3-flash-preview',
-    pro: 'gemini-3-pro-preview'
 };
 
-const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion. You don't just track food — you coach, strategize, and help users build better eating habits through natural, warm conversation.
+// --- Context caching: system instruction + tools ---
+// Two variants: base prompt and base + onboarding addendum
+// TTL: 24 hours. Lazy-initialized on first request.
+const CACHE_TTL = '86400s';
+const cachedContentNames = { base: null, onboarding: null };
+
+const getOrCreateCache = async (needsOnboarding) => {
+    const variant = needsOnboarding ? 'onboarding' : 'base';
+
+    if (cachedContentNames[variant]) {
+        return cachedContentNames[variant];
+    }
+
+    try {
+        const systemInstruction = needsOnboarding
+            ? BASE_SYSTEM_PROMPT + ONBOARDING_ADDENDUM
+            : BASE_SYSTEM_PROMPT;
+
+        const cache = await genAI.caches.create({
+            model: MODELS.flash,
+            config: {
+                systemInstruction,
+                tools: [{ functionDeclarations: toolDeclarations }],
+                displayName: `kalli-${variant}`,
+                ttl: CACHE_TTL
+            }
+        });
+
+        cachedContentNames[variant] = cache.name;
+        getLogger().info({ variant, cacheName: cache.name }, 'Context cache created');
+        return cache.name;
+    } catch (err) {
+        getLogger().warn({ err, variant }, 'Context cache creation failed, falling back to uncached');
+        return null;
+    }
+};
+
+const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion. You don't just track food — you coach, strategize, and help users build better eating habits through natural, warm conversation.
 
 ## Your Identity & Personality
 - Expert nutrition coach who happens to be an AI — warm, knowledgeable, feels like a friend who knows nutrition science
@@ -33,6 +69,7 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 - Simple logs ("a banana", "a coffee") → brief, conversational confirmation with daily context
 - "Add up my calories" / "what did I eat today" → structured breakdown is expected
 - General chat, questions, coaching → purely conversational, no structured data unless it adds clarity
+- **Card-aware responses**: When you log food via logFood, the user sees a visual card showing the exact item breakdown, calories, and macros. Your text response should focus on **coaching and context** — don't restate the per-item breakdown or macro numbers that the card shows. Instead, weave in daily progress, encouragement, strategy, or pattern insights.
 
 ## Natural Tone Rules
 - Never open with filler affirmations ("Great question!", "Absolutely!", "Of course!", "That's a great choice!")
@@ -63,6 +100,15 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 
 4. Acknowledge specific brands by name when mentioned
 
+## Confirmation Protocol
+- **Before calling logFood**, briefly summarize what you plan to log and ask the user to confirm UNLESS:
+  - The request is completely unambiguous with clear quantities, meal type, and simple items (e.g., "log 2 eggs for breakfast")
+  - The user explicitly said "log" or "add" with specific details
+- When in doubt, confirm. Users prefer being asked over having wrong items logged.
+- For multi-item meals, always confirm the full list before logging.
+- For photos: identify items, present your breakdown with estimated nutrition, and ask "Should I log this?" before calling logFood.
+- This does NOT apply to getDailySummary, searchFoodLogs, getUserGoals, or lookupNutrition — those are informational and can be called freely.
+
 ## Coaching Behaviors
 - **Day-open strategy**: When context shows this is the user's first interaction of the day, acknowledge the new day. If yesterday's data is available, briefly reference it and suggest a strategy for today
 - **Day-close reflection**: When the user seems done for the day, provide a summary with wins and areas to improve tomorrow
@@ -85,23 +131,35 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 - If you provide a range (e.g., "350-400 cal"), pick a specific value when logging and tell the user the exact number you logged.
 
 ## Important Rules
-- Always use the tools provided to log food — don't just describe nutrition
-- **logFood format**: Always pass food data in the \`items\` array parameter. Example: \`{ date: "2026-02-21", meal: "breakfast", items: [{ name: "Eggs", quantity: 2, unit: "large", calories: 148, protein: 12, carbs: 1, fat: 10 }], nutritionSource: "ai_estimate" }\`
-- **logFood anti-patterns — NEVER DO THESE**:
-    - Flat args: \`{ name: "Eggs", calories: 148, ... }\` (missing items array)
-    - Wrong key: \`{ foods: [...] }\` or \`{ foodItems: [...] }\` (must be \`items\`)
-    - Only use the \`items\` key. Any other format will cause a silent failure and the food will NOT be saved.
+- Always use the tools to log food — never just describe nutrition without calling logFood.
+- **logFood format**: Always use the \`items\` array parameter. Never use flat args or alternative keys like \`foods\` or \`foodItems\`.
 - **NEVER claim you have logged, are logging, or will log food unless you actually call the logFood tool in the same response.** If you haven't called logFood, do NOT say "I've logged that" — the user will see no confirmation card and think the app is broken. Either call the tool or tell the user what you plan to log and ask for confirmation first.
-- Be precise with nutrition estimates. For complex, restaurant, or unfamiliar foods, use lookupNutrition before quoting values. Your training data is reliable for common whole foods.
+- Be precise with nutrition estimates. **Default to calling lookupNutrition** for any food you're about to log — it provides USDA-verified data. Only skip it for truly trivial items (plain water, black coffee, a single banana). Never use ai_estimate when lookupNutrition could give you real data.
+
+## Hypothetical vs Actual Meals
+- **Only log food the user has ALREADY eaten.** Never log hypothetical, planned, or future meals.
+- **"I had" / "I ate" / "I just finished"** → actual, may proceed to log (with confirmation if needed)
+- **"I'm thinking of" / "I might have" / "What about"** → hypothetical, respond with coaching/advice only
+- **"I'll have" / "I'm going to have" / "I'm planning on"** → future intent, acknowledge and offer to log later ("Sounds good — let me know when you've had it and I'll log it")
+- **"What should I have?" / "Can I have X?"** → questions/advice, respond conversationally
+- When discussing meal plans or daily strategies, NEVER auto-log foods mentioned — only log when the user explicitly tells you they ATE something.
+
 - If unsure about a food, ask for clarification rather than guessing wrong
 - Format nutrition info clearly using **Markdown only** (bold, lists, headers). Never use HTML tags like \`<details>\`, \`<summary>\`, \`<table>\`, etc.
 - **Meal Categorization**: Try to categorize foods based on time of day. **If ambiguous (e.g. cereal at 3 PM), ASK the user** before logging.
-- **Nutrition Source Tracking**: When using \`logFood\`, you MUST specify the \`nutritionSource\` field:
-    - \`usda\`: Used \`lookupNutrition\` and found USDA data
-    - \`common_foods\`: Used \`lookupNutrition\` and found common foods data
-    - \`ai_estimate\`: Estimating from your own knowledge (most common)
-    - \`nutrition_label\`: Extracted from a photo or user-provided label
-    - \`user_input\`: User explicitly provided the macros
+- **Nutrition Source Tracking**: When using \`logFood\`, you MUST specify the \`nutritionSource\` field accurately based on where the data came from.
+
+## Nutrition Source Tracking
+Set \`nutritionSource\` in \`logFood\` based on where the numbers ACTUALLY came from:
+- **"nutrition_label"** — You extracted values from a photo of a nutrition/ingredients label
+- **"user_input"** — The user explicitly told you the macros/calories (e.g. "it was 350 cals")
+- **"usda"** — lookupNutrition returned \`success: true\` with \`source: "usda"\`
+- **"common_foods"** — lookupNutrition returned \`success: true\` with \`source: "common_foods"\`
+- **"ai_estimate"** — lookupNutrition returned \`success: false\` (or was not called), so you estimated from your own knowledge
+
+**CRITICAL**: If lookupNutrition returned \`success: false\` for a food, you MUST use "ai_estimate" for that item — never "usda" or "common_foods".
+
+Always call lookupNutrition before falling back to ai_estimate. The only exceptions are truly trivial items (plain water, black coffee, a single piece of common fruit).
 
 ## Vision Analysis & Nutrition Labels
 - **Food Photos**: Identify items and ESTIMATE portions. Use visual cues. If unsure, give a range or ask "how much?".
@@ -116,6 +174,18 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
 - **NEVER** use \`logFood\` to create "adjustment" entries. Always use \`updateFoodLog\`.
 - **NEVER** guess the \`logId\`. Always search first.
 
+## Referencing Previous Meals
+- When the user mentions **leftovers**, **"same as yesterday"**, **"what I had earlier"**, or similar references to past meals:
+    1. Use \`searchFoodLogs\` with the appropriate date to find the referenced meal
+    2. Use the same nutrition values from the previous log (adjusting quantity if specified)
+    3. Log as a new entry for today with the matched nutrition data
+- When the user says they want to **correct** or **change** something:
+    1. Proactively use \`searchFoodLogs\` to find potential matches
+    2. Show the user what you found and confirm which item to update
+    3. Use \`updateFoodLog\` with the correct logId
+- When the user says **"I actually had X instead of Y"** or **"that was wrong"**:
+    1. Search for the original item first, confirm the match, then update
+
 ## Deleting Logs
 - To remove a food log entry, use \`deleteFoodLog\`:
     1.  Use \`searchFoodLogs\` to find the item(s)
@@ -123,7 +193,9 @@ const SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and companion
     3.  **Wait for explicit confirmation** before calling \`deleteFoodLog\`
     4.  After deleting, confirm what was removed and show updated daily totals
 - If clearly unambiguous and explicitly requested in the same message, you may search and delete in one turn — still confirm afterward.
-- **NEVER** zero out values with \`updateFoodLog\` as a substitute for deletion.
+- **NEVER** zero out values with \`updateFoodLog\` as a substitute for deletion.`;
+
+const ONBOARDING_ADDENDUM = `
 
 ## Onboarding & Profile Setup
 
@@ -195,14 +267,13 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
     try {
         const modelName = MODELS.flash;
 
-        const enhancedContext = await buildEnhancedContext(userId, userTimezone);
+        const { context: enhancedContext, needsOnboarding } = await buildEnhancedContext(userId, userTimezone, userProfile);
+        const systemInstruction = needsOnboarding ? BASE_SYSTEM_PROMPT + ONBOARDING_ADDENDUM : BASE_SYSTEM_PROMPT;
 
         const contents = [
-            { role: 'user', parts: [{ text: enhancedContext + SYSTEM_PROMPT }] },
-            ...chatHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.content }]
-            })),
+            { role: 'user', parts: [{ text: enhancedContext }] },
+            { role: 'model', parts: [{ text: 'Got it — I have your latest context. How can I help?' }] },
+            ...buildChatHistory(chatHistory),
             { role: 'user', parts: [{ text: message }] }
         ];
 
@@ -225,15 +296,27 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 .map(p => p.functionCall) || [];
         };
 
+        // Try to use cached system instruction + tools
+        const cacheName = await getOrCreateCache(needsOnboarding);
+        const config = cacheName
+            ? {
+                maxOutputTokens: 8192,
+                temperature: 1.0,
+                thinkingConfig: { thinkingLevel: 'LOW' },
+                cachedContent: cacheName
+            }
+            : {
+                systemInstruction,
+                maxOutputTokens: 8192,
+                temperature: 1.0,
+                tools: [{ functionDeclarations: toolDeclarations }],
+                thinkingConfig: { thinkingLevel: 'LOW' }
+            };
+
         const payload = {
             model: modelName,
             contents,
-            config: {
-                systemInstruction: SYSTEM_PROMPT,
-                maxOutputTokens: 8192,
-                temperature: 1.0,
-                tools: [{ functionDeclarations: toolDeclarations }]
-            }
+            config
         };
 
         let result = await genAI.models.generateContent(payload);
@@ -276,11 +359,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config: {
-                    systemInstruction: SYSTEM_PROMPT,
-                    maxOutputTokens: 8192,
-                    temperature: 1.0,
-                }
+                config
             });
 
             responseText = getResponseText(result);
@@ -306,17 +385,18 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 };
 
 const processImageMessage = async (message, images, chatHistory, userProfile, userId, userTimezone, idempotencyKey) => {
-    const modelName = MODELS.pro;
+    const modelName = MODELS.flash;
     // Support both single imageBase64 string (legacy) and array of images
     const imageArray = Array.isArray(images) ? images : [images];
     getLogger().info({ modelName, hasMessage: !!message, imageCount: imageArray.length }, 'Processing image message');
 
     try {
-        const enhancedContext = await buildEnhancedContext(userId, userTimezone);
+        const { context: enhancedContext, needsOnboarding } = await buildEnhancedContext(userId, userTimezone, userProfile);
+        const systemInstruction = needsOnboarding ? BASE_SYSTEM_PROMPT + ONBOARDING_ADDENDUM : BASE_SYSTEM_PROMPT;
         const userText = message || 'What food is in this image? Please identify and log it.';
 
         const parts = [];
-        parts.push({ text: enhancedContext + userText });
+        parts.push({ text: userText });
         for (const img of imageArray) {
             parts.push({
                 inlineData: {
@@ -327,6 +407,8 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         }
 
         const contents = [
+            { role: 'user', parts: [{ text: enhancedContext }] },
+            { role: 'model', parts: [{ text: 'Got it — I have your latest context. How can I help?' }] },
             ...buildChatHistory(chatHistory.slice(0, -1)),
             { role: 'user', parts }
         ];
@@ -339,15 +421,27 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 ?.filter(p => p.functionCall)
                 .map(p => p.functionCall) || [];
 
+        // Try to use cached system instruction + tools
+        const cacheName = await getOrCreateCache(needsOnboarding);
+        const imgConfig = cacheName
+            ? {
+                maxOutputTokens: 4096,
+                temperature: 1.0,
+                thinkingConfig: { thinkingLevel: 'LOW' },
+                cachedContent: cacheName
+            }
+            : {
+                systemInstruction,
+                maxOutputTokens: 4096,
+                temperature: 1.0,
+                tools: [{ functionDeclarations: toolDeclarations }],
+                thinkingConfig: { thinkingLevel: 'LOW' }
+            };
+
         const payload = {
             model: modelName,
             contents,
-            config: {
-                systemInstruction: SYSTEM_PROMPT,
-                maxOutputTokens: 4096,
-                temperature: 1.0,
-                tools: [{ functionDeclarations: toolDeclarations }]
-            }
+            config: imgConfig
         };
 
         let result = await genAI.models.generateContent(payload);
@@ -390,11 +484,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config: {
-                    systemInstruction: SYSTEM_PROMPT,
-                    maxOutputTokens: 4096,
-                    temperature: 1.0,
-                }
+                config: imgConfig
             });
 
             responseText = getImgResponseText(result);
@@ -482,14 +572,38 @@ const getRecentDayLogs = async (userId, timezone, days = 3) => {
     };
 };
 
-const buildEnhancedContext = async (userId, userTimezone) => {
+const formatLogsByMeal = (logs, label) => {
+    if (!logs || logs.length === 0) return '';
+    const groups = {};
+    for (const log of logs) {
+        const meal = log.meal || 'snack';
+        if (!groups[meal]) groups[meal] = [];
+        groups[meal].push(log);
+    }
+    const mealOrder = { breakfast: 1, lunch: 2, dinner: 3, snack: 4 };
+    const sorted = Object.entries(groups).sort(([a], [b]) => (mealOrder[a] || 5) - (mealOrder[b] || 5));
+    let out = `\n${label}:\n`;
+    for (const [meal, items] of sorted) {
+        const itemStrs = items.map(i => `${i.name} ${Math.round(i.calories || 0)} cal`).join(', ');
+        out += `- ${meal.charAt(0).toUpperCase() + meal.slice(1)}: ${itemStrs}\n`;
+    }
+    // Note missing meals for yesterday context
+    const loggedMeals = new Set(Object.keys(groups));
+    const allMeals = ['breakfast', 'lunch', 'dinner'];
+    const missing = allMeals.filter(m => !loggedMeals.has(m));
+    if (missing.length > 0 && missing.length < 3) {
+        out += `- (No ${missing.join(' or ')} logged)\n`;
+    }
+    return out;
+};
+
+const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
     const today = getTodayStr(userTimezone);
     const yesterday = getYesterdayStr(userTimezone);
 
-    let userDoc, goals, todayLogs, yesterdayLogs, recentAvg;
+    let goals, todayLogs, yesterdayLogs, recentAvg;
     try {
-        [userDoc, goals, todayLogs, yesterdayLogs, recentAvg] = await Promise.all([
-            db.collection('users').doc(userId).get(),
+        [goals, todayLogs, yesterdayLogs, recentAvg] = await Promise.all([
             getGoalsForDate(userId, today),
             getDayLogs(userId, today),
             getDayLogs(userId, yesterday),
@@ -497,18 +611,25 @@ const buildEnhancedContext = async (userId, userTimezone) => {
         ]);
     } catch (err) {
         getLogger().warn({ err }, 'Failed to build enhanced context, falling back to basic');
-        return `[Context: Today is ${today}. Timezone: ${userTimezone || 'UTC'}]\n\n`;
+        return { context: `[Context: Today is ${today}. Timezone: ${userTimezone || 'UTC'}]\n\n`, needsOnboarding: false };
     }
 
-    const userData = userDoc.exists ? userDoc.data() : {};
+    const userData = userProfile || {};
     const firstName = userData.firstName || '';
     const biometrics = userData.biometrics || {};
+    let needsOnboarding = false;
 
     const todaySummary = sumLogs(todayLogs);
     const yesterdaySummary = yesterdayLogs.length > 0 ? sumLogs(yesterdayLogs) : null;
 
+    // Current time and day of week for temporal awareness
+    const tz = userTimezone || 'UTC';
+    const now = new Date();
+    const timeStr = now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+    const dayName = now.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' });
+
     let context = `[COACHING CONTEXT — Use this data naturally in conversation. Do NOT dump it as a list.]\n`;
-    context += `Date: ${today} | Timezone: ${userTimezone || 'UTC'}\n`;
+    context += `Date: ${dayName}, ${today} | Time: ${timeStr} | Timezone: ${tz}\n`;
 
     if (firstName) {
         context += `User goes by: ${firstName} (use sparingly — most replies need no name)\n`;
@@ -521,10 +642,13 @@ const buildEnhancedContext = async (userId, userTimezone) => {
 
     if (todaySummary.count === 0) {
         context += `(No food logged yet today — this may be the user's first interaction of the day.)\n`;
+    } else {
+        context += formatLogsByMeal(todayLogs, 'Items logged today');
     }
 
     if (yesterdaySummary) {
         context += `\nYesterday (${yesterday}): ${yesterdaySummary.calories} cal, ${yesterdaySummary.protein}g protein, ${yesterdaySummary.carbs}g carbs, ${yesterdaySummary.fat}g fat\n`;
+        context += formatLogsByMeal(yesterdayLogs, 'Yesterday\'s items');
     }
 
     if (recentAvg) {
@@ -543,10 +667,11 @@ const buildEnhancedContext = async (userId, userTimezone) => {
         context += '\n';
     } else {
         context += `\n**ONBOARDING NEEDED** — No biometrics set. If the user wants to get started or set up their profile, begin the onboarding conversation. Otherwise respond normally but mention they can set up their profile for personalized coaching.\n`;
+        needsOnboarding = true;
     }
 
     context += `[END CONTEXT]\n\n`;
-    return context;
+    return { context, needsOnboarding };
 };
 
 module.exports = {

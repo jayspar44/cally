@@ -19,7 +19,8 @@ const GCP_PROJECT_ID = 'cally-658';
 const SECRETS = {
     FIREBASE_SERVICE_ACCOUNT: 'FIREBASE_SERVICE_ACCOUNT',
     GEMINI_API_KEY: 'GEMINI_API_KEY',
-    FIREBASE_CLIENT_CONFIG: 'FIREBASE_CLIENT_CONFIG'
+    FIREBASE_CLIENT_CONFIG: 'FIREBASE_CLIENT_CONFIG',
+    USDA_API_KEY: 'USDA_API_KEY'
 };
 
 const rl = readline.createInterface({
@@ -128,10 +129,14 @@ async function setupFromGCP() {
         console.log(`📥 Fetching ${SECRETS.GEMINI_API_KEY}...`);
         const geminiApiKey = await getGCPSecret(SECRETS.GEMINI_API_KEY);
 
+        console.log(`📥 Fetching ${SECRETS.USDA_API_KEY}...`);
+        const usdaApiKey = await getGCPSecret(SECRETS.USDA_API_KEY);
+
         const compactServiceAccount = JSON.stringify(JSON.parse(firebaseServiceAccount));
         const backendEnvContent = `PORT=3501
 FIREBASE_SERVICE_ACCOUNT='${compactServiceAccount}'
 GEMINI_API_KEY=${geminiApiKey}
+USDA_API_KEY=${usdaApiKey}
 NODE_ENV=development
 # Comma-separated list of allowed origins for CORS
 # Local dev defaults to: localhost:3500, localhost:5173, capacitor://localhost
