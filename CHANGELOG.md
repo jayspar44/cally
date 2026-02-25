@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.4](https://github.com/jayspar44/cally/compare/v0.4.3...v0.4.4) (2026-02-25)
+
+
+### Bug Fixes
+
+* add max iteration guard to tool-calling loops da4a386
+* add time awareness and catch-up logging to AI prompt 4aa38f4
+
 ### [0.4.3](https://github.com/jayspar44/cally/compare/v0.4.2...v0.4.3) (2026-02-25)
 
 
