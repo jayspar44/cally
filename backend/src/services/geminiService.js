@@ -390,6 +390,10 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
         if (toolIterations >= MAX_TOOL_ITERATIONS) {
             getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations');
+            // Append fallback message to inform user of incomplete response
+            if (responseText && !responseText.includes('reached processing limit')) {
+                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
+            }
         }
 
         return {
@@ -522,6 +526,10 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
 
         if (toolIterations >= MAX_TOOL_ITERATIONS) {
             getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations (image)');
+            // Append fallback message to inform user of incomplete response
+            if (responseText && !responseText.includes('reached processing limit')) {
+                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
+            }
         }
 
         return {

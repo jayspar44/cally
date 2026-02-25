@@ -42,7 +42,9 @@ export const UserPreferencesProvider = ({ children }) => {
                         // Sync browser timezone to backend if it differs
                         const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         if (browserTz && data.settings?.timezone !== browserTz) {
-                            api.updateUserProfile({ settings: { timezone: browserTz } }).catch(() => {});
+                            api.updateUserProfile({ settings: { timezone: browserTz } }).catch((err) => {
+                                logger.warn('Failed to sync timezone to backend', err);
+                            });
                             setSettings(prev => ({ ...prev, timezone: browserTz }));
                         }
                     }
