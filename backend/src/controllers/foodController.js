@@ -153,6 +153,11 @@ const updateLog = async (req, res) => {
         cleanUpdates.updatedAt = FieldValue.serverTimestamp();
         cleanUpdates.corrected = true;
 
+        const NUTRIENT_KEYS = ['calories', 'protein', 'carbs', 'fat'];
+        if (NUTRIENT_KEYS.some(k => k in cleanUpdates)) {
+            cleanUpdates.nutrientsCorrected = true;
+        }
+
         await docRef.update(cleanUpdates);
 
         req.log.info({ action: 'food.updateLog', logId: id }, 'Food log updated');

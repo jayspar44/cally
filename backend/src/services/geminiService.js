@@ -153,13 +153,25 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 Set \`nutritionSource\` in \`logFood\` based on where the numbers ACTUALLY came from:
 - **"nutrition_label"** — You extracted values from a photo of a nutrition/ingredients label
 - **"user_input"** — The user explicitly told you the macros/calories (e.g. "it was 350 cals")
+- **"user_history"** — lookupNutrition returned \`source: "user_history"\`
 - **"usda"** — lookupNutrition returned \`success: true\` with \`source: "usda"\`
 - **"common_foods"** — lookupNutrition returned \`success: true\` with \`source: "common_foods"\`
 - **"ai_estimate"** — lookupNutrition returned \`success: false\` (or was not called), so you estimated from your own knowledge
 
+**Source priority** (highest to lowest): nutrition_label > user_input > user_history > usda > common_foods > ai_estimate
+
 **CRITICAL**: If lookupNutrition returned \`success: false\` for a food, you MUST use "ai_estimate" for that item — never "usda" or "common_foods".
 
 Always call lookupNutrition before falling back to ai_estimate. The only exceptions are truly trivial items (plain water, black coffee, a single piece of common fruit).
+
+## User History in lookupNutrition
+\`lookupNutrition\` now checks the user's past food logs FIRST — before USDA. It returns \`source: "user_history"\` when it finds a match from a past corrected entry or an entry from an authoritative source (usda, nutrition_label, user_input).
+
+**Name specificity matters** — "Barebells Banana Caramel" is NOT "Barebells Salted Caramel". Only use a history match if the food is genuinely the same item. If the match seems wrong or too generic, ignore it and the tool will fall through to USDA automatically.
+
+**Scale by quantity** — history data is per the logged quantity. If history shows 1 bar = 200 cal and user had 2 bars, log 400 cal. If history shows 5oz pasta = 275 cal and user had 2oz, scale proportionally.
+
+**Corrected entries are most trusted** — if user_history returns \`corrected: true\`, the user explicitly fixed these values. Trust them.
 
 ## Vision Analysis & Nutrition Labels
 - **Food Photos**: Identify items and ESTIMATE portions. Use visual cues. If unsure, give a range or ask "how much?".
@@ -325,6 +337,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         let foodLog = null;
         let responseText = getResponseText(result);
         let functionCalls = getFunctionCalls(result);
+        const lookupCache = new Map();
 
         while (functionCalls.length > 0) {
             const functionResponses = [];
@@ -333,7 +346,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
-                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey);
+                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
@@ -450,6 +463,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         let foodLog = null;
         let responseText = getImgResponseText(result);
         let functionCalls = getImgFunctionCalls(result);
+        const lookupCache = new Map();
 
         while (functionCalls.length > 0) {
             const functionResponses = [];
@@ -458,7 +472,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 getLogger().info({ tool: call.name }, 'Executing tool');
                 toolsUsed.push(call.name);
 
-                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo' });
+                const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo', lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);

@@ -1,4 +1,21 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "foodLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nutritionSource", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "foodLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nutrientsCorrected", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }
