@@ -14,6 +14,7 @@ const MODELS = {
 // --- Context caching: system instruction + tools ---
 // Two variants: base prompt and base + onboarding addendum
 // TTL: 24 hours. Lazy-initialized on first request.
+const MAX_TOOL_ITERATIONS = 10;
 const CACHE_TTL = '86400s';
 const cachedContentNames = { base: null, onboarding: null };
 
@@ -345,11 +346,13 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         let functionCalls = getFunctionCalls(result);
         const lookupCache = new Map();
 
-        while (functionCalls.length > 0) {
+        let toolIterations = 0;
+        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
+            toolIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name }, 'Executing tool');
+                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { lookupCache });
@@ -383,6 +386,10 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
             responseText = getResponseText(result);
             functionCalls = getFunctionCalls(result);
+        }
+
+        if (toolIterations >= MAX_TOOL_ITERATIONS) {
+            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations');
         }
 
         return {
@@ -471,11 +478,13 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         let functionCalls = getImgFunctionCalls(result);
         const lookupCache = new Map();
 
-        while (functionCalls.length > 0) {
+        let toolIterations = 0;
+        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
+            toolIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name }, 'Executing tool');
+                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo', lookupCache });
@@ -509,6 +518,10 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
 
             responseText = getImgResponseText(result);
             functionCalls = getImgFunctionCalls(result);
+        }
+
+        if (toolIterations >= MAX_TOOL_ITERATIONS) {
+            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations (image)');
         }
 
         return {
