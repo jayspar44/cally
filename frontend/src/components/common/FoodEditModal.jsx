@@ -42,14 +42,17 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave({
-            ...formData,
-            quantity: Number(formData.quantity),
-            calories: Number(formData.calories),
-            protein: Number(formData.protein),
-            carbs: Number(formData.carbs),
-            fat: Number(formData.fat)
-        });
+        const changes = {};
+        const numericKeys = ['quantity', 'calories', 'protein', 'carbs', 'fat'];
+        for (const [key, val] of Object.entries(formData)) {
+            const isNumeric = numericKeys.includes(key);
+            const newVal = isNumeric ? Number(val) : val;
+            const oldVal = initialData[key] ?? (isNumeric ? 0 : '');
+            if (newVal !== oldVal) changes[key] = newVal;
+        }
+        if (Object.keys(changes).length > 0) {
+            onSave(changes);
+        }
     };
 
     return (

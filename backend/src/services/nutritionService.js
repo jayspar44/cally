@@ -3,58 +3,6 @@ const logger = require('../logger');
 const USDA_API_BASE = 'https://api.nal.usda.gov/fdc/v1';
 const USDA_API_KEY = process.env.USDA_API_KEY || 'DEMO_KEY';
 
-const searchFoods = async (query, limit = 5) => {
-    try {
-        const url = `${USDA_API_BASE}/foods/search?api_key=${USDA_API_KEY}&query=${encodeURIComponent(query)}&pageSize=${limit}&dataType=Survey%20(FNDDS),Foundation,SR%20Legacy`;
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`USDA API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        return (data.foods || []).map(food => ({
-            fdcId: food.fdcId,
-            name: food.description,
-            brand: food.brandOwner || null,
-            category: food.foodCategory || null,
-            servingSize: food.servingSize || null,
-            servingUnit: food.servingSizeUnit || null,
-            nutrients: extractNutrients(food.foodNutrients || [])
-        }));
-    } catch (error) {
-        logger.error({ err: error, query }, 'USDA search failed');
-        return [];
-    }
-};
-
-const getFoodDetails = async (fdcId) => {
-    try {
-        const url = `${USDA_API_BASE}/food/${fdcId}?api_key=${USDA_API_KEY}`;
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`USDA API error: ${response.status}`);
-        }
-
-        const food = await response.json();
-
-        return {
-            fdcId: food.fdcId,
-            name: food.description,
-            brand: food.brandOwner || null,
-            category: food.foodCategory?.description || null,
-            servingSize: food.servingSize || 100,
-            servingUnit: food.servingSizeUnit || 'g',
-            nutrients: extractNutrients(food.foodNutrients || [])
-        };
-    } catch (error) {
-        logger.error({ err: error, fdcId }, 'USDA food details failed');
-        return null;
-    }
-};
-
 const extractNutrients = (nutrients) => {
     const nutrientMap = {
         1008: 'calories',    // Energy (kcal)
@@ -84,6 +32,44 @@ const extractNutrients = (nutrients) => {
     });
 
     return result;
+};
+
+const mapFoodResult = (food) => ({
+    fdcId: food.fdcId,
+    name: food.description,
+    brand: food.brandOwner || null,
+    category: food.foodCategory || null,
+    servingSize: food.servingSize || null,
+    servingUnit: food.servingSizeUnit || null,
+    nutrients: extractNutrients(food.foodNutrients || [])
+});
+
+const searchFoods = async (query, limit = 5) => {
+    try {
+        // Sanitize: strip parentheses (cause USDA 400 when unmatched)
+        const sanitizedQuery = query.replace(/[()]/g, '');
+
+        const response = await fetch(`${USDA_API_BASE}/foods/search?api_key=${USDA_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: sanitizedQuery,
+                pageSize: limit,
+                dataType: ['Survey (FNDDS)', 'Foundation', 'Branded']
+            })
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text().catch(() => '');
+            throw new Error(`USDA API error: ${response.status} - ${errorBody}`);
+        }
+
+        const data = await response.json();
+        return (data.foods || []).map(mapFoodResult);
+    } catch (error) {
+        logger.error({ err: error, query }, 'USDA search failed');
+        return [];
+    }
 };
 
 const COMMON_FOODS = {
@@ -122,20 +108,8 @@ const quickLookup = (query) => {
     return null;
 };
 
-const scaleNutrition = (baseNutrition, servings) => {
-    return {
-        calories: Math.round(baseNutrition.calories * servings),
-        protein: Math.round(baseNutrition.protein * servings * 10) / 10,
-        carbs: Math.round(baseNutrition.carbs * servings * 10) / 10,
-        fat: Math.round(baseNutrition.fat * servings * 10) / 10,
-        fiber: baseNutrition.fiber ? Math.round(baseNutrition.fiber * servings * 10) / 10 : null
-    };
-};
-
 module.exports = {
     searchFoods,
-    getFoodDetails,
     quickLookup,
-    scaleNutrition,
     COMMON_FOODS
 };

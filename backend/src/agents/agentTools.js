@@ -54,8 +54,8 @@ const toolDeclarations = [
                 },
                 nutritionSource: {
                     type: 'string',
-                    enum: ['ai_estimate', 'usda', 'common_foods', 'user_input', 'nutrition_label'],
-                    description: 'Source of the nutrition data. Use "ai_estimate" if you estimated it, "usda" if you used lookupNutrition and found it in USDA, "common_foods" if you used lookupNutrition and found it there, "user_input" if the user explicitly provided macros, "nutrition_label" if from an image/label.'
+                    enum: ['ai_estimate', 'usda', 'common_foods', 'user_input', 'nutrition_label', 'user_history'],
+                    description: 'Source of the nutrition data. Use "ai_estimate" if you estimated it, "usda" if from lookupNutrition USDA, "common_foods" if from lookupNutrition fallback, "user_input" if user explicitly provided macros, "nutrition_label" if from a photo/label, "user_history" if from lookupNutrition user history match.'
                 }
             },
             required: ['date', 'meal', 'items', 'nutritionSource']
@@ -63,7 +63,7 @@ const toolDeclarations = [
     },
     {
         name: 'lookupNutrition',
-        description: 'Look up nutrition information for a food item. Use this when you need accurate nutrition data for a specific food.',
+        description: 'Look up nutrition information for a food item from the USDA database. You SHOULD call this for ALL foods before logging — it returns authoritative USDA data when available, with common foods as fallback. Only skip this for trivial items (plain water, black coffee, a single piece of common fruit).',
         parameters: {
             type: 'object',
             properties: {
@@ -204,7 +204,7 @@ const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey,
             case 'logFood':
                 return await logFood(args, userId, userTimezone, idempotencyKey, options);
             case 'lookupNutrition':
-                return await lookupNutrition(args);
+                return await lookupNutrition(args, userId, options);
             case 'updateFoodLog':
                 return await updateFoodLog(args, userId);
             case 'getDailySummary':
@@ -363,9 +363,27 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
 
     const batch = db.batch();
     const createdIds = [];
+    const lookupCache = options.lookupCache;
 
     for (const item of items) {
         const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
+
+        // Resolve nutritionSource from lookup cache if available (exact match only)
+        let resolvedNutritionSource = nutritionSource || 'ai_estimate';
+        if (lookupCache && lookupCache.size > 0) {
+            const cacheEntry = lookupCache.get(item.name.toLowerCase().trim());
+            if (cacheEntry) {
+                if (cacheEntry.source !== resolvedNutritionSource) {
+                    getLogger().info({
+                        action: 'tool.logFood.sourceOverride',
+                        item: item.name,
+                        aiSaid: resolvedNutritionSource,
+                        actual: cacheEntry.source
+                    }, 'Overriding AI nutritionSource with cached lookup result');
+                }
+                resolvedNutritionSource = cacheEntry.source;
+            }
+        }
 
         const foodLogItem = {
             date,
@@ -379,7 +397,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
             fat: item.fat || 0,
             originalMessage: originalMessage || '',
             source: options.source || 'chat',
-            nutritionSource: nutritionSource || 'ai_estimate',
+            nutritionSource: resolvedNutritionSource,
             corrected: false,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
@@ -450,20 +468,94 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     return result;
 };
 
-const lookupNutrition = async (args) => {
+const lookupNutrition = async (args, userId, options = {}) => {
     const { foodName } = args;
+    const { lookupCache } = options;
+    const cacheKey = foodName.toLowerCase().trim();
 
-    const quickResult = quickLookup(foodName);
-    if (quickResult) {
-        return {
-            success: true,
-            source: 'common_foods',
-            data: quickResult
-        };
+    // 1. User history — corrected entries and authoritative sources
+    if (userId) {
+        try {
+            const foodLogsRef = db.collection('users').doc(userId).collection('foodLogs');
+
+            const [authoritativeSnap, correctedSnap] = await Promise.all([
+                foodLogsRef
+                    .where('nutritionSource', 'in', ['usda', 'nutrition_label', 'user_input'])
+                    .orderBy('createdAt', 'desc')
+                    .limit(10)
+                    .get(),
+                foodLogsRef
+                    .where('nutrientsCorrected', '==', true)
+                    .orderBy('createdAt', 'desc')
+                    .limit(10)
+                    .get()
+            ]);
+
+            // Merge and dedupe by doc ID — corrected first (higher trust)
+            const seen = new Set();
+            const candidates = [];
+            for (const snap of [correctedSnap, authoritativeSnap]) {
+                for (const doc of snap.docs) {
+                    if (!seen.has(doc.id)) {
+                        seen.add(doc.id);
+                        candidates.push({ id: doc.id, ...doc.data() });
+                    }
+                }
+            }
+
+            // Filter by name match (case-insensitive substring)
+            const lowerFood = foodName.toLowerCase();
+            const matches = candidates.filter(c =>
+                c.name && c.name.toLowerCase().includes(lowerFood)
+            );
+
+            if (matches.length > 0) {
+                const best = matches[0];
+                getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'user_history',
+                    matchedName: best.name, corrected: best.nutrientsCorrected || false
+                }, 'Nutrition lookup: user_history match');
+                if (lookupCache) lookupCache.set(cacheKey, { source: 'user_history', matchedName: best.name });
+                return {
+                    success: true,
+                    source: 'user_history',
+                    data: {
+                        name: best.name,
+                        calories: best.calories,
+                        protein: best.protein,
+                        carbs: best.carbs,
+                        fat: best.fat,
+                        quantity: best.quantity,
+                        unit: best.unit,
+                        originalSource: best.nutritionSource,
+                        corrected: best.nutrientsCorrected || false,
+                        date: best.date
+                    },
+                    alternatives: matches.slice(1, 3).map(m => ({
+                        name: m.name,
+                        calories: m.calories,
+                        protein: m.protein,
+                        carbs: m.carbs,
+                        fat: m.fat,
+                        quantity: m.quantity,
+                        unit: m.unit,
+                        originalSource: m.nutritionSource,
+                        corrected: m.nutrientsCorrected || false,
+                        date: m.date
+                    }))
+                };
+            }
+        } catch (err) {
+            getLogger().warn({ err, foodName }, 'User history lookup failed, falling through to USDA');
+        }
     }
 
+    // 2. USDA — most authoritative external source
     const usdaResults = await searchFoods(foodName, 3);
     if (usdaResults.length > 0) {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'usda',
+            matchedName: usdaResults[0].name, resultCount: usdaResults.length
+        }, 'Nutrition lookup: USDA match');
+        if (lookupCache) lookupCache.set(cacheKey, { source: 'usda', matchedName: usdaResults[0].name });
         return {
             success: true,
             source: 'usda',
@@ -472,9 +564,27 @@ const lookupNutrition = async (args) => {
         };
     }
 
+    // 3. Common foods fallback
+    const quickResult = quickLookup(foodName);
+    if (quickResult) {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'common_foods',
+            matchedName: quickResult.name
+        }, 'Nutrition lookup: common_foods match');
+        if (lookupCache) lookupCache.set(cacheKey, { source: 'common_foods', matchedName: quickResult.name });
+        return {
+            success: true,
+            source: 'common_foods',
+            data: quickResult
+        };
+    }
+
+    // 4. Nothing found — do NOT cache failures, let AI's ai_estimate stand
+    getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'none'
+    }, 'Nutrition lookup: no match found');
     return {
         success: false,
-        error: `No nutrition data found for "${foodName}". Please estimate based on your knowledge.`
+        source: 'none',
+        error: `No nutrition data found for "${foodName}". Estimate based on your knowledge and use nutritionSource "ai_estimate" when logging.`
     };
 };
 
@@ -582,6 +692,11 @@ const updateFoodLog = async (args, userId) => {
 
     cleanUpdates.updatedAt = FieldValue.serverTimestamp();
     cleanUpdates.corrected = true;
+
+    const NUTRIENT_KEYS = ['calories', 'protein', 'carbs', 'fat'];
+    if (NUTRIENT_KEYS.some(k => k in cleanUpdates)) {
+        cleanUpdates.nutrientsCorrected = true;
+    }
 
     getLogger().info({
         action: 'tool.updateFoodLog',

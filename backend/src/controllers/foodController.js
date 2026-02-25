@@ -99,6 +99,7 @@ const createLog = async (req, res) => {
                 fat: item.fat || 0,
                 originalMessage: originalMessage || '',
                 source,
+                nutritionSource: item.nutritionSource || 'user_input',
                 corrected: false,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
@@ -152,6 +153,11 @@ const updateLog = async (req, res) => {
 
         cleanUpdates.updatedAt = FieldValue.serverTimestamp();
         cleanUpdates.corrected = true;
+
+        const NUTRIENT_KEYS = ['calories', 'protein', 'carbs', 'fat'];
+        if (NUTRIENT_KEYS.some(k => k in cleanUpdates)) {
+            cleanUpdates.nutrientsCorrected = true;
+        }
 
         await docRef.update(cleanUpdates);
 

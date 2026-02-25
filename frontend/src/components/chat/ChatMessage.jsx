@@ -15,7 +15,7 @@ const stripDetailsBlocks = (content) => {
 
 const RANGE_LABELS = { '1W': 'weekly', '1M': 'monthly', '3M': 'quarterly' };
 
-export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
+export default function ChatMessage({ message, isLastMessage, onEditLog, onDelete, onRetry }) {
     const isUser = message.role === 'user';
     const isSending = message.status === 'sending';
     const isFailed = message.status === 'failed';
@@ -90,7 +90,7 @@ export default function ChatMessage({ message, onEditLog, onDelete, onRetry }) {
                     {/* Food Log Card (Assistant Only) */}
                     {!isUser && message.foodLog && (
                         <div className="mt-3 -mx-0.5">
-                            <FoodLogCard foodLog={message.foodLog} onEdit={onEditLog} />
+                            <FoodLogCard foodLog={message.foodLog} onEdit={onEditLog} defaultExpanded={isLastMessage} />
                         </div>
                     )}
 
