@@ -99,6 +99,7 @@ const createLog = async (req, res) => {
                 fat: item.fat || 0,
                 originalMessage: originalMessage || '',
                 source,
+                nutritionSource: item.nutritionSource || 'user_input',
                 corrected: false,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp()
