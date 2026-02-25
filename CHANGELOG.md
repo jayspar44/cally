@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.3](https://github.com/jayspar44/cally/compare/v0.4.2...v0.4.3) (2026-02-25)
+
+
+### Features
+
+* add correction memory and fix nutritionSource tracking e51cb53
+
+
+### Bug Fixes
+
+* improve food card UX, timezone sync, and nutrition source tracking 3d16af6
+
 ### [0.4.2](https://github.com/jayspar44/cally/compare/v0.4.1...v0.4.2) (2026-02-22)
 
 
