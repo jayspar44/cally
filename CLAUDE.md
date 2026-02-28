@@ -10,7 +10,7 @@ AI-powered calorie tracking app with chat-first interface, photo recognition, an
 - **Frontend**: React 19 + Vite 7 + Tailwind CSS 4 + Capacitor 8
 - **Backend**: Node.js 22 + Express 5
 - **Database**: Firebase Firestore | **Auth**: Firebase Auth
-- **AI**: Gemini 3 Flash Preview (chat/text) + Gemini 3 Pro Preview (vision/complex)
+- **AI**: Gemini 3 Flash Preview (chat, vision, insights)
 - **Hosting**: Cloud Run (backend) + Firebase Hosting (frontend) | **CI/CD**: Cloud Build
 
 ## Project Structure
