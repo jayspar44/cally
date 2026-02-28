@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
-import { Sparkles, Plus } from 'lucide-react';
+import { Sparkles, Plus, ChevronRight } from 'lucide-react';
 import { cn } from '../utils/cn';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
@@ -74,6 +74,28 @@ export default function Home() {
   };
 
   const pacingText = getPacingText(summary.totalCalories, goals.targetCalories);
+
+  // Adaptive macro logic
+  const getExpectedProgress = () => {
+    const hour = new Date().getHours();
+    const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
+    return (wakingHoursElapsed / 16) * 100;
+  };
+
+  const expectedProgress = getExpectedProgress();
+  const isOffTrack = (prog) => prog < expectedProgress * 0.6;
+
+  // Context-aware CTA
+  const getCtaLabel = (meals) => {
+    const hour = new Date().getHours();
+    const loggedMeals = new Set((meals || []).map(m => m.meal));
+
+    if (hour >= 6 && hour < 11 && !loggedMeals.has('breakfast')) return 'Log breakfast';
+    if (hour >= 11 && hour < 15 && !loggedMeals.has('lunch')) return 'Log lunch';
+    if (hour >= 15 && hour < 17 && !loggedMeals.has('snack') && loggedMeals.has('lunch')) return 'Add a snack';
+    if (hour >= 17 && hour < 22 && !loggedMeals.has('dinner')) return 'Log dinner';
+    return 'Log something';
+  };
 
   return (
     <div className="space-y-6 pb-8">
@@ -176,6 +198,7 @@ export default function Home() {
             target={goals.targetProtein}
             progress={progress.protein}
             color="protein"
+            compact={!isOffTrack(progress.protein)}
           />
           <MacroCard
             label="Carbs"
@@ -183,6 +206,7 @@ export default function Home() {
             target={goals.targetCarbs}
             progress={progress.carbs}
             color="carbs"
+            compact={!isOffTrack(progress.carbs)}
           />
           <MacroCard
             label="Fat"
@@ -190,12 +214,29 @@ export default function Home() {
             target={goals.targetFat}
             progress={progress.fat}
             color="fat"
+            compact={!isOffTrack(progress.fat)}
           />
         </div>
 
         {/* Decorative background element */}
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
       </section>
+
+      {/* Weekly Focus Tracker */}
+      {greeting?.activeFocus && (
+        <Link to="/chat" className="block card-base">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="type-label mb-1">This Week's Focus</p>
+              <p className="type-body font-medium">{greeting.activeFocus}</p>
+              {greeting.focusProgress && (
+                <p className="type-secondary mt-1">{greeting.focusProgress}</p>
+              )}
+            </div>
+            <ChevronRight className="w-5 h-5 text-primary/30" />
+          </div>
+        </Link>
+      )}
 
       {/* Meals Feed */}
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
@@ -218,7 +259,7 @@ export default function Home() {
         className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-accent text-white font-sans font-semibold text-sm shadow-sm hover:bg-accent/90 active:scale-[0.98] transition-all"
       >
         <Plus className="w-4.5 h-4.5" />
-        Log something
+        {getCtaLabel(dailySummary?.meals)}
       </button>
     </div>
   );
