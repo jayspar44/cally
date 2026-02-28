@@ -41,7 +41,7 @@ export default function Home() {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     api.getHomeGreeting(timezone)
       .then(data => setGreeting(data))
-      .catch(err => console.error('Greeting fetch failed:', err))
+      .catch(err => logger.error('Greeting fetch failed:', err))
       .finally(() => setGreetingLoading(false));
   }, []);
 
