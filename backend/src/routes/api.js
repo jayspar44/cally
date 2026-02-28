@@ -35,7 +35,7 @@ router.get('/user/recommended-targets', getRecommendedTargets);
 router.get('/user/badges', getBadges);
 
 // Home
-router.get('/home/greeting', homeController.getGreeting);
+router.get('/home/greeting', aiRateLimit, homeController.getGreeting);
 
 router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);

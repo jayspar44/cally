@@ -791,8 +791,9 @@ Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged
             greetingPrompt += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein`;
         }
 
-        if (weeklyFocus) {
-            greetingPrompt += `\nActive weekly focus: "${weeklyFocus.label || weeklyFocus}"`;
+        const focusLabel = weeklyFocus ? (weeklyFocus.label || (typeof weeklyFocus === 'string' ? weeklyFocus : null)) : null;
+        if (focusLabel) {
+            greetingPrompt += `\nActive weekly focus: "${focusLabel}"`;
         }
 
         greetingPrompt += `\n\nRespond with ONLY the greeting text. No quotes, no labels, no preamble.`;
@@ -808,14 +809,12 @@ Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged
 
         // 9. If weeklyFocus exists, evaluate progress with a second lightweight call
         let focusProgress = null;
-        let activeFocus = null;
+        const activeFocus = focusLabel;
 
-        if (weeklyFocus) {
-            activeFocus = weeklyFocus.label || (typeof weeklyFocus === 'string' ? weeklyFocus : null);
-
+        if (focusLabel) {
             const focusPrompt = `You are Kalli, a nutrition coach. Given the user's weekly focus and today's data, write ONE short sentence (max 12 words) evaluating their progress on this focus. Be specific and encouraging if warranted, honest if not.
 
-Weekly focus: "${activeFocus}"
+Weekly focus: "${focusLabel}"
 Today's progress: ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat (${todaySummary.count} items)
 Goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein
 ${recentAvg ? `Recent ${recentAvg.days}-day avg: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein` : ''}
