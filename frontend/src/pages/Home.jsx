@@ -241,7 +241,7 @@ export default function Home() {
       {/* Meals Feed */}
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
         <section className="space-y-4">
-          <h3 className="type-section-header px-4">Today's Meals</h3>
+          <h3 className="type-label px-4">Today's Meals</h3>
           <div className="bg-surface rounded-[2rem] shadow-card overflow-hidden divide-y divide-border">
             {dailySummary.meals.map((meal, index) => (
               <MealItem key={index} meal={meal} />
