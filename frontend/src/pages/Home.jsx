@@ -35,7 +35,7 @@ export default function Home() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
         <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-        <div className="font-serif text-primary/60 animate-pulse">Loading Kalli...</div>
+        <div className="type-secondary animate-pulse">Loading Kalli...</div>
       </div>
     );
   }
@@ -50,13 +50,13 @@ export default function Home() {
 
       {/* Onboarding Card */}
       {needsOnboarding && (
-        <section className="bg-surface rounded-[2rem] p-6 shadow-card relative overflow-hidden">
+        <section className="card-base relative overflow-hidden">
           <div className="flex flex-col items-center text-center">
             <div className="w-14 h-14 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-4">
               <Sparkles className="w-7 h-7 text-accent" />
             </div>
-            <h2 className="font-serif font-black text-2xl text-primary mb-2">Get Personalized Coaching</h2>
-            <p className="font-sans text-primary/60 text-sm max-w-xs leading-snug mb-5">
+            <h2 className="type-page-title mb-2">Get Personalized Coaching</h2>
+            <p className="type-secondary max-w-xs leading-snug mb-5">
               Share a few details and Kalli will calculate your ideal calorie and macro targets using science-backed formulas.
             </p>
             <button
@@ -71,18 +71,18 @@ export default function Home() {
       )}
 
       {/* Daily Summary Card */}
-      <section className="bg-surface rounded-[2rem] p-6 shadow-card relative overflow-hidden">
+      <section className="card-base relative overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-end mb-6">
           <div>
-            <h2 className="font-serif font-black text-2xl text-primary mb-1">Today's Fuel</h2>
-            <p className="font-sans text-primary/70 text-sm">Summary of your nutrition.</p>
+            <h2 className="type-page-title mb-1">Today's Fuel</h2>
+            <p className="type-secondary">Summary of your nutrition.</p>
           </div>
           <div className="text-right">
-            <span className="font-mono font-bold text-3xl text-primary block leading-none">
+            <span className="type-value text-3xl block leading-none">
               {Math.round(summary.totalCalories)}
             </span>
-            <span className="font-sans text-xs text-primary/55 uppercase tracking-widest font-semibold">
+            <span className="type-label tracking-widest">
               Calories
             </span>
           </div>
@@ -118,7 +118,7 @@ export default function Home() {
           </div>
           <div className="mt-2 text-right">
             <span className={cn(
-              "font-sans text-sm font-medium",
+              "type-secondary",
               remainingCalories >= 0 ? "text-primary" : "text-primary font-bold"
             )}>
               {remainingCalories > 0 ? `${remainingCalories} left` : remainingCalories === 0 ? 'Goal reached' : `${Math.abs(remainingCalories)} over`}
@@ -158,7 +158,7 @@ export default function Home() {
       {/* Meals Feed */}
       {dailySummary?.meals && dailySummary.meals.length > 0 && (
         <section className="space-y-4">
-          <h3 className="font-serif font-bold text-xl text-primary px-4">Today's Meals</h3>
+          <h3 className="type-section-header px-4">Today's Meals</h3>
           <div className="bg-surface rounded-[2rem] shadow-card overflow-hidden divide-y divide-border">
             {dailySummary.meals.map((meal, index) => (
               <MealItem key={index} meal={meal} />

@@ -91,7 +91,7 @@ export default function MacroCard({ label, current, progress, color }) {
 
                 {/* Centered Percentage */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`font-mono font-bold text-sm ${theme.text}`}>
+                    <span className={`type-value text-sm ${theme.text}`}>
                         {Math.round(rawProgress)}%
                     </span>
                 </div>
@@ -99,10 +99,10 @@ export default function MacroCard({ label, current, progress, color }) {
 
             {/* Label & Value */}
             <div className="text-center">
-                <div className={`font-mono font-bold text-lg leading-none mb-1 ${theme.text}`}>
+                <div className={`type-value text-lg leading-none mb-1 ${theme.text}`}>
                     {Math.round(current)}g
                 </div>
-                <div className="font-sans font-medium text-primary/70 text-xs tracking-wide uppercase">
+                <div className="type-label">
                     {label}
                 </div>
             </div>

@@ -22,15 +22,15 @@ export default function MealItem({ meal }) {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
-                        <span className="font-serif font-bold text-lg text-primary capitalize">
+                        <span className="type-section-header capitalize">
                             {meal.meal}
                         </span>
-                        <span className="font-mono font-bold text-primary">
+                        <span className="type-value">
                             {Math.round(meal.totalCalories)}
                         </span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <p className="font-sans text-sm text-primary/70 truncate pr-4">
+                        <p className="type-secondary truncate pr-4">
                             {meal.description || 'No description'}
                         </p>
                         <ChevronDown className={cn(
@@ -54,7 +54,7 @@ export default function MealItem({ meal }) {
                                 <span className="font-mono text-primary/80 block">
                                     {item.name}
                                 </span>
-                                <span className="font-sans text-xs text-primary/65">
+                                <span className="type-caption">
                                     {item.quantity} {item.unit}
                                 </span>
                             </div>
