@@ -48,7 +48,7 @@ function SecondaryStreaks({ calorieStreak, macroStreak }) {
     );
 }
 
-export default function StreakBanner({ stats, loading }) {
+export default function StreakBanner({ stats, loading, nextBadge }) {
     if (loading) {
         return (
             <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm animate-pulse">
@@ -93,6 +93,11 @@ export default function StreakBanner({ stats, loading }) {
                         <p className="type-secondary mt-0.5">Keep it going!</p>
                     </div>
                 </div>
+                {nextBadge && (
+                    <p className="type-caption mt-2">
+                        {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
+                    </p>
+                )}
                 <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />
             </div>
         );
@@ -113,6 +118,11 @@ export default function StreakBanner({ stats, loading }) {
                     <p className="type-secondary mt-0.5">Log daily to build a new one</p>
                 </div>
             </div>
+            {nextBadge && (
+                <p className="type-caption mt-2">
+                    {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
+                </p>
+            )}
             <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />
         </div>
     );
