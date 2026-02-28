@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
@@ -15,6 +15,9 @@ export default function Home() {
   const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
   const [dailySummary, setDailySummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [greeting, setGreeting] = useState(null);
+  const [greetingLoading, setGreetingLoading] = useState(true);
+  const greetingFetched = useRef(false);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -31,6 +34,17 @@ export default function Home() {
     fetchSummary();
   }, []);
 
+  useEffect(() => {
+    if (greetingFetched.current) return;
+    greetingFetched.current = true;
+
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    api.getHomeGreeting(timezone)
+      .then(data => setGreeting(data))
+      .catch(err => console.error('Greeting fetch failed:', err))
+      .finally(() => setGreetingLoading(false));
+  }, []);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
@@ -44,6 +58,22 @@ export default function Home() {
   const goals = dailySummary?.goals || { targetCalories: 2000, targetProtein: 50, targetCarbs: 250, targetFat: 65 };
   const progress = dailySummary?.progress || { calories: 0, protein: 0, carbs: 0, fat: 0 };
   const remainingCalories = Math.round(goals.targetCalories - summary.totalCalories);
+
+  const getPacingText = (currentCalories, targetCalories) => {
+    const now = new Date();
+    const hour = now.getHours();
+    // Assume 7am-11pm waking window (16 hours)
+    const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
+    const expectedByNow = Math.round((wakingHoursElapsed / 16) * targetCalories);
+
+    if (currentCalories === 0) return null;
+    const diff = currentCalories - expectedByNow;
+    if (Math.abs(diff) < 100) return 'Right on pace for this time of day';
+    if (diff > 0) return `~${Math.abs(diff)} cal ahead of typical pace`;
+    return `~${Math.abs(diff)} cal behind typical pace`;
+  };
+
+  const pacingText = getPacingText(summary.totalCalories, goals.targetCalories);
 
   return (
     <div className="space-y-6 pb-8">
@@ -69,6 +99,15 @@ export default function Home() {
           <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
         </section>
       )}
+
+      {/* AI Greeting */}
+      {greetingLoading ? (
+        <div className="h-5 w-3/4 bg-primary/10 rounded-md animate-pulse" />
+      ) : greeting?.greeting ? (
+        <p className="type-body text-primary/80 leading-relaxed">
+          {greeting.greeting}
+        </p>
+      ) : null}
 
       {/* Daily Summary Card */}
       <section className="card-base relative overflow-hidden">
@@ -124,6 +163,9 @@ export default function Home() {
               {remainingCalories > 0 ? `${remainingCalories} left` : remainingCalories === 0 ? 'Goal reached' : `${Math.abs(remainingCalories)} over`}
             </span>
           </div>
+          {pacingText && (
+            <p className="type-caption mt-1">{pacingText}</p>
+          )}
         </div>
 
         {/* Macros */}
