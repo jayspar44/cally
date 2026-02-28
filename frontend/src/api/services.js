@@ -136,4 +136,6 @@ export const api = {
         const response = await client.get('/user/recommended-targets');
         return response.data;
     },
+
+    getHomeGreeting: (timezone) => client.get(`/home/greeting?timezone=${encodeURIComponent(timezone)}`).then(res => res.data),
 };
