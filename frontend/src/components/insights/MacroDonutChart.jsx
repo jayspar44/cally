@@ -93,7 +93,7 @@ export default function MacroDonutChart({ averages, goals }) {
                 {macros.map(macro => (
                     <div key={macro.key}>
                         <div className="flex items-baseline justify-between mb-1.5">
-                            <span className="type-secondary text-primary">{macro.label}</span>
+                            <span className="font-sans text-sm font-medium text-primary">{macro.label}</span>
                             <div className="flex items-baseline gap-1.5">
                                 <span className={cn(
                                     "font-mono text-sm font-bold",

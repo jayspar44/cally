@@ -121,7 +121,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block type-label mb-1">Protein</label>
+                            <label className="block type-label text-protein mb-1">Protein</label>
                             <input
                                 type="number"
                                 name="protein"
@@ -131,7 +131,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block type-label mb-1">Carbs</label>
+                            <label className="block type-label text-carbs mb-1">Carbs</label>
                             <input
                                 type="number"
                                 name="carbs"
@@ -141,7 +141,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block type-label mb-1">Fat</label>
+                            <label className="block type-label text-fat mb-1">Fat</label>
                             <input
                                 type="number"
                                 name="fat"
