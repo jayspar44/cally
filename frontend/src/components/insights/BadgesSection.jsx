@@ -117,7 +117,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                     </div>
 
                     {/* Name */}
-                    <h3 className="font-serif font-bold text-lg text-primary">{badge.name}</h3>
+                    <h3 className="type-section-header">{badge.name}</h3>
 
                     {/* Tier badge */}
                     {badge.tier && (
@@ -130,7 +130,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                     )}
 
                     {/* Description */}
-                    <p className="font-sans text-sm text-primary/70 leading-relaxed">
+                    <p className="type-secondary leading-relaxed">
                         {badge.description}
                     </p>
 
@@ -181,7 +181,7 @@ export default function BadgesSection({ badgeData, loading }) {
     if (!hasBadges) {
         return (
             <div className="text-center py-8 bg-primary/[0.03] dark:bg-white/[0.03] rounded-2xl border border-dashed border-primary/15">
-                <p className="font-sans text-sm text-primary/50">Start logging to earn badges</p>
+                <p className="type-secondary">Start logging to earn badges</p>
             </div>
         );
     }

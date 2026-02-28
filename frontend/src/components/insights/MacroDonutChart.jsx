@@ -72,8 +72,8 @@ export default function MacroDonutChart({ averages, goals }) {
     if (!hasData) {
         return (
             <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
-                <h3 className="font-serif font-bold text-lg text-primary mb-4">Macros</h3>
-                <div className="flex items-center justify-center h-[120px] text-primary/30 font-sans text-sm">
+                <h3 className="type-section-header mb-4">Macros</h3>
+                <div className="flex items-center justify-center h-[120px] type-secondary">
                     No macro data yet
                 </div>
             </section>
@@ -83,7 +83,7 @@ export default function MacroDonutChart({ averages, goals }) {
     return (
         <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
             <div className="flex items-center gap-2.5 mb-4">
-                <h3 className="font-serif font-bold text-lg text-primary">Macros</h3>
+                <h3 className="type-section-header">Macros</h3>
                 <span className={cn("font-mono text-sm font-bold px-2.5 py-0.5 rounded-full", score.className)}>
                     {score.label}
                 </span>
@@ -93,7 +93,7 @@ export default function MacroDonutChart({ averages, goals }) {
                 {macros.map(macro => (
                     <div key={macro.key}>
                         <div className="flex items-baseline justify-between mb-1.5">
-                            <span className="font-sans text-sm font-medium text-primary">{macro.label}</span>
+                            <span className="type-secondary text-primary">{macro.label}</span>
                             <div className="flex items-baseline gap-1.5">
                                 <span className={cn(
                                     "font-mono text-sm font-bold",

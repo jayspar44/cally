@@ -6,7 +6,7 @@ function SecondaryStreaks({ calorieStreak, macroStreak }) {
     if (bothZero) {
         return (
             <div className="mt-3 pt-3 border-t border-dashed border-primary/10">
-                <p className="font-sans text-sm text-primary/60 text-center">
+                <p className="type-secondary text-center">
                     <Target className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
                     Hit your calorie or macro target to start a streak
                 </p>
@@ -69,8 +69,8 @@ export default function StreakBanner({ stats, loading }) {
                         <Target className="w-6 h-6 text-primary/50" />
                     </div>
                     <div>
-                        <h4 className="font-serif font-bold text-base text-primary">Start Your Journey</h4>
-                        <p className="font-sans text-sm text-primary/60">Log your first meal to begin tracking</p>
+                        <h4 className="type-section-header">Start Your Journey</h4>
+                        <p className="type-secondary">Log your first meal to begin tracking</p>
                     </div>
                 </div>
             </div>
@@ -87,10 +87,10 @@ export default function StreakBanner({ stats, loading }) {
                     </div>
                     <div>
                         <div className="flex items-baseline gap-1.5">
-                            <span className="font-mono font-bold text-3xl text-primary leading-none">{currentStreak}</span>
-                            <span className="font-sans text-sm font-medium text-primary/80">Day Streak</span>
+                            <span className="type-value text-3xl leading-none">{currentStreak}</span>
+                            <span className="type-secondary">Day Streak</span>
                         </div>
-                        <p className="font-sans text-sm text-primary/60 mt-0.5">Keep it going!</p>
+                        <p className="type-secondary mt-0.5">Keep it going!</p>
                     </div>
                 </div>
                 <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />
@@ -107,10 +107,10 @@ export default function StreakBanner({ stats, loading }) {
                 </div>
                 <div>
                     <div className="flex items-baseline gap-1.5">
-                        <span className="font-mono font-bold text-3xl text-primary leading-none">{bestStreak}d</span>
-                        <span className="font-sans text-sm font-medium text-primary/80">Best Streak</span>
+                        <span className="type-value text-3xl leading-none">{bestStreak}d</span>
+                        <span className="type-secondary">Best Streak</span>
                     </div>
-                    <p className="font-sans text-sm text-primary/60 mt-0.5">Log daily to build a new one</p>
+                    <p className="type-secondary mt-0.5">Log daily to build a new one</p>
                 </div>
             </div>
             <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />

@@ -61,10 +61,10 @@ export default function KalliInsightCard({ timeRange = '1W', periodStart = null 
 
     if (loading) {
         return (
-            <section className="bg-accent/5 dark:bg-accent/10 rounded-[2rem] p-5 border border-accent/15">
+            <section className="card-accent">
                 <div className="flex items-center gap-3">
                     <Loader2 className="w-5 h-5 text-accent animate-spin" />
-                    <span className="text-sm text-primary/50 font-sans">Generating your {RANGE_LABELS[timeRange]} insight...</span>
+                    <span className="type-secondary">Generating your {RANGE_LABELS[timeRange]} insight...</span>
                 </div>
             </section>
         );
@@ -73,7 +73,7 @@ export default function KalliInsightCard({ timeRange = '1W', periodStart = null 
     if (error || !insight) return null;
 
     return (
-        <section className="bg-accent/5 dark:bg-accent/10 rounded-[2rem] p-5 border border-accent/15 relative">
+        <section className="card-accent relative">
             {/* Decorative sparkle */}
             <div className="absolute -top-8 -right-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -93,7 +93,7 @@ export default function KalliInsightCard({ timeRange = '1W', periodStart = null 
                             <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} />
                         </button>
                     </div>
-                    <div className="font-sans text-sm text-primary/75 leading-relaxed [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ul]:mb-1.5 [&_li]:mb-0.5 [&_strong]:text-primary [&_strong]:font-semibold [&_*]:text-inherit">
+                    <div className="type-secondary leading-relaxed [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ul]:mb-1.5 [&_li]:mb-0.5 [&_strong]:text-primary [&_strong]:font-semibold [&_*]:text-inherit">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {insight}
                         </ReactMarkdown>

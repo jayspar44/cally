@@ -105,7 +105,7 @@ export default function TrendsChart({
     return (
         <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif font-bold text-lg text-primary">Trends</h3>
+                <h3 className="type-section-header">Trends</h3>
             </div>
 
             {/* Period Navigation */}
@@ -145,8 +145,8 @@ export default function TrendsChart({
             {/* Avg Stat Line */}
             {averages && (
                 <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5 mb-3 px-0.5">
-                    <span className="font-mono text-sm text-primary/50 uppercase">Avg {RANGE_LABELS[timeRange]}</span>
-                    <span className="font-mono font-bold text-lg text-primary">
+                    <span className="type-label">Avg {RANGE_LABELS[timeRange]}</span>
+                    <span className="type-value text-lg">
                         {Math.round(averages[selectedMetric] || 0).toLocaleString()}{config.unit}
                     </span>
                     {targetValue > 0 && (
@@ -260,7 +260,7 @@ export default function TrendsChart({
                         )}
                     </ResponsiveContainer>
                 ) : (
-                    <div className="flex items-center justify-center h-full text-primary/30 font-sans text-sm">
+                    <div className="flex items-center justify-center h-full type-secondary">
                         Not enough data yet
                     </div>
                 )}
