@@ -23,9 +23,10 @@ const CustomTooltip = ({ active, payload, metric }) => {
     const config = METRIC_CONFIG[metric];
     const value = Math.round(data.displayValue || 0);
     return (
-        <div className="bg-primary text-white text-sm px-2.5 py-1.5 rounded-lg font-mono shadow-lg">
-            <span className="font-bold">{value}</span> {config.unit}
-            {data.label && <div className="opacity-70">{data.label}</div>}
+        <div className="bg-primary/95 backdrop-blur-sm text-white px-3 py-2 rounded-xl shadow-lg border border-white/10">
+            <span className="type-value text-sm text-white">{value}</span>
+            <span className="type-caption text-white/70 ml-1">{config.unit}</span>
+            {data.label && <div className="type-caption text-white/60 mt-0.5">{data.label}</div>}
         </div>
     );
 };
@@ -198,10 +199,11 @@ export default function TrendsChart({
                             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                                 <defs>
                                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={config.color} stopOpacity={0.15} />
-                                        <stop offset="100%" stopColor={config.color} stopOpacity={0.02} />
+                                        <stop offset="0%" stopColor={config.color} stopOpacity={0.12} />
+                                        <stop offset="100%" stopColor={config.color} stopOpacity={0.01} />
                                     </linearGradient>
                                 </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-primary)" opacity={0.06} vertical={false} />
                                 <XAxis
                                     dataKey="dayLabel"
                                     tick={{ fontSize: 11, fill: 'var(--color-primary)', opacity: 0.6 }}
@@ -236,6 +238,7 @@ export default function TrendsChart({
                             </AreaChart>
                         ) : (
                             <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-primary)" opacity={0.06} vertical={false} />
                                 <XAxis
                                     dataKey="dayLabel"
                                     tick={{ fontSize: 11, fill: 'var(--color-primary)', opacity: 0.6 }}
