@@ -6,7 +6,7 @@ import { parseLocalDate, toDateStr } from '../utils/dateUtils';
 import { BarChart3, Plus } from 'lucide-react';
 import KalliInsightCard from '../components/insights/KalliInsightCard';
 import TrendsChart from '../components/insights/TrendsChart';
-import MacroDonutChart from '../components/insights/MacroDonutChart';
+import MacroTrends from '../components/insights/MacroTrends';
 import StreakBanner from '../components/insights/StreakBanner';
 import BadgesSection from '../components/insights/BadgesSection';
 
@@ -297,7 +297,7 @@ export default function Insights() {
             <KalliInsightCard timeRange={timeRange} periodStart={periodStart} />
 
             {/* Macro Breakdown */}
-            <MacroDonutChart
+            <MacroTrends
                 averages={averages}
                 goals={goals}
                 prevAverages={prevAverages}

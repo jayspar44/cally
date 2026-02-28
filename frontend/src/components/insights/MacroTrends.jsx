@@ -8,20 +8,34 @@ const MACRO_CONFIG = [
     { key: 'fat', label: 'Fat', goalKey: 'targetFat', color: 'var(--color-fat)', bgClass: 'bg-[var(--color-fat)]' }
 ];
 
-export default function MacroDonutChart({ averages, goals }) {
+const TREND_ARROWS = { up: '\u2191', down: '\u2193', stable: '\u2192' };
+
+export default function MacroTrends({ averages, goals, prevAverages }) {
     const macros = useMemo(() => {
         if (!averages) return [];
         return MACRO_CONFIG.map(m => {
-            const value = Math.round(averages[m.key] || 0);
+            const avg = Math.round(averages[m.key] || 0);
             const target = goals?.[m.goalKey] || 0;
-            const pct = target > 0 ? Math.min(150, Math.round((value / target) * 100)) : 0;
-            const diffPct = target > 0 ? Math.round(((value - target) / target) * 100) : 0;
+            const prevAvg = prevAverages?.[m.key] || 0;
+            const diffPct = target > 0 ? Math.round(((avg - target) / target) * 100) : 0;
             const onTarget = target > 0 && Math.abs(diffPct) <= 10;
-            const isOver = diffPct > 10;
-            const isUnder = diffPct < -10;
-            return { ...m, value, target, pct, diffPct, onTarget, isOver, isUnder };
+
+            // Compare to previous period if available, otherwise compare to goal
+            let delta, trend;
+            if (prevAvg > 0) {
+                delta = avg - Math.round(prevAvg);
+                trend = delta > 2 ? 'up' : delta < -2 ? 'down' : 'stable';
+            } else if (target > 0) {
+                delta = avg - target;
+                trend = delta > 2 ? 'up' : delta < -2 ? 'down' : 'stable';
+            } else {
+                delta = 0;
+                trend = 'stable';
+            }
+
+            return { ...m, avg, target, delta, trend, onTarget, diffPct };
         });
-    }, [averages, goals]);
+    }, [averages, goals, prevAverages]);
 
     const score = useMemo(() => {
         const onTargetCount = macros.filter(m => m.onTarget).length;
@@ -50,7 +64,7 @@ export default function MacroDonutChart({ averages, goals }) {
             return `Macros are well balanced \u2014 protein, carbs, and fat are all close to target.`;
         }
 
-        if (worstMacro.isOver) {
+        if (worstMacro.diffPct > 10) {
             const tips = {
                 fat: 'lighter cooking methods or smaller cheese portions would help',
                 carbs: 'swapping refined carbs for veggies or protein would help',
@@ -67,7 +81,7 @@ export default function MacroDonutChart({ averages, goals }) {
         return `${worstMacro.label} is averaging ${worstAbsDiff}% below target \u2014 ${tips[worstMacro.key] || 'adjusting portions would help'}.`;
     }, [averages, goals, macros]);
 
-    const hasData = macros.some(m => m.value > 0);
+    const hasData = macros.some(m => m.avg > 0);
 
     if (!hasData) {
         return (
@@ -89,62 +103,58 @@ export default function MacroDonutChart({ averages, goals }) {
                 </span>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
                 {macros.map(macro => (
-                    <div key={macro.key}>
-                        <div className="flex items-baseline justify-between mb-1.5">
-                            <span className="font-sans text-sm font-medium text-primary">{macro.label}</span>
-                            <div className="flex items-baseline gap-1.5">
+                    <div key={macro.key} className="flex items-center gap-3">
+                        {/* Color dot */}
+                        <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: macro.color }}
+                        />
+
+                        {/* Macro name */}
+                        <span className="font-sans text-sm font-medium text-primary w-16">
+                            {macro.label}
+                        </span>
+
+                        {/* Current average */}
+                        <span className="type-value text-sm flex-1">
+                            {macro.avg}g
+                        </span>
+
+                        {/* Target (if set) */}
+                        {macro.target > 0 && (
+                            <span className="font-mono text-sm text-primary/40">
+                                / {macro.target}g
+                            </span>
+                        )}
+
+                        {/* Trend arrow + delta */}
+                        {macro.delta !== 0 && (
+                            <div className="flex items-center gap-1 min-w-[60px] justify-end">
                                 <span className={cn(
                                     "font-mono text-sm font-bold",
-                                    macro.onTarget
-                                        ? "text-emerald-600 dark:text-emerald-400"
-                                        : "text-amber-600 dark:text-amber-400"
+                                    macro.trend === 'up' ? "text-emerald-600 dark:text-emerald-400"
+                                        : macro.trend === 'down' ? "text-amber-600 dark:text-amber-400"
+                                            : "text-primary/40"
                                 )}>
-                                    {macro.value}g
+                                    {TREND_ARROWS[macro.trend]}
                                 </span>
-                                {macro.target > 0 && (
-                                    <span className="font-mono text-sm text-primary/40">/ {macro.target}g</span>
-                                )}
-                                {macro.target > 0 && (
-                                    <span className={cn(
-                                        "font-mono text-xs font-bold",
-                                        macro.onTarget
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : "text-amber-600 dark:text-amber-400"
-                                    )}>
-                                        {macro.onTarget
-                                            ? '\u2713'
-                                            : `${macro.diffPct > 0 ? '+' : ''}${macro.diffPct}%`
-                                        }
-                                    </span>
-                                )}
+                                <span className={cn(
+                                    "font-mono text-sm font-medium",
+                                    macro.trend === 'up' ? "text-emerald-600 dark:text-emerald-400"
+                                        : macro.trend === 'down' ? "text-amber-600 dark:text-amber-400"
+                                            : "text-primary/40"
+                                )}>
+                                    {macro.delta > 0 ? '+' : ''}{macro.delta}g
+                                </span>
                             </div>
-                        </div>
-                        {macro.target > 0 && (
-                            <div className="relative h-2.5 bg-primary/8 dark:bg-white/8 rounded-full overflow-hidden">
-                                {/* Base segment: up to 100% */}
-                                <div
-                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-                                    style={{
-                                        width: `${Math.min(100, macro.pct)}%`,
-                                        backgroundColor: macro.color
-                                    }}
-                                />
-                                {/* Overflow segment: past 100%, reduced opacity */}
-                                {macro.pct > 100 && (
-                                    <div
-                                        className="absolute inset-y-0 rounded-r-full transition-all duration-500"
-                                        style={{
-                                            left: '100%',
-                                            width: `${Math.min(30, macro.pct - 100)}%`,
-                                            backgroundColor: macro.color,
-                                            opacity: 0.5
-                                        }}
-                                    />
-                                )}
-                                {/* Target marker at 100% */}
-                                <div className="absolute top-0 bottom-0 w-0.5 bg-primary/25 dark:bg-white/25" style={{ left: '100%' }} />
+                        )}
+                        {macro.delta === 0 && (
+                            <div className="flex items-center gap-1 min-w-[60px] justify-end">
+                                <span className="font-mono text-sm text-primary/40">
+                                    {TREND_ARROWS.stable}
+                                </span>
                             </div>
                         )}
                     </div>

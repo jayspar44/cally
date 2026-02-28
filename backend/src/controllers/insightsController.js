@@ -597,8 +597,17 @@ const getAISummary = async (req, res) => {
             return `${dayName} ${date}: ${Math.round(byDate[date].calories)} cal — ${uniqueFoods}`;
         }).join('\n');
 
+        const FORMAT_RULES = `FORMAT: Exactly 2-3 bullet points, each starting with "- ".
+Each bullet MUST reference specific data (numbers, days, meals, trends).
+NEVER write generic encouragement like "Great job" or "Keep it up."
+BAD: "- You're doing well with your nutrition goals"
+GOOD: "- Your protein averages 82g on weekdays but drops to 55g on weekends — a 33% gap"
+GOOD: "- You've hit your calorie target 5 of the last 7 days, with the two misses on Wednesday and Saturday"`;
+
         const RANGE_PROMPTS = {
-            '1W': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight. Focus on ACUTE adjustments. Reference specific days by name (e.g. 'Tuesday's pizza') — NEVER say 'yesterday' or 'today' since the user may read this days later. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+            '1W': `You are Kalli, a friendly AI nutrition coach. Write personalized weekly patterns. Focus on ACUTE adjustments. Reference specific days by name (e.g. 'Tuesday's pizza') — NEVER say 'yesterday' or 'today' since the user may read this days later. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+
+${FORMAT_RULES}
 
 Today: ${todayStr}
 Period: ${startStr} to ${endStr} (this week)
@@ -613,13 +622,15 @@ Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 Daily breakdown:
 ${dailyBreakdown}
 
-Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`,
+Focus on one positive observation and one actionable suggestion.`,
 
             '1M': (() => {
                 const sortedDates = Object.keys(byDate).sort();
                 const firstLogDate = sortedDates[0] || startStr;
                 const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
-                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized monthly insight. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+                return `You are Kalli, a friendly AI nutrition coach. Write personalized monthly patterns. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+
+${FORMAT_RULES}
 
 Today: ${todayStr}
 Period: ${startStr} to ${endStr} (last 30 days)
@@ -633,14 +644,16 @@ Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Keep it to 2-3 sentences max. Focus on pattern-level observations.`;
+Focus on pattern-level observations.`;
             })(),
 
             '3M': (() => {
                 const sortedDates = Object.keys(byDate).sort();
                 const firstLogDate = sortedDates[0] || startStr;
                 const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
-                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized quarterly insight. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+                return `You are Kalli, a friendly AI nutrition coach. Write personalized quarterly patterns. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+
+${FORMAT_RULES}
 
 Today: ${todayStr}
 Period: ${startStr} to ${endStr} (last 3 months)
@@ -654,7 +667,7 @@ Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`;
+Focus on progress trajectory and long-term wins.`;
             })()
         };
 
