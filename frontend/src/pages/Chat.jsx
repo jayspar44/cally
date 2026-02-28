@@ -22,6 +22,7 @@ export default function Chat() {
     const [editingFoodLog, setEditingFoodLog] = useState(null);
     const [sendingWithImage, setSendingWithImage] = useState(false);
     const errorTimerRef = useRef(null);
+    const weeklyReviewCheckedRef = useRef(false);
 
     useEffect(() => {
         if (!initialized) loadHistory();
@@ -68,6 +69,28 @@ export default function Chat() {
             sendMessage("Hey Kalli, I'd like to get started!");
         }
     }, [needsOnboarding, initialized, messages.length, onboardingTriggered, sending, sendMessage]);
+
+    // Check for weekly review on mount
+    useEffect(() => {
+        if (!initialized || weeklyReviewCheckedRef.current) return;
+        weeklyReviewCheckedRef.current = true;
+
+        const checkReview = async () => {
+            try {
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                const { shouldTrigger } = await api.checkWeeklyReview(timezone);
+                if (shouldTrigger) {
+                    await api.triggerWeeklyReview(timezone);
+                    // Reload history to show the new review message
+                    loadHistory();
+                }
+            } catch (err) {
+                logger.warn('Weekly review check failed:', err);
+            }
+        };
+
+        checkReview();
+    }, [initialized, loadHistory]);
 
     // Detect profileUpdated and refresh context
     useEffect(() => {
