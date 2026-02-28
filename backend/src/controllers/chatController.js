@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { db } = require('../services/firebase');
 const { processMessage, processImageMessage } = require('../services/geminiService');
+const { shouldTriggerReview, generateWeeklyReview } = require('../services/weeklyReviewService');
 
 const SERVER_TIMEOUT_MS = 150000;
 
@@ -239,9 +240,49 @@ const deleteMessage = async (req, res) => {
     }
 };
 
+const checkWeeklyReview = async (req, res) => {
+    try {
+        const userId = req.user.uid;
+        const { timezone } = req.query;
+
+        req.log.info({ action: 'chat.checkWeeklyReview', timezone }, 'Checking weekly review trigger');
+
+        const shouldTrigger = await shouldTriggerReview(userId, timezone);
+
+        res.json({ shouldTrigger });
+    } catch (error) {
+        req.log.error({ err: error }, 'Failed to check weekly review');
+        res.status(500).json({ error: 'Failed to check weekly review' });
+    }
+};
+
+const triggerWeeklyReview = async (req, res) => {
+    try {
+        const userId = req.user.uid;
+        const { timezone } = req.body;
+
+        req.log.info({ action: 'chat.triggerWeeklyReview', timezone }, 'Triggering weekly review generation');
+
+        const result = await generateWeeklyReview(userId, timezone);
+
+        req.log.info({
+            action: 'chat.triggerWeeklyReview',
+            messageId: result.messageId,
+            hasFocus: !!result.focus,
+        }, 'Weekly review generated');
+
+        res.json(result);
+    } catch (error) {
+        req.log.error({ err: error }, 'Failed to generate weekly review');
+        res.status(500).json({ error: 'Failed to generate weekly review' });
+    }
+};
+
 module.exports = {
     sendMessage,
     getHistory,
     clearHistory,
-    deleteMessage
+    deleteMessage,
+    checkWeeklyReview,
+    triggerWeeklyReview
 };

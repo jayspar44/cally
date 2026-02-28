@@ -4,7 +4,7 @@ const router = express.Router();
 const pkg = require('../../package.json');
 const { verifyToken } = require('../controllers/authController');
 const { updateProfile, getProfile, getRecommendedTargets, getBadges } = require('../controllers/userController');
-const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
+const { sendMessage, getHistory, clearHistory, deleteMessage, checkWeeklyReview, triggerWeeklyReview } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
 const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
 const homeController = require('../controllers/homeController');
@@ -41,6 +41,8 @@ router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);
 router.delete('/chat/history', clearHistory);
 router.delete('/chat/message/:id', deleteMessage);
+router.get('/chat/weekly-review/check', checkWeeklyReview);
+router.post('/chat/weekly-review', aiRateLimit, triggerWeeklyReview);
 
 router.get('/food/logs', getLogs);
 router.get('/food/logs/:id', getLog);
