@@ -83,7 +83,7 @@ export default function KalliInsightCard({ timeRange = '1W', periodStart = null 
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1.5">
-                        <h3 className="font-serif font-bold text-sm text-primary">Kalli's Insight</h3>
+                        <h3 className="type-section-header">Kalli's Insight</h3>
                         <button
                             onClick={() => fetchInsight(true)}
                             disabled={refreshing}

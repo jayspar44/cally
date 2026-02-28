@@ -20,13 +20,13 @@ function SecondaryStreaks({ calorieStreak, macroStreak }) {
                 <Target className="w-4 h-4 text-primary/40" />
                 {calorieStreak > 0 ? (
                     <>
-                        <span className="font-mono text-sm font-bold text-primary">{calorieStreak}d</span>
-                        <span className="font-sans text-sm text-primary/50">Calories</span>
+                        <span className="type-value text-sm text-primary">{calorieStreak}d</span>
+                        <span className="type-caption">Calories</span>
                     </>
                 ) : (
                     <>
-                        <span className="font-mono text-sm font-bold text-primary/30">--</span>
-                        <span className="font-sans text-sm text-primary/30">Calories</span>
+                        <span className="type-value text-sm text-primary/30">--</span>
+                        <span className="type-caption text-primary/30">Calories</span>
                     </>
                 )}
             </div>
@@ -34,13 +34,13 @@ function SecondaryStreaks({ calorieStreak, macroStreak }) {
                 <Scale className="w-4 h-4 text-primary/40" />
                 {macroStreak > 0 ? (
                     <>
-                        <span className="font-mono text-sm font-bold text-primary">{macroStreak}d</span>
-                        <span className="font-sans text-sm text-primary/50">Macros</span>
+                        <span className="type-value text-sm text-primary">{macroStreak}d</span>
+                        <span className="type-caption">Macros</span>
                     </>
                 ) : (
                     <>
-                        <span className="font-mono text-sm font-bold text-primary/30">--</span>
-                        <span className="font-sans text-sm text-primary/30">Macros</span>
+                        <span className="type-value text-sm text-primary/30">--</span>
+                        <span className="type-caption text-primary/30">Macros</span>
                     </>
                 )}
             </div>

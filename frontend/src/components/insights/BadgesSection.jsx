@@ -45,7 +45,7 @@ function BadgeCard({ badge, earned, onClick }) {
 
             {/* Name */}
             <span className={cn(
-                "font-sans text-sm font-medium leading-tight",
+                "type-secondary leading-tight",
                 earned ? "text-primary" : "text-primary/50"
             )}>
                 {badge.name}
@@ -53,7 +53,7 @@ function BadgeCard({ badge, earned, onClick }) {
 
             {/* Status — pinned to bottom */}
             {earned && dateStr && (
-                <span className="font-mono text-sm text-primary/45 mt-auto">{dateStr}</span>
+                <span className="type-caption text-primary/45 mt-auto">{dateStr}</span>
             )}
             {!earned && badge.percentage != null && (
                 <div className="w-full mt-auto">
@@ -63,7 +63,7 @@ function BadgeCard({ badge, earned, onClick }) {
                             style={{ width: `${badge.percentage}%` }}
                         />
                     </div>
-                    <span className="font-mono text-sm text-primary/45 mt-0.5 block">
+                    <span className="type-value text-sm text-primary/45 mt-0.5 block">
                         {badge.current}/{badge.target}
                     </span>
                 </div>
@@ -140,7 +140,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            <span className="font-mono text-sm font-medium">Unlocked {dateStr}</span>
+                            <span className="type-caption">Unlocked {dateStr}</span>
                         </div>
                     ) : badge.percentage != null ? (
                         <div className="w-full mt-1">
@@ -150,7 +150,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                                     style={{ width: `${badge.percentage}%` }}
                                 />
                             </div>
-                            <span className="font-mono text-sm text-primary/50 mt-1.5 block">
+                            <span className="type-value text-sm text-primary/50 mt-1.5 block">
                                 {badge.current} / {badge.target} ({badge.percentage}%)
                             </span>
                         </div>
