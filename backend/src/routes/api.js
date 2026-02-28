@@ -7,6 +7,7 @@ const { updateProfile, getProfile, getRecommendedTargets, getBadges } = require(
 const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
 const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
+const homeController = require('../controllers/homeController');
 
 const aiRateLimit = rateLimit({
     windowMs: 60 * 1000,
@@ -32,6 +33,9 @@ router.post('/user/profile', updateProfile);
 router.get('/user/profile', getProfile);
 router.get('/user/recommended-targets', getRecommendedTargets);
 router.get('/user/badges', getBadges);
+
+// Home
+router.get('/home/greeting', homeController.getGreeting);
 
 router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);

@@ -715,7 +715,132 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
     return { context, needsOnboarding };
 };
 
+const generateHomeGreeting = async (userId, timezone) => {
+    const logger = getLogger();
+    const tz = timezone || 'America/New_York';
+    const today = getTodayStr(tz);
+
+    try {
+        // 1. Get user doc for settings, weeklyFocus, and firstName
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const firstName = userData.firstName || '';
+        const weeklyFocus = userData.weeklyFocus || null;
+
+        // 2. Get goals, today's logs, and recent averages in parallel
+        const [goals, todayLogs, recentAvg] = await Promise.all([
+            getGoalsForDate(userId, today),
+            getDayLogs(userId, today),
+            getRecentDayLogs(userId, tz, 5),
+        ]);
+
+        // 3. Compute summaries
+        const todaySummary = sumLogs(todayLogs);
+        const todayFormatted = formatLogsByMeal(todayLogs, 'Logged today');
+
+        // 4. Determine time of day
+        const now = new Date();
+        const timeStr = now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+        const hour = parseInt(now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false }), 10);
+        let timeOfDay;
+        if (hour < 12) timeOfDay = 'morning';
+        else if (hour < 17) timeOfDay = 'afternoon';
+        else if (hour < 21) timeOfDay = 'evening';
+        else timeOfDay = 'late night';
+
+        // 5. Determine which meals are logged
+        const loggedMeals = new Set(todayLogs.map(l => l.meal));
+        const allMeals = ['breakfast', 'lunch', 'dinner'];
+        const missingMeals = allMeals.filter(m => !loggedMeals.has(m));
+
+        // 6. Compute remaining macros
+        const remaining = {
+            calories: goals.targetCalories - todaySummary.calories,
+            protein: goals.targetProtein - todaySummary.protein,
+            carbs: goals.targetCarbs - todaySummary.carbs,
+            fat: goals.targetFat - todaySummary.fat,
+        };
+
+        // 7. Build greeting prompt
+        let greetingPrompt = `You are Kalli, a warm and knowledgeable AI nutrition coach. Generate a personalized 1-2 sentence greeting for the user's home screen.
+
+RULES:
+- Be specific — reference actual data, not generic platitudes
+- If a macro (especially protein) is notably off-track, mention it briefly
+- If it's late and nothing is logged, gently nudge without being pushy
+- If on track, acknowledge briefly and suggest what to aim for next
+- No emojis. Maximum 1 exclamation mark. Warm but concise tone.
+- Vary your openings — don't always start with "Hey!" or the user's name. Mix it up: use observations, time references, or jump straight into the insight.
+- 1-2 sentences ONLY. Max ~40 words.
+- Do NOT use the user's name in every greeting — use it sparingly (maybe 1 in 4 times).
+
+CONTEXT:
+Time: ${timeStr} (${timeOfDay})
+${firstName ? `User's name: ${firstName}` : ''}
+Daily goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein, ${goals.targetCarbs}g carbs, ${goals.targetFat}g fat
+Today's progress (${todaySummary.count} items): ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat
+Remaining: ${remaining.calories} cal, ${remaining.protein}g protein, ${remaining.carbs}g carbs, ${remaining.fat}g fat
+Meals logged: ${loggedMeals.size > 0 ? [...loggedMeals].join(', ') : 'none yet'}
+Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged'}`;
+
+        if (todayFormatted) {
+            greetingPrompt += `\n${todayFormatted}`;
+        }
+
+        if (recentAvg) {
+            greetingPrompt += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein`;
+        }
+
+        if (weeklyFocus) {
+            greetingPrompt += `\nActive weekly focus: "${weeklyFocus.label || weeklyFocus}"`;
+        }
+
+        greetingPrompt += `\n\nRespond with ONLY the greeting text. No quotes, no labels, no preamble.`;
+
+        // 8. Call Gemini Flash for greeting
+        const greetingResult = await genAI.models.generateContent({
+            model: MODELS.flash,
+            contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
+            config: { temperature: 0.9, maxOutputTokens: 150 }
+        });
+
+        const greeting = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+
+        // 9. If weeklyFocus exists, evaluate progress with a second lightweight call
+        let focusProgress = null;
+        let activeFocus = null;
+
+        if (weeklyFocus) {
+            activeFocus = weeklyFocus.label || (typeof weeklyFocus === 'string' ? weeklyFocus : null);
+
+            const focusPrompt = `You are Kalli, a nutrition coach. Given the user's weekly focus and today's data, write ONE short sentence (max 12 words) evaluating their progress on this focus. Be specific and encouraging if warranted, honest if not.
+
+Weekly focus: "${activeFocus}"
+Today's progress: ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat (${todaySummary.count} items)
+Goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein
+${recentAvg ? `Recent ${recentAvg.days}-day avg: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein` : ''}
+Time of day: ${timeOfDay}
+
+Respond with ONLY the progress sentence. No quotes, no labels.`;
+
+            const focusResult = await genAI.models.generateContent({
+                model: MODELS.flash,
+                contents: [{ role: 'user', parts: [{ text: focusPrompt }] }],
+                config: { temperature: 0.9, maxOutputTokens: 50 }
+            });
+
+            focusProgress = focusResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || null;
+        }
+
+        return { greeting, focusProgress, activeFocus };
+    } catch (error) {
+        logger.error({ err: error, userId }, 'Failed to generate home greeting');
+        throw error;
+    }
+};
+
 module.exports = {
     processMessage,
-    processImageMessage
+    processImageMessage,
+    generateHomeGreeting
 };
