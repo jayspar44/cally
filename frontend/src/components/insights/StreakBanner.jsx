@@ -51,7 +51,7 @@ function SecondaryStreaks({ calorieStreak, macroStreak }) {
 export default function StreakBanner({ stats, loading }) {
     if (loading) {
         return (
-            <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-4 border border-border/40 shadow-sm animate-pulse">
+            <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm animate-pulse">
                 <div className="h-14 bg-primary/5 rounded-xl" />
             </div>
         );
@@ -63,7 +63,7 @@ export default function StreakBanner({ stats, loading }) {
     // State C: New User
     if (!hasLogs) {
         return (
-            <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-4 border border-border/40 shadow-sm">
+            <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-primary/8 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Target className="w-6 h-6 text-primary/50" />
@@ -80,7 +80,7 @@ export default function StreakBanner({ stats, loading }) {
     // State A: Active Streak (>= 3 days)
     if (currentStreak >= 3) {
         return (
-            <div className="bg-accent/10 dark:bg-accent/15 rounded-2xl p-4 border border-accent/15 shadow-sm">
+            <div className="bg-accent/10 dark:bg-accent/15 rounded-2xl p-5 border border-accent/15 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
                         <Flame className="w-6 h-6 text-accent" />
@@ -100,7 +100,7 @@ export default function StreakBanner({ stats, loading }) {
 
     // State B: No Active Streak (< 3 days, but has logged before)
     return (
-        <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-4 border border-border/40 shadow-sm">
+        <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm">
             <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-primary/8 rounded-xl flex items-center justify-center flex-shrink-0">
                     <BarChart3 className="w-6 h-6 text-primary/70" />

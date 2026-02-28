@@ -10,13 +10,13 @@ export default function MealSection({ meal, items, totalCalories, onEditItem }) 
                 )}
             </div>
             {items.length > 0 ? (
-                <div className="bg-surface rounded-xl border border-border/50 divide-y divide-border/30 overflow-hidden shadow-sm">
+                <div className="bg-surface rounded-2xl border border-border/50 divide-y divide-border/30 overflow-hidden shadow-sm">
                     {items.map(item => (
                         <FoodItemRow key={item.id} item={item} onEdit={() => onEditItem(item)} />
                     ))}
                 </div>
             ) : (
-                <div className="bg-surface/50 rounded-xl border border-dashed border-border/30 p-4 text-center">
+                <div className="bg-surface/50 rounded-2xl border border-dashed border-border/30 p-5 text-center">
                     <span className="type-secondary">No {meal} logged</span>
                 </div>
             )}
