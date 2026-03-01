@@ -17,8 +17,38 @@ export function invalidateGreetingCache() {
   greetingCache = { data: null, timestamp: 0 };
 }
 
-// Invalidate cache on food changes even when Home is unmounted
+// Invalidate cache on food changes even when Home is unmounted (registered once at module load)
 window.addEventListener('food-log-changed', invalidateGreetingCache);
+
+const getPacingText = (currentCalories, targetCalories) => {
+  const now = new Date();
+  const hour = now.getHours();
+  const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
+  const expectedByNow = Math.round((wakingHoursElapsed / 16) * targetCalories);
+
+  if (currentCalories === 0) return null;
+  const diff = currentCalories - expectedByNow;
+  if (Math.abs(diff) < 100) return 'Right on pace for this time of day';
+  if (diff > 0) return `~${Math.abs(diff)} cal ahead of typical pace`;
+  return `~${Math.abs(diff)} cal behind typical pace`;
+};
+
+const getExpectedProgress = () => {
+  const hour = new Date().getHours();
+  const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
+  return (wakingHoursElapsed / 16) * 100;
+};
+
+const getCtaLabel = (meals) => {
+  const hour = new Date().getHours();
+  const loggedMeals = new Set((meals || []).map(m => m.meal));
+
+  if (hour >= 6 && hour < 11 && !loggedMeals.has('breakfast')) return 'Log breakfast';
+  if (hour >= 11 && hour < 15 && !loggedMeals.has('lunch')) return 'Log lunch';
+  if (hour >= 15 && hour < 17 && !loggedMeals.has('snack') && loggedMeals.has('lunch')) return 'Add a snack';
+  if (hour >= 17 && hour < 22 && !loggedMeals.has('dinner')) return 'Log dinner';
+  return 'Log something';
+};
 
 export default function Home() {
   const navigate = useNavigate();
@@ -70,12 +100,9 @@ export default function Home() {
     fetchGreeting();
   }, [fetchGreeting]);
 
-  // Listen for food log changes to invalidate cache
+  // Refetch greeting when food changes (cache already invalidated by module-level listener)
   useEffect(() => {
-    const onFoodChange = () => {
-      invalidateGreetingCache();
-      fetchGreeting(true);
-    };
+    const onFoodChange = () => fetchGreeting(true);
     window.addEventListener('food-log-changed', onFoodChange);
     return () => window.removeEventListener('food-log-changed', onFoodChange);
   }, [fetchGreeting]);
@@ -94,43 +121,9 @@ export default function Home() {
   const progress = dailySummary?.progress || { calories: 0, protein: 0, carbs: 0, fat: 0 };
   const remainingCalories = Math.round(goals.targetCalories - summary.totalCalories);
 
-  const getPacingText = (currentCalories, targetCalories) => {
-    const now = new Date();
-    const hour = now.getHours();
-    // Assume 7am-11pm waking window (16 hours)
-    const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
-    const expectedByNow = Math.round((wakingHoursElapsed / 16) * targetCalories);
-
-    if (currentCalories === 0) return null;
-    const diff = currentCalories - expectedByNow;
-    if (Math.abs(diff) < 100) return 'Right on pace for this time of day';
-    if (diff > 0) return `~${Math.abs(diff)} cal ahead of typical pace`;
-    return `~${Math.abs(diff)} cal behind typical pace`;
-  };
-
   const pacingText = getPacingText(summary.totalCalories, goals.targetCalories);
-
-  // Adaptive macro logic
-  const getExpectedProgress = () => {
-    const hour = new Date().getHours();
-    const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
-    return (wakingHoursElapsed / 16) * 100;
-  };
-
   const expectedProgress = getExpectedProgress();
   const isOffTrack = (prog) => prog < expectedProgress * 0.6;
-
-  // Context-aware CTA
-  const getCtaLabel = (meals) => {
-    const hour = new Date().getHours();
-    const loggedMeals = new Set((meals || []).map(m => m.meal));
-
-    if (hour >= 6 && hour < 11 && !loggedMeals.has('breakfast')) return 'Log breakfast';
-    if (hour >= 11 && hour < 15 && !loggedMeals.has('lunch')) return 'Log lunch';
-    if (hour >= 15 && hour < 17 && !loggedMeals.has('snack') && loggedMeals.has('lunch')) return 'Add a snack';
-    if (hour >= 17 && hour < 22 && !loggedMeals.has('dinner')) return 'Log dinner';
-    return 'Log something';
-  };
 
   return (
     <div className="space-y-6 pb-8">

@@ -740,8 +740,8 @@ export default function Settings() {
                             <CalendarDays className="w-5 h-5" />
                         </div>
                         <div className="flex flex-col">
-                            <span className="font-sans text-sm font-medium text-primary">Weekly Review Day</span>
-                            <span className="font-mono text-xs text-primary/40">When Kalli sends your review</span>
+                            <span className="type-secondary font-medium">Weekly Review Day</span>
+                            <span className="type-caption">When Kalli sends your review</span>
                         </div>
                     </div>
                     <select
@@ -850,8 +850,8 @@ export default function Settings() {
                                         : <MessageSquare className="w-5 h-5" />}
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="font-sans text-sm font-medium">Trigger Weekly Review</span>
-                                    <span className="font-sans text-xs opacity-60">Force generate a review in Chat</span>
+                                    <span className="type-secondary font-medium">Trigger Weekly Review</span>
+                                    <span className="type-caption">Force generate a review in Chat</span>
                                 </div>
                             </div>
                             <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />

@@ -582,26 +582,37 @@ const getDayLogs = async (userId, dateStr) => {
 };
 
 const getRecentDayLogs = async (userId, timezone, days = 3) => {
-    const now = new Date();
-    const dates = [];
-    for (let i = 1; i <= days; i++) {
-        const d = new Date(now);
-        if (timezone) {
-            const todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone });
-            const base = parseLocalDate(todayStr);
-            base.setDate(base.getDate() - i);
-            dates.push(toDateStr(base));
-        } else {
-            d.setDate(d.getDate() - i);
-            dates.push(toDateStr(d));
-        }
+    const todayStr = timezone
+        ? new Date().toLocaleDateString('en-CA', { timeZone: timezone })
+        : toDateStr(new Date());
+    const base = parseLocalDate(todayStr);
+    const end = new Date(base);
+    end.setDate(end.getDate() - 1);
+    const start = new Date(base);
+    start.setDate(start.getDate() - days);
+    const startDate = toDateStr(start);
+    const endDate = toDateStr(end);
+
+    // Single range query instead of N individual queries
+    const snapshot = await db.collection('users').doc(userId)
+        .collection('foodLogs')
+        .where('date', '>=', startDate)
+        .where('date', '<=', endDate)
+        .limit(200)
+        .get();
+
+    if (snapshot.empty) return null;
+
+    // Group logs by date
+    const byDate = {};
+    for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const d = data.date;
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(data);
     }
 
-    const allLogs = await Promise.all(dates.map(date => getDayLogs(userId, date)));
-    const daysWithData = allLogs.filter(logs => logs.length > 0);
-
-    if (daysWithData.length === 0) return null;
-
+    const daysWithData = Object.values(byDate);
     const totals = daysWithData.map(sumLogs);
     const count = totals.length;
     return {
@@ -644,8 +655,9 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
 
     let goals, todayLogs, yesterdayLogs, recentAvg;
     try {
+        const userSettings = (userProfile || {}).settings || {};
         [goals, todayLogs, yesterdayLogs, recentAvg] = await Promise.all([
-            getGoalsForDate(userId, today),
+            getGoalsForDate(userId, today, userSettings),
             getDayLogs(userId, today),
             getDayLogs(userId, yesterday),
             getRecentDayLogs(userId, userTimezone, 3),
@@ -725,11 +737,12 @@ const generateHomeGreeting = async (userId, timezone) => {
         const userDoc = await db.collection('users').doc(userId).get();
         const userData = userDoc.exists ? userDoc.data() : {};
         const firstName = userData.firstName || '';
+        const userSettings = userData.settings || {};
         const weeklyFocus = userData.weeklyFocus || null;
 
         // 2. Get goals, today's logs, and recent averages in parallel
         const [goals, todayLogs, recentAvg] = await Promise.all([
-            getGoalsForDate(userId, today),
+            getGoalsForDate(userId, today, userSettings),
             getDayLogs(userId, today),
             getRecentDayLogs(userId, tz, 5),
         ]);

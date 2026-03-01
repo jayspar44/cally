@@ -1,9 +1,10 @@
 const { generateHomeGreeting } = require('../services/geminiService');
+const { safeTimezone } = require('../utils/dateUtils');
 
 const getGreeting = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const timezone = req.query.timezone || 'America/New_York';
+        const timezone = safeTimezone(req.query.timezone);
 
         req.log.info({ action: 'home.getGreeting', timezone }, 'Generating home greeting');
 

@@ -8,9 +8,9 @@ const admin = require('firebase-admin');
 /**
  * Check if today is the user's review day and they haven't had a review today.
  */
-const shouldTriggerReview = async (userId, timezone) => {
+const shouldTriggerReview = async (userId, timezone = 'America/New_York') => {
     const logger = getLogger();
-    const tz = timezone || 'America/New_York';
+    const tz = timezone;
 
     try {
         const userDoc = await db.collection('users').doc(userId).get();
@@ -46,6 +46,7 @@ const getLogsForRange = async (userId, startDate, endDate) => {
         .collection('foodLogs')
         .where('date', '>=', startDate)
         .where('date', '<=', endDate)
+        .limit(500)
         .get();
     return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
 };
@@ -64,15 +65,32 @@ const sumLogs = (logs) => logs.reduce((acc, log) => ({
 /**
  * Generate a weekly review and store it as a chat message.
  */
-const generateWeeklyReview = async (userId, timezone) => {
+const generateWeeklyReview = async (userId, timezone = 'America/New_York') => {
     const logger = getLogger();
-    const tz = timezone || 'America/New_York';
+    const tz = timezone;
     const today = getTodayStr(tz);
 
     try {
-        // 1. Get user data and goals
-        const userDoc = await db.collection('users').doc(userId).get();
-        const userData = userDoc.exists ? userDoc.data() : {};
+        // 1. Claim the review slot atomically to prevent duplicates
+        const userDocRef = db.collection('users').doc(userId);
+        let userData;
+        try {
+            await db.runTransaction(async (txn) => {
+                const snap = await txn.get(userDocRef);
+                userData = snap.exists ? snap.data() : {};
+                if (userData.lastWeeklyReview === today) {
+                    throw new Error('ALREADY_REVIEWED');
+                }
+                txn.update(userDocRef, { lastWeeklyReview: today });
+            });
+        } catch (txnErr) {
+            if (txnErr.message === 'ALREADY_REVIEWED') {
+                logger.info({ userId }, 'Weekly review already generated today, skipping');
+                return null;
+            }
+            throw txnErr;
+        }
+
         const firstName = userData.firstName || '';
         const settings = userData.settings || {};
 
@@ -219,18 +237,16 @@ RULES:
         };
         const msgDoc = await chatHistoryRef.add(reviewMessage);
 
-        // 10. Store the focus and update lastWeeklyReview
-        const userUpdate = {
-            lastWeeklyReview: today,
-        };
+        // 10. Store the focus (lastWeeklyReview already set in transaction above)
         if (focusText) {
-            userUpdate.weeklyFocus = {
-                label: focusText,
-                setAt: admin.firestore.FieldValue.serverTimestamp(),
-                reviewMessageId: msgDoc.id,
-            };
+            await db.collection('users').doc(userId).update({
+                weeklyFocus: {
+                    label: focusText,
+                    setAt: admin.firestore.FieldValue.serverTimestamp(),
+                    reviewMessageId: msgDoc.id,
+                },
+            });
         }
-        await db.collection('users').doc(userId).update(userUpdate);
 
         logger.info({
             userId,

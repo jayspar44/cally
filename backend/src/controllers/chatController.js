@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { db } = require('../services/firebase');
 const { processMessage, processImageMessage } = require('../services/geminiService');
 const { shouldTriggerReview, generateWeeklyReview } = require('../services/weeklyReviewService');
+const { safeTimezone } = require('../utils/dateUtils');
 
 const SERVER_TIMEOUT_MS = 150000;
 
@@ -243,7 +244,7 @@ const deleteMessage = async (req, res) => {
 const checkWeeklyReview = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { timezone } = req.query;
+        const timezone = safeTimezone(req.query.timezone);
 
         req.log.info({ action: 'chat.checkWeeklyReview', timezone }, 'Checking weekly review trigger');
 
@@ -259,11 +260,16 @@ const checkWeeklyReview = async (req, res) => {
 const triggerWeeklyReview = async (req, res) => {
     try {
         const userId = req.user.uid;
-        const { timezone } = req.body;
+        const timezone = safeTimezone(req.body.timezone);
 
         req.log.info({ action: 'chat.triggerWeeklyReview', timezone }, 'Triggering weekly review generation');
 
         const result = await generateWeeklyReview(userId, timezone);
+
+        if (!result) {
+            req.log.info({ action: 'chat.triggerWeeklyReview' }, 'Weekly review already generated today');
+            return res.json({ alreadyGenerated: true });
+        }
 
         req.log.info({
             action: 'chat.triggerWeeklyReview',
