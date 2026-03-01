@@ -195,6 +195,21 @@ export default function Settings() {
         }
     };
 
+    const [triggeringReview, setTriggeringReview] = useState(false);
+    const handleTriggerWeeklyReview = async () => {
+        if (!confirm('Trigger a weekly review now? This will generate a review message in Chat.')) return;
+        setTriggeringReview(true);
+        try {
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            await api.triggerWeeklyReview(timezone);
+            navigate('/chat');
+        } catch {
+            alert('Failed to trigger weekly review');
+        } finally {
+            setTriggeringReview(false);
+        }
+    };
+
     const handleResetTargets = async () => {
         if (!confirm('Reset nutrition targets to defaults (2000 cal, 50g protein, 250g carbs, 65g fat)?')) return;
         try {
@@ -816,6 +831,27 @@ export default function Settings() {
                                 <div className="flex flex-col items-start">
                                     <span className="font-sans text-sm font-medium">Reset Nutrition Targets</span>
                                     <span className="font-sans text-xs opacity-60">Revert to default 2000 cal / 50p / 250c / 65f</span>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+                        </button>
+
+                        <div className="h-px bg-border/50 my-2" />
+
+                        <button
+                            onClick={handleTriggerWeeklyReview}
+                            disabled={triggeringReview}
+                            className="w-full flex items-center justify-between py-2 group text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                                    {triggeringReview
+                                        ? <div className="w-5 h-5 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+                                        : <MessageSquare className="w-5 h-5" />}
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="font-sans text-sm font-medium">Trigger Weekly Review</span>
+                                    <span className="font-sans text-xs opacity-60">Force generate a review in Chat</span>
                                 </div>
                             </div>
                             <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />

@@ -23,10 +23,10 @@ const CustomTooltip = ({ active, payload, metric }) => {
     const config = METRIC_CONFIG[metric];
     const value = Math.round(data.displayValue || 0);
     return (
-        <div className="bg-primary/95 backdrop-blur-sm text-white px-3 py-2 rounded-xl shadow-lg border border-white/10">
-            <span className="type-value text-sm text-white">{value}</span>
-            <span className="type-caption text-white/70 ml-1">{config.unit}</span>
-            {data.label && <div className="type-caption text-white/60 mt-0.5">{data.label}</div>}
+        <div className="bg-[#1C1D1D] backdrop-blur-sm px-3 py-2 rounded-xl shadow-lg border border-white/10">
+            <span className="font-mono font-bold text-sm text-white">{value}</span>
+            <span className="font-sans text-xs font-medium text-white/70 ml-1">{config.unit}</span>
+            {data.label && <div className="font-sans text-xs font-medium text-white/60 mt-0.5">{data.label}</div>}
         </div>
     );
 };
@@ -58,7 +58,7 @@ export default function TrendsChart({
             return monthlyData.days.map(day => ({
                 ...day,
                 displayValue: day[selectedMetric] || 0,
-                dayLabel: day.date.slice(8),
+                dayLabel: day.date,
                 label: formatDateDisplay(day.date, { month: 'short', day: 'numeric' }),
                 isToday: isTodayUtil(day.date),
                 hasData: day.tracked,
@@ -245,6 +245,7 @@ export default function TrendsChart({
                                     tickLine={false}
                                     axisLine={false}
                                     interval={xAxisInterval}
+                                    tickFormatter={timeRange === '1M' ? v => v.slice(8) : undefined}
                                 />
                                 <YAxis
                                     domain={[0, maxValue]}

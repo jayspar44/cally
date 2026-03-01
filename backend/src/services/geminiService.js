@@ -321,7 +321,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             ? {
                 maxOutputTokens: 8192,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'LOW' },
+                thinkingConfig: { thinkingLevel: 'MEDIUM' },
                 cachedContent: cacheName
             }
             : {
@@ -329,7 +329,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 maxOutputTokens: 8192,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'LOW' }
+                thinkingConfig: { thinkingLevel: 'MEDIUM' }
             };
 
         const payload = {
@@ -457,7 +457,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
             ? {
                 maxOutputTokens: 4096,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'LOW' },
+                thinkingConfig: { thinkingLevel: 'MEDIUM' },
                 cachedContent: cacheName
             }
             : {
@@ -465,7 +465,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 maxOutputTokens: 4096,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'LOW' }
+                thinkingConfig: { thinkingLevel: 'MEDIUM' }
             };
 
         const payload = {
@@ -775,13 +775,15 @@ RULES:
 - Do NOT use the user's name in every greeting — use it sparingly (maybe 1 in 4 times).
 
 CONTEXT:
+Today: ${today} (${new Date().toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' })})
 Time: ${timeStr} (${timeOfDay})
 ${firstName ? `User's name: ${firstName}` : ''}
 Daily goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein, ${goals.targetCarbs}g carbs, ${goals.targetFat}g fat
 Today's progress (${todaySummary.count} items): ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat
 Remaining: ${remaining.calories} cal, ${remaining.protein}g protein, ${remaining.carbs}g carbs, ${remaining.fat}g fat
 Meals logged: ${loggedMeals.size > 0 ? [...loggedMeals].join(', ') : 'none yet'}
-Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged'}`;
+Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged'}
+IMPORTANT: Today's log is STILL IN PROGRESS — the user hasn't finished eating for the day. Do NOT compare today's partial totals to full-day targets or previous full days as if today is complete.`;
 
         if (todayFormatted) {
             greetingPrompt += `\n${todayFormatted}`;
@@ -802,7 +804,7 @@ Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged
         const greetingResult = await genAI.models.generateContent({
             model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
-            config: { temperature: 0.9, maxOutputTokens: 150 }
+            config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }
         });
 
         const greeting = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
@@ -825,7 +827,7 @@ Respond with ONLY the progress sentence. No quotes, no labels.`;
             const focusResult = await genAI.models.generateContent({
                 model: MODELS.flash,
                 contents: [{ role: 'user', parts: [{ text: focusPrompt }] }],
-                config: { temperature: 0.9, maxOutputTokens: 50 }
+                config: { temperature: 1.0, maxOutputTokens: 512, thinkingConfig: { thinkingLevel: 'LOW' } }
             });
 
             focusProgress = focusResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || null;

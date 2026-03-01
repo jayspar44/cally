@@ -201,12 +201,12 @@ export default function Insights() {
     const periodLabel = useMemo(() => formatPeriodLabel(activeData?.startDate, activeData?.endDate), [activeData]);
     const periodStart = useMemo(() => computePeriodStart(timeRange, periodOffset), [timeRange, periodOffset]);
 
-    // Compute next badge to earn (highest progress, not yet 100%)
+    // Compute next streak badge to earn (consistency category only)
     const nextBadge = useMemo(() => {
         if (!badgeData?.progress?.length) return null;
-        const inProgress = badgeData.progress.filter(b => b.percentage < 100);
-        if (!inProgress.length) return null;
-        return inProgress.sort((a, b) => b.percentage - a.percentage)[0];
+        const streakBadges = badgeData.progress.filter(b => b.percentage < 100 && b.category === 'consistency');
+        if (!streakBadges.length) return null;
+        return streakBadges.sort((a, b) => b.percentage - a.percentage)[0];
     }, [badgeData]);
 
     if (loadingData && !weeklyData) {
@@ -247,13 +247,6 @@ export default function Insights() {
 
     return (
         <div className="space-y-4 pb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Streak Banner (top of page) */}
-            <StreakBanner
-                stats={badgeData?.stats}
-                loading={loadingBadges}
-                nextBadge={nextBadge}
-            />
-
             {/* Time Range Selector (only show when multiple ranges available) */}
             {availableRanges.length > 1 && (
                 <div className="flex justify-center">
@@ -276,6 +269,9 @@ export default function Insights() {
                 </div>
             )}
 
+            {/* AI Insight (adapts to selected time range) */}
+            <KalliInsightCard timeRange={timeRange} periodStart={periodStart} />
+
             {/* Trends Chart with Metric Switcher */}
             <TrendsChart
                 timeRange={timeRange}
@@ -293,14 +289,18 @@ export default function Insights() {
                 periodLabel={periodLabel}
             />
 
-            {/* AI Insight (adapts to time range) */}
-            <KalliInsightCard timeRange={timeRange} periodStart={periodStart} />
-
-            {/* Macro Breakdown */}
+            {/* Macro Breakdown (progress bars) */}
             <MacroTrends
                 averages={averages}
                 goals={goals}
                 prevAverages={prevAverages}
+            />
+
+            {/* Streak Banner */}
+            <StreakBanner
+                stats={badgeData?.stats}
+                loading={loadingBadges}
+                nextBadge={nextBadge}
             />
 
             {/* Divider */}

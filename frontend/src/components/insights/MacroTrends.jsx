@@ -19,8 +19,8 @@ export default function MacroTrends({ averages, goals, prevAverages }) {
             const prevAvg = prevAverages?.[m.key] || 0;
             const diffPct = target > 0 ? Math.round(((avg - target) / target) * 100) : 0;
             const onTarget = target > 0 && Math.abs(diffPct) <= 10;
+            const progress = target > 0 ? (avg / target) * 100 : 0;
 
-            // Compare to previous period if available, otherwise compare to goal
             let delta, trend;
             if (prevAvg > 0) {
                 delta = avg - Math.round(prevAvg);
@@ -33,7 +33,7 @@ export default function MacroTrends({ averages, goals, prevAverages }) {
                 trend = 'stable';
             }
 
-            return { ...m, avg, target, delta, trend, onTarget, diffPct };
+            return { ...m, avg, target, delta, trend, onTarget, diffPct, progress };
         });
     }, [averages, goals, prevAverages]);
 
@@ -48,7 +48,6 @@ export default function MacroTrends({ averages, goals, prevAverages }) {
     const insightText = useMemo(() => {
         if (!goals || !averages) return null;
 
-        // Find the macro with the largest absolute deviation from target
         let worstMacro = null;
         let worstAbsDiff = 0;
         for (const m of macros) {
@@ -96,65 +95,92 @@ export default function MacroTrends({ averages, goals, prevAverages }) {
 
     return (
         <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
-            <div className="flex items-center gap-2.5 mb-4">
+            <div className="flex items-center gap-2.5 mb-5">
                 <h3 className="type-section-header">Macros</h3>
                 <span className={cn("font-mono text-sm font-bold px-2.5 py-0.5 rounded-full", score.className)}>
                     {score.label}
                 </span>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
                 {macros.map(macro => (
-                    <div key={macro.key} className="flex items-center gap-3">
-                        {/* Color dot */}
-                        <div
-                            className="w-3 h-3 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: macro.color }}
-                        />
-
-                        {/* Macro name */}
-                        <span className="font-sans text-sm font-medium text-primary w-16">
-                            {macro.label}
-                        </span>
-
-                        {/* Current average */}
-                        <span className="type-value text-sm flex-1">
-                            {macro.avg}g
-                        </span>
-
-                        {/* Target (if set) */}
-                        {macro.target > 0 && (
-                            <span className="font-mono text-sm text-primary/40">
-                                / {macro.target}g
-                            </span>
-                        )}
-
-                        {/* Trend arrow + delta */}
-                        {macro.delta !== 0 && (
-                            <div className="flex items-center gap-1 min-w-[60px] justify-end">
-                                <span className={cn(
-                                    "font-mono text-sm font-bold",
-                                    macro.trend === 'up' ? "text-emerald-600 dark:text-emerald-400"
-                                        : macro.trend === 'down' ? "text-amber-600 dark:text-amber-400"
-                                            : "text-primary/40"
-                                )}>
-                                    {TREND_ARROWS[macro.trend]}
+                    <div key={macro.key}>
+                        {/* Label row: name + avg/target on left, delta on right */}
+                        <div className="flex items-baseline justify-between mb-1.5">
+                            <div className="flex items-baseline gap-1.5">
+                                <span className="font-sans text-sm font-medium text-primary">
+                                    {macro.label}
                                 </span>
-                                <span className={cn(
-                                    "font-mono text-sm font-medium",
-                                    macro.trend === 'up' ? "text-emerald-600 dark:text-emerald-400"
-                                        : macro.trend === 'down' ? "text-amber-600 dark:text-amber-400"
-                                            : "text-primary/40"
-                                )}>
-                                    {macro.delta > 0 ? '+' : ''}{macro.delta}g
+                                <span className="font-mono text-sm text-primary/70">
+                                    {macro.avg}g
+                                    {macro.target > 0 && (
+                                        <span className="text-primary/40"> / {macro.target}g</span>
+                                    )}
                                 </span>
                             </div>
-                        )}
-                        {macro.delta === 0 && (
-                            <div className="flex items-center gap-1 min-w-[60px] justify-end">
-                                <span className="font-mono text-sm text-primary/40">
+
+                            {macro.delta !== 0 ? (
+                                <div className="flex items-center gap-1">
+                                    <span className={cn(
+                                        "font-mono text-xs font-bold",
+                                        macro.trend === 'up' ? "text-emerald-600 dark:text-emerald-400"
+                                            : macro.trend === 'down' ? "text-amber-600 dark:text-amber-400"
+                                                : "text-primary/40"
+                                    )}>
+                                        {TREND_ARROWS[macro.trend]} {macro.delta > 0 ? '+' : ''}{macro.delta}g
+                                    </span>
+                                </div>
+                            ) : (
+                                <span className="font-mono text-xs text-primary/40">
                                     {TREND_ARROWS.stable}
                                 </span>
+                            )}
+                        </div>
+
+                        {/* Progress bar */}
+                        {macro.target > 0 ? (
+                            <div className={cn(
+                                "w-full bg-primary/5 rounded-full h-3 relative overflow-hidden",
+                                macro.progress > 100 && "shadow-[0_0_8px_rgba(40,65,54,0.3)] dark:shadow-[0_0_8px_rgba(226,229,225,0.25)]"
+                            )}>
+                                {macro.progress <= 100 ? (
+                                    <div
+                                        className="h-full rounded-full transition-all duration-1000 ease-out"
+                                        style={{
+                                            width: `${Math.min(100, macro.progress)}%`,
+                                            backgroundColor: macro.color
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full">
+                                        <div
+                                            className="h-full rounded-l-full transition-all duration-1000 ease-out"
+                                            style={{
+                                                width: `${(macro.target / macro.avg) * 100}%`,
+                                                backgroundColor: macro.color
+                                            }}
+                                        />
+                                        <div className="w-0.5 h-full bg-primary/30 shrink-0" />
+                                        <div
+                                            className="h-full rounded-r-full transition-all duration-1000 ease-out"
+                                            style={{
+                                                flex: 1,
+                                                backgroundColor: macro.color
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="w-full bg-primary/5 rounded-full h-3">
+                                <div
+                                    className="h-full rounded-full"
+                                    style={{
+                                        width: '100%',
+                                        backgroundColor: macro.color,
+                                        opacity: 0.3
+                                    }}
+                                />
                             </div>
                         )}
                     </div>

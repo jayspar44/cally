@@ -8,8 +8,6 @@ const admin = require('firebase-admin');
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const MODEL = 'gemini-3-flash-preview';
 
-const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
 /**
  * Check if today is the user's review day and they haven't had a review today.
  */
@@ -24,9 +22,6 @@ const shouldTriggerReview = async (userId, timezone) => {
 
         // Get current day of week in user's timezone
         const now = new Date();
-        const dayIndex = parseInt(now.toLocaleString('en-US', { timeZone: tz, weekday: 'numeric' }), 10);
-        // toLocaleString weekday: 'numeric' returns 1 (Sunday) through 7 (Saturday) in en-US
-        // But this is unreliable — use a more explicit approach
         const dayName = now.toLocaleString('en-US', { timeZone: tz, weekday: 'long' }).toLowerCase();
 
         if (dayName !== reviewDay) {
@@ -199,7 +194,7 @@ RULES:
         const result = await genAI.models.generateContent({
             model: MODEL,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { temperature: 0.7, maxOutputTokens: 500 }
+            config: { temperature: 1.0, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'LOW' } }
         });
 
         const reviewText = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';

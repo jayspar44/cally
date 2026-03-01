@@ -1,52 +1,4 @@
-import { Flame, BarChart3, Target, Scale } from 'lucide-react';
-
-function SecondaryStreaks({ calorieStreak, macroStreak }) {
-    const bothZero = calorieStreak === 0 && macroStreak === 0;
-
-    if (bothZero) {
-        return (
-            <div className="mt-3 pt-3 border-t border-dashed border-primary/10">
-                <p className="type-secondary text-center">
-                    <Target className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
-                    Hit your calorie or macro target to start a streak
-                </p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="mt-3 pt-3 border-t border-dashed border-primary/10 flex items-center gap-6">
-            <div className="flex items-center gap-1.5">
-                <Target className="w-4 h-4 text-primary/40" />
-                {calorieStreak > 0 ? (
-                    <>
-                        <span className="type-value text-sm text-primary">{calorieStreak}d</span>
-                        <span className="type-caption">Calories</span>
-                    </>
-                ) : (
-                    <>
-                        <span className="type-value text-sm text-primary/30">--</span>
-                        <span className="type-caption text-primary/30">Calories</span>
-                    </>
-                )}
-            </div>
-            <div className="flex items-center gap-1.5">
-                <Scale className="w-4 h-4 text-primary/40" />
-                {macroStreak > 0 ? (
-                    <>
-                        <span className="type-value text-sm text-primary">{macroStreak}d</span>
-                        <span className="type-caption">Macros</span>
-                    </>
-                ) : (
-                    <>
-                        <span className="type-value text-sm text-primary/30">--</span>
-                        <span className="type-caption text-primary/30">Macros</span>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-}
+import { Flame, Target } from 'lucide-react';
 
 export default function StreakBanner({ stats, loading, nextBadge }) {
     if (loading) {
@@ -57,11 +9,10 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
         );
     }
 
-    const { currentStreak = 0, bestStreak = 0, calorieStreak = 0, macroStreak = 0 } = stats || {};
-    const hasLogs = currentStreak > 0 || bestStreak > 0;
+    const { currentStreak = 0, bestStreak = 0 } = stats || {};
 
-    // State C: New User
-    if (!hasLogs) {
+    // State 1: New user — no logs ever
+    if (currentStreak === 0 && bestStreak === 0) {
         return (
             <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -77,8 +28,8 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
         );
     }
 
-    // State A: Active Streak (>= 3 days)
-    if (currentStreak >= 3) {
+    // State 2: On best streak (current >= 3 and matching or exceeding best)
+    if (currentStreak >= 3 && currentStreak >= bestStreak) {
         return (
             <div className="bg-accent/10 dark:bg-accent/15 rounded-2xl p-5 border border-accent/15 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -90,7 +41,7 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
                             <span className="type-value text-3xl leading-none">{currentStreak}</span>
                             <span className="type-secondary">Day Streak</span>
                         </div>
-                        <p className="type-secondary mt-0.5">Keep it going!</p>
+                        <p className="text-accent font-sans text-sm font-semibold mt-0.5">Personal Best!</p>
                     </div>
                 </div>
                 {nextBadge && (
@@ -98,24 +49,48 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
                         {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
                     </p>
                 )}
-                <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />
             </div>
         );
     }
 
-    // State B: No Active Streak (< 3 days, but has logged before)
+    // State 3: Active streak, not best (current >= 3 but below best)
+    if (currentStreak >= 3 && currentStreak < bestStreak) {
+        return (
+            <div className="bg-accent/10 dark:bg-accent/15 rounded-2xl p-5 border border-accent/15 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <Flame className="w-6 h-6 text-accent" />
+                    </div>
+                    <div>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="type-value text-3xl leading-none">{currentStreak}</span>
+                            <span className="type-secondary">Day Streak</span>
+                        </div>
+                        <p className="type-secondary mt-0.5">Best: {bestStreak}d</p>
+                    </div>
+                </div>
+                {nextBadge && (
+                    <p className="type-caption mt-2">
+                        {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
+                    </p>
+                )}
+            </div>
+        );
+    }
+
+    // State 4: Broken streak (current < 3, but has historical best)
     return (
         <div className="bg-white/80 dark:bg-surface/80 rounded-2xl p-5 border border-border/40 shadow-sm">
             <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-primary/8 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <BarChart3 className="w-6 h-6 text-primary/70" />
+                    <Flame className="w-6 h-6 text-primary/40" />
                 </div>
                 <div>
                     <div className="flex items-baseline gap-1.5">
-                        <span className="type-value text-3xl leading-none">{bestStreak}d</span>
-                        <span className="type-secondary">Best Streak</span>
+                        <span className="type-value text-3xl leading-none">{currentStreak}d</span>
+                        <span className="type-secondary">Current Streak</span>
                     </div>
-                    <p className="type-secondary mt-0.5">Log daily to build a new one</p>
+                    <p className="type-secondary mt-0.5">Best: {bestStreak}d</p>
                 </div>
             </div>
             {nextBadge && (
@@ -123,7 +98,6 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
                     {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
                 </p>
             )}
-            <SecondaryStreaks calorieStreak={calorieStreak} macroStreak={macroStreak} />
         </div>
     );
 }

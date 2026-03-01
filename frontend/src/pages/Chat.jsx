@@ -56,7 +56,7 @@ export default function Chat() {
             navigate('/chat', { replace: true, state: {} });
 
             const rangeLabel = { '1W': 'weekly', '1M': 'monthly', '3M': 'quarterly' }[range] || 'weekly';
-            const message = `[The user tapped "Chat about this" on their ${rangeLabel} nutrition insight. Here's the insight they want to discuss further: "${text}"]`;
+            const message = `You wrote this in my ${rangeLabel} insight on the Insights page:\n\n"${text}"\n\nCan you expand on this?`;
 
             sendMessage(message, null, null, { insightContext: { text, range } });
         }

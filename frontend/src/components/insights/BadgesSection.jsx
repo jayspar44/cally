@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 
 const TIER_COLORS = {
@@ -164,6 +164,22 @@ function BadgeDetailModal({ badge, earned, onClose }) {
 export default function BadgesSection({ badgeData, loading }) {
     const [selectedBadge, setSelectedBadge] = useState(null);
 
+    // Sort earned badges: most recent first
+    const sortedEarned = useMemo(() => {
+        const earned = badgeData?.earned || [];
+        return [...earned].sort((a, b) => {
+            const aTime = a.earnedAt ? new Date(a.earnedAt).getTime() : 0;
+            const bTime = b.earnedAt ? new Date(b.earnedAt).getTime() : 0;
+            return bTime - aTime;
+        });
+    }, [badgeData]);
+
+    // Sort in-progress badges: closest to completing first (highest percentage)
+    const sortedProgress = useMemo(() => {
+        const progress = badgeData?.progress || [];
+        return [...progress].sort((a, b) => (b.percentage || 0) - (a.percentage || 0));
+    }, [badgeData]);
+
     if (loading) {
         return (
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
@@ -174,9 +190,7 @@ export default function BadgesSection({ badgeData, loading }) {
         );
     }
 
-    const earned = badgeData?.earned || [];
-    const progress = badgeData?.progress || [];
-    const hasBadges = earned.length > 0 || progress.length > 0;
+    const hasBadges = sortedEarned.length > 0 || sortedProgress.length > 0;
 
     if (!hasBadges) {
         return (
@@ -188,24 +202,39 @@ export default function BadgesSection({ badgeData, loading }) {
 
     return (
         <>
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
-                {earned.map(badge => (
-                    <BadgeCard
-                        key={badge.badgeId}
-                        badge={badge}
-                        earned
-                        onClick={() => setSelectedBadge({ badge, earned: true })}
-                    />
-                ))}
-                {progress.map(badge => (
-                    <BadgeCard
-                        key={badge.badgeId}
-                        badge={badge}
-                        earned={false}
-                        onClick={() => setSelectedBadge({ badge, earned: false })}
-                    />
-                ))}
-            </div>
+            {/* Earned row */}
+            {sortedEarned.length > 0 && (
+                <div className="space-y-2">
+                    <p className="type-label px-1">Earned ({sortedEarned.length})</p>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                        {sortedEarned.map(badge => (
+                            <BadgeCard
+                                key={badge.badgeId}
+                                badge={badge}
+                                earned
+                                onClick={() => setSelectedBadge({ badge, earned: true })}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* In Progress row */}
+            {sortedProgress.length > 0 && (
+                <div className="space-y-2">
+                    <p className="type-label px-1">In Progress ({sortedProgress.length})</p>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                        {sortedProgress.map(badge => (
+                            <BadgeCard
+                                key={badge.badgeId}
+                                badge={badge}
+                                earned={false}
+                                onClick={() => setSelectedBadge({ badge, earned: false })}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <BadgeDetailModal
                 badge={selectedBadge?.badge}

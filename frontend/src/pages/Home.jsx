@@ -1,13 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
-import { Sparkles, Plus, ChevronRight } from 'lucide-react';
+import { Plus, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
+
+// Module-level greeting cache (survives component remounts)
+const GREETING_TTL = 30 * 60 * 1000; // 30 minutes
+let greetingCache = { data: null, timestamp: 0 };
+
+export function invalidateGreetingCache() {
+  greetingCache = { data: null, timestamp: 0 };
+}
+
+// Invalidate cache on food changes even when Home is unmounted
+window.addEventListener('food-log-changed', invalidateGreetingCache);
 
 export default function Home() {
   const navigate = useNavigate();
@@ -15,9 +26,28 @@ export default function Home() {
   const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
   const [dailySummary, setDailySummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [greeting, setGreeting] = useState(null);
-  const [greetingLoading, setGreetingLoading] = useState(true);
+  const [greeting, setGreeting] = useState(greetingCache.data);
+  const [greetingLoading, setGreetingLoading] = useState(!greetingCache.data);
   const greetingFetched = useRef(false);
+
+  const fetchGreeting = useCallback((force = false) => {
+    const now = Date.now();
+    if (!force && greetingCache.data && (now - greetingCache.timestamp) < GREETING_TTL) {
+      setGreeting(greetingCache.data);
+      setGreetingLoading(false);
+      return;
+    }
+
+    setGreetingLoading(true);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    api.getHomeGreeting(timezone)
+      .then(data => {
+        greetingCache = { data, timestamp: Date.now() };
+        setGreeting(data);
+      })
+      .catch(err => logger.error('Greeting fetch failed:', err))
+      .finally(() => setGreetingLoading(false));
+  }, []);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -37,13 +67,18 @@ export default function Home() {
   useEffect(() => {
     if (greetingFetched.current) return;
     greetingFetched.current = true;
+    fetchGreeting();
+  }, [fetchGreeting]);
 
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    api.getHomeGreeting(timezone)
-      .then(data => setGreeting(data))
-      .catch(err => logger.error('Greeting fetch failed:', err))
-      .finally(() => setGreetingLoading(false));
-  }, []);
+  // Listen for food log changes to invalidate cache
+  useEffect(() => {
+    const onFoodChange = () => {
+      invalidateGreetingCache();
+      fetchGreeting(true);
+    };
+    window.addEventListener('food-log-changed', onFoodChange);
+    return () => window.removeEventListener('food-log-changed', onFoodChange);
+  }, [fetchGreeting]);
 
   if (loading) {
     return (
@@ -124,11 +159,24 @@ export default function Home() {
 
       {/* AI Greeting */}
       {greetingLoading ? (
-        <div className="h-5 w-3/4 bg-primary/10 rounded-md animate-pulse" />
+        <div className="card-accent h-16 animate-pulse" />
       ) : greeting?.greeting ? (
-        <p className="type-body text-primary/80 leading-relaxed">
-          {greeting.greeting}
-        </p>
+        <div className="card-accent relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <span className="font-serif font-bold text-sm text-accent">Coach Kalli</span>
+            <button
+              onClick={() => fetchGreeting(true)}
+              className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-accent/40 hover:text-accent transition-colors"
+              aria-label="Refresh greeting"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="type-body text-primary/80 leading-relaxed">
+            {greeting.greeting}
+          </p>
+        </div>
       ) : null}
 
       {/* Daily Summary Card */}
