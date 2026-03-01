@@ -1,12 +1,9 @@
-const { GoogleGenAI } = require('@google/genai');
 const { db } = require('./firebase');
 const { getGoalsForDate } = require('./goalsService');
 const { getLogger } = require('../logger');
 const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils');
+const { genAI, MODELS } = require('./geminiService');
 const admin = require('firebase-admin');
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-const MODEL = 'gemini-3-flash-preview';
 
 /**
  * Check if today is the user's review day and they haven't had a review today.
@@ -192,7 +189,7 @@ RULES:
 
         // 7. Call Gemini
         const result = await genAI.models.generateContent({
-            model: MODEL,
+            model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: { temperature: 1.0, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'LOW' } }
         });
@@ -217,7 +214,7 @@ RULES:
                 type: 'weekly_review',
                 weekStart: thisWeekStart,
                 weekEnd: thisWeekEnd,
-                model: MODEL,
+                model: MODELS.flash,
             }
         };
         const msgDoc = await chatHistoryRef.add(reviewMessage);

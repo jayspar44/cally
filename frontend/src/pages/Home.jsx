@@ -4,7 +4,7 @@ import { api } from '../api/services';
 import { logger } from '../utils/logger';
 import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
-import { Plus, ChevronRight, RefreshCw } from 'lucide-react';
+import { Sparkles, Plus, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';

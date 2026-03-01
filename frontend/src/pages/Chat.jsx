@@ -82,7 +82,7 @@ export default function Chat() {
                 if (shouldTrigger) {
                     await api.triggerWeeklyReview(timezone);
                     // Reload history to show the new review message
-                    loadHistory();
+                    await loadHistory();
                 }
             } catch (err) {
                 logger.warn('Weekly review check failed:', err);

@@ -46,7 +46,7 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
                 </div>
                 {nextBadge && (
                     <p className="type-caption mt-2">
-                        {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
+                        {Math.max(0, nextBadge.target - nextBadge.current)} more {Math.max(0, nextBadge.target - nextBadge.current) === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
                     </p>
                 )}
             </div>
@@ -71,7 +71,7 @@ export default function StreakBanner({ stats, loading, nextBadge }) {
                 </div>
                 {nextBadge && (
                     <p className="type-caption mt-2">
-                        {nextBadge.target - nextBadge.current} more {nextBadge.target - nextBadge.current === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
+                        {Math.max(0, nextBadge.target - nextBadge.current)} more {Math.max(0, nextBadge.target - nextBadge.current) === 1 ? 'day' : 'days'} to earn &ldquo;{nextBadge.name}&rdquo;
                     </p>
                 )}
             </div>

@@ -841,6 +841,8 @@ Respond with ONLY the progress sentence. No quotes, no labels.`;
 };
 
 module.exports = {
+    genAI,
+    MODELS,
     processMessage,
     processImageMessage,
     generateHomeGreeting
