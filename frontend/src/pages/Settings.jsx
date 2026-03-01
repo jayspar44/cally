@@ -201,7 +201,7 @@ export default function Settings() {
         setTriggeringReview(true);
         try {
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            await api.triggerWeeklyReview(timezone);
+            await api.triggerWeeklyReview(timezone, { force: true });
             navigate('/chat');
         } catch {
             alert('Failed to trigger weekly review');

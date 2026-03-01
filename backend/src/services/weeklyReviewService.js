@@ -65,7 +65,7 @@ const sumLogs = (logs) => logs.reduce((acc, log) => ({
 /**
  * Generate a weekly review and store it as a chat message.
  */
-const generateWeeklyReview = async (userId, timezone = 'America/New_York') => {
+const generateWeeklyReview = async (userId, timezone = 'America/New_York', { force = false } = {}) => {
     const logger = getLogger();
     const tz = timezone;
     const today = getTodayStr(tz);
@@ -74,21 +74,27 @@ const generateWeeklyReview = async (userId, timezone = 'America/New_York') => {
         // 1. Claim the review slot atomically to prevent duplicates
         const userDocRef = db.collection('users').doc(userId);
         let userData;
-        try {
-            await db.runTransaction(async (txn) => {
-                const snap = await txn.get(userDocRef);
-                userData = snap.exists ? snap.data() : {};
-                if (userData.lastWeeklyReview === today) {
-                    throw new Error('ALREADY_REVIEWED');
+        if (force) {
+            const snap = await userDocRef.get();
+            userData = snap.exists ? snap.data() : {};
+            await userDocRef.update({ lastWeeklyReview: today });
+        } else {
+            try {
+                await db.runTransaction(async (txn) => {
+                    const snap = await txn.get(userDocRef);
+                    userData = snap.exists ? snap.data() : {};
+                    if (userData.lastWeeklyReview === today) {
+                        throw new Error('ALREADY_REVIEWED');
+                    }
+                    txn.update(userDocRef, { lastWeeklyReview: today });
+                });
+            } catch (txnErr) {
+                if (txnErr.message === 'ALREADY_REVIEWED') {
+                    logger.info({ userId }, 'Weekly review already generated today, skipping');
+                    return null;
                 }
-                txn.update(userDocRef, { lastWeeklyReview: today });
-            });
-        } catch (txnErr) {
-            if (txnErr.message === 'ALREADY_REVIEWED') {
-                logger.info({ userId }, 'Weekly review already generated today, skipping');
-                return null;
+                throw txnErr;
             }
-            throw txnErr;
         }
 
         const firstName = userData.firstName || '';

@@ -264,7 +264,8 @@ const triggerWeeklyReview = async (req, res) => {
 
         req.log.info({ action: 'chat.triggerWeeklyReview', timezone }, 'Triggering weekly review generation');
 
-        const result = await generateWeeklyReview(userId, timezone);
+        const force = req.body.force === true;
+        const result = await generateWeeklyReview(userId, timezone, { force });
 
         if (!result) {
             req.log.info({ action: 'chat.triggerWeeklyReview' }, 'Weekly review already generated today');
