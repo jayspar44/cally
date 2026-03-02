@@ -65,7 +65,7 @@ const sumLogs = (logs) => logs.reduce((acc, log) => ({
 /**
  * Generate a weekly review and store it as a chat message.
  */
-const generateWeeklyReview = async (userId, timezone = 'America/New_York', { force = false } = {}) => {
+const generateWeeklyReview = async (userId, timezone = 'America/New_York', { force = false, skipChatMessage = false } = {}) => {
     const logger = getLogger();
     const tz = timezone;
     const today = getTodayStr(tz);
@@ -190,25 +190,38 @@ ${prevWeekDailyAvg ? `PREVIOUS WEEK (${prevWeekStart} to ${prevWeekEnd}):
 - Days tracked: ${prevDaysTracked}/7
 - Daily averages: ${prevWeekDailyAvg.calories} cal, ${prevWeekDailyAvg.protein}g protein, ${prevWeekDailyAvg.carbs}g carbs, ${prevWeekDailyAvg.fat}g fat` : 'PREVIOUS WEEK: No data available.'}
 
-FORMAT YOUR RESPONSE WITH EXACTLY THESE 4 SECTIONS:
+${userData.weeklyFocus?.label ? `LAST WEEK'S FOCUS: "${userData.weeklyFocus.label}"
+Evaluate whether the user met this focus based on the data. Include one bullet point about it — did they hit it, partially, or miss it? Be specific.` : ''}
 
-**Wins**
-1-2 things that went well this week. Be specific with numbers from the data.
+FORMAT — follow this structure exactly:
 
-**Patterns**
-1-2 observations about eating patterns (e.g., consistency, meal timing, protein distribution).
+1. One short opening sentence — set the tone, reference the week casually
+2. 4-6 bullet points (use "-") — each bullet is ONE specific observation with real numbers. Mix wins and areas to improve. Compare to last week where relevant. Keep each bullet to one sentence.
+3. One short closing sentence — the main coaching takeaway or encouragement
 
-**Compared to last week**
-1 specific comparison point using actual numbers. If no previous week data, note this is a baseline week.
+Then on its own line:
+WEEKLY FOCUS: [one specific, measurable goal for next week]
 
-WEEKLY FOCUS: [Write exactly ONE specific, measurable focus for next week. It should be actionable and based on the data. Examples: "Hit 100g+ protein on at least 5 days", "Log all 3 main meals every day", "Keep daily calories under 2200"]
+EXAMPLE OUTPUT:
+Here's your week at a glance.
+
+- Protein averaged 86g/day, up from 58g last week — solid improvement
+- Only tracked 3 out of 7 days though, down from a full week before
+- Calories came in at 1151/day when logging, well under your 2015 target
+- Carbs sitting at 106g vs your 214g goal — you might be running low on fuel
+- Barebells bars and broccoli showing up regularly, good protein-dense picks
+
+Consistency is the biggest lever right now — when you do log, the picture is clear.
+
+WEEKLY FOCUS: Log all 3 main meals for at least 5 days this week
 
 RULES:
-- No emojis
-- Use the data — don't make up numbers
-- Keep each section to 1-2 sentences
-- The WEEKLY FOCUS line MUST start with exactly "WEEKLY FOCUS:" (this is parsed programmatically)
+- No emojis, no bold section headers, no numbered lists
+- Bullet points use "-" (not "*" or numbers)
+- Each bullet: one insight, one sentence, real numbers from the data
+- The WEEKLY FOCUS line MUST start with exactly "WEEKLY FOCUS:" (parsed programmatically)
 - Be encouraging but honest
+- Use contractions naturally (you're, that's, you've)
 - The focus must be specific and measurable, not vague`;
 
         // 7. Call Gemini
@@ -224,48 +237,59 @@ RULES:
             throw new Error('Empty response from Gemini for weekly review');
         }
 
-        // 8. Parse the weekly focus
-        const focusMatch = reviewText.match(/WEEKLY FOCUS:\s*(.+)/i);
+        // 8. Parse the weekly focus and strip it from the display text
+        const focusMatch = reviewText.match(/WEEKLY FOCUS:\s*(.+)/i)
+            || reviewText.match(/\*\*Next week's focus:\*\*\s*(.+)/i);
         const focusText = focusMatch ? focusMatch[1].trim() : null;
 
-        // 9. Store the review as a chat message
-        const chatHistoryRef = db.collection('users').doc(userId).collection('chatHistory');
-        const reviewMessage = {
-            role: 'assistant',
-            content: reviewText,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            metadata: {
-                type: 'weekly_review',
-                weekStart: thisWeekStart,
-                weekEnd: thisWeekEnd,
-                model: MODELS.flash,
-            }
-        };
-        const msgDoc = await chatHistoryRef.add(reviewMessage);
+        // Remove the focus line (and any preceding ---) from the text shown in chat
+        const displayText = reviewText
+            .replace(/\n---\s*\n\*\*Next week's focus:\*\*.*/i, '')
+            .replace(/\nWEEKLY FOCUS:\s*.*/i, '')
+            .trim();
+
+        // 9. Store the review as a chat message (skip when called from agent tool — the chat controller stores the response)
+        let messageId = null;
+        if (!skipChatMessage) {
+            const chatHistoryRef = db.collection('users').doc(userId).collection('chatHistory');
+            const reviewMessage = {
+                role: 'assistant',
+                content: displayText,
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                metadata: {
+                    type: 'weekly_review',
+                    weekStart: thisWeekStart,
+                    weekEnd: thisWeekEnd,
+                    focus: focusText || null,
+                    model: MODELS.flash,
+                }
+            };
+            const msgDoc = await chatHistoryRef.add(reviewMessage);
+            messageId = msgDoc.id;
+        }
 
         // 10. Store the focus (lastWeeklyReview already set in transaction above)
         if (focusText) {
-            await db.collection('users').doc(userId).update({
-                weeklyFocus: {
-                    label: focusText,
-                    setAt: admin.firestore.FieldValue.serverTimestamp(),
-                    reviewMessageId: msgDoc.id,
-                },
-            });
+            const focusData = {
+                label: focusText,
+                setAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            if (messageId) focusData.reviewMessageId = messageId;
+            await db.collection('users').doc(userId).update({ weeklyFocus: focusData });
         }
 
         logger.info({
             userId,
-            messageId: msgDoc.id,
+            messageId,
             daysTracked,
             daysOnTarget,
             hasFocus: !!focusText,
         }, 'Weekly review generated');
 
         return {
-            message: reviewText,
+            message: displayText,
             focus: focusText,
-            messageId: msgDoc.id,
+            messageId,
         };
     } catch (error) {
         logger.error({ err: error, userId }, 'Failed to generate weekly review');

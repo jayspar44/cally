@@ -195,6 +195,14 @@ const toolDeclarations = [
             },
             required: ['biometrics']
         }
+    },
+    {
+        name: 'triggerWeeklyReview',
+        description: 'Generate the user\'s weekly nutrition review. Only call this when the user agrees to do their weekly review — context will tell you when it\'s review day and the review hasn\'t been done yet. The review analyzes this week vs last week, highlights wins and patterns, and sets a focus for next week. Returns the full review text which you should present conversationally.',
+        parameters: {
+            type: 'object',
+            properties: {}
+        }
     }
 ];
 
@@ -217,6 +225,8 @@ const executeTool = async (toolName, args, userId, userTimezone, idempotencyKey,
                 return await deleteFoodLog(args, userId);
             case 'updateUserProfile':
                 return await updateUserProfile(args, userId, userTimezone);
+            case 'triggerWeeklyReview':
+                return await triggerWeeklyReviewTool(userId, userTimezone);
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` };
         }
@@ -900,6 +910,37 @@ const updateUserProfile = async (args, userId, userTimezone) => {
             calculationDetails,
         }
     };
+};
+
+const triggerWeeklyReviewTool = async (userId, userTimezone) => {
+    // Lazy require to avoid circular dependency: agentTools → weeklyReviewService → geminiService → agentTools
+    const { generateWeeklyReview } = require('../services/weeklyReviewService');
+    const tz = userTimezone || 'America/New_York';
+
+    try {
+        const result = await generateWeeklyReview(userId, tz, { skipChatMessage: true });
+
+        if (!result) {
+            return {
+                success: true,
+                message: 'A weekly review has already been generated today.',
+                data: { alreadyGenerated: true }
+            };
+        }
+
+        return {
+            success: true,
+            message: result.message,
+            data: {
+                reviewText: result.message,
+                focus: result.focus,
+                messageId: result.messageId
+            }
+        };
+    } catch (error) {
+        getLogger().error({ err: error, userId }, 'Weekly review tool failed');
+        return { success: false, error: 'Failed to generate weekly review. Try again later.' };
+    }
 };
 
 module.exports = {

@@ -202,7 +202,7 @@ export default function Settings() {
         try {
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             await api.triggerWeeklyReview(timezone, { force: true });
-            navigate('/chat');
+            navigate('/chat', { state: { refreshHistory: true } });
         } catch {
             alert('Failed to trigger weekly review');
         } finally {

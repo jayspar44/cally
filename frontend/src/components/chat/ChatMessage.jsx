@@ -102,7 +102,7 @@ export default function ChatMessage({ message, isLastMessage, onEditLog, onDelet
                                 onDelete();
                             }}
                             className={cn(
-                                "absolute -top-2 w-6 h-6 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200",
+                                "absolute -top-2 w-6 h-6 flex items-center justify-center rounded-full bg-red-500 text-white shadow-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200",
                                 isUser ? "-left-2" : "-right-2"
                             )}
                             title="Delete Message (Dev Mode)"
@@ -111,6 +111,14 @@ export default function ChatMessage({ message, isLastMessage, onEditLog, onDelet
                         </button>
                     )}
                 </div>
+
+                {/* Weekly Review Focus Card */}
+                {!isUser && message.metadata?.type === 'weekly_review' && message.metadata?.focus && (
+                    <div className="mt-2 bg-accent/5 border border-accent/15 rounded-xl px-4 py-3">
+                        <p className="type-label text-accent mb-1">Next week's focus</p>
+                        <p className="type-body font-medium text-primary/90">{message.metadata.focus}</p>
+                    </div>
+                )}
 
                 {/* Timestamp & Status (Outside Bubble) */}
                 <div className={cn(

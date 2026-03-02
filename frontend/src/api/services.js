@@ -142,6 +142,5 @@ export const api = {
 
     getHomeGreeting: (timezone) => client.get(`/home/greeting?timezone=${encodeURIComponent(timezone)}`).then(res => res.data),
 
-    checkWeeklyReview: (timezone) => client.get(`/chat/weekly-review/check?timezone=${encodeURIComponent(timezone)}`).then(res => res.data),
     triggerWeeklyReview: (timezone, { force = false } = {}) => client.post('/chat/weekly-review', { timezone, force }).then(res => res.data),
 };

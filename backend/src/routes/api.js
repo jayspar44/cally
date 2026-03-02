@@ -12,7 +12,7 @@ const homeController = require('../controllers/homeController');
 const aiRateLimit = rateLimit({
     windowMs: 60 * 1000,
     max: 10,
-    keyGenerator: (req) => req.user?.uid || req.ip,
+    keyGenerator: (req) => req.user?.uid || 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many AI requests, please try again in a minute.' }

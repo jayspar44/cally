@@ -22,7 +22,6 @@ export default function Chat() {
     const [editingFoodLog, setEditingFoodLog] = useState(null);
     const [sendingWithImage, setSendingWithImage] = useState(false);
     const errorTimerRef = useRef(null);
-    const weeklyReviewCheckedRef = useRef(false);
 
     useEffect(() => {
         if (!initialized) loadHistory();
@@ -62,6 +61,14 @@ export default function Chat() {
         }
     }, [location.state, initialized, insightTriggered, sending, navigate, sendMessage]);
 
+    // Reload history when navigated with refreshHistory (e.g., after manual weekly review from Settings)
+    useEffect(() => {
+        if (location.state?.refreshHistory && initialized) {
+            navigate('/chat', { replace: true, state: {} });
+            loadHistory();
+        }
+    }, [location.state, initialized, navigate, loadHistory]);
+
     // Auto-trigger onboarding for new users with no chat history
     useEffect(() => {
         if (needsOnboarding && initialized && messages.length === 0 && !onboardingTriggered && !sending) {
@@ -69,28 +76,6 @@ export default function Chat() {
             sendMessage("Hey Kalli, I'd like to get started!");
         }
     }, [needsOnboarding, initialized, messages.length, onboardingTriggered, sending, sendMessage]);
-
-    // Check for weekly review on mount
-    useEffect(() => {
-        if (!initialized || weeklyReviewCheckedRef.current) return;
-        weeklyReviewCheckedRef.current = true;
-
-        const checkReview = async () => {
-            try {
-                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                const { shouldTrigger } = await api.checkWeeklyReview(timezone);
-                if (shouldTrigger) {
-                    await api.triggerWeeklyReview(timezone);
-                    // Reload history to show the new review message
-                    await loadHistory();
-                }
-            } catch (err) {
-                logger.warn('Weekly review check failed:', err);
-            }
-        };
-
-        checkReview();
-    }, [initialized, loadHistory]);
 
     // Detect profileUpdated and refresh context
     useEffect(() => {

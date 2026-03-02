@@ -152,7 +152,13 @@ export default function Home() {
 
       {/* AI Greeting */}
       {greetingLoading ? (
-        <div className="card-accent h-16 animate-pulse" />
+        <div className="card-accent">
+          <div className="w-20 h-3.5 bg-accent/15 rounded-md animate-pulse mb-3" />
+          <div className="space-y-2">
+            <div className="w-full h-3.5 bg-accent/10 rounded-md animate-pulse" />
+            <div className="w-3/4 h-3.5 bg-accent/10 rounded-md animate-pulse" />
+          </div>
+        </div>
       ) : greeting?.greeting ? (
         <div className="card-accent relative overflow-hidden">
           <div className="absolute -top-8 -right-8 w-32 h-32 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
@@ -264,7 +270,17 @@ export default function Home() {
       </section>
 
       {/* Weekly Focus Tracker */}
-      {greeting?.activeFocus && (
+      {greetingLoading ? (
+        <div className="card-base">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="w-24 h-3 bg-primary/10 rounded-md animate-pulse mb-2" />
+              <div className="w-48 h-4 bg-primary/8 rounded-md animate-pulse" />
+            </div>
+            <ChevronRight className="w-5 h-5 text-primary/10" />
+          </div>
+        </div>
+      ) : greeting?.activeFocus ? (
         <Link to="/chat" className="block card-base">
           <div className="flex items-center justify-between">
             <div>
@@ -277,7 +293,7 @@ export default function Home() {
             <ChevronRight className="w-5 h-5 text-primary/30" />
           </div>
         </Link>
-      )}
+      ) : null}
 
       {/* Meals Feed */}
       {dailySummary?.meals && dailySummary.meals.length > 0 && (

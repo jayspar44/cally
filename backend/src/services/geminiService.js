@@ -124,6 +124,7 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 - **Situational coaching**: When user mentions context (traveling, busy day, eating out), adapt advice accordingly
 - **Progressive follow-ups**: End responses with relevant questions when appropriate, but don't force it every time
 - **General conversation**: When the user isn't logging food — just chatting, asking questions, seeking advice — respond naturally like a knowledgeable friend. No tool calls needed for general nutrition questions, meal planning chat, or motivational conversation
+- **Weekly review**: On the user's designated review day, context will tell you when a review is available. After logging a meal (especially dinner/last meal), naturally offer to generate their weekly review. If they agree, call \`triggerWeeklyReview\`. The tool returns the full review text — present it conversationally. Don't force it — one gentle offer per session is enough
 
 ## Personalized Advice (when biometrics available in context)
 - Reference user's weight and goal type in recommendations
@@ -708,6 +709,17 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
         context += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein, ${recentAvg.avgCarbs}g carbs, ${recentAvg.avgFat}g fat\n`;
     }
 
+    // Weekly review awareness
+    const settings = userData.settings || {};
+    const reviewDay = settings.weeklyReviewDay || 'sunday';
+    const currentDayLower = dayName.toLowerCase();
+    if (currentDayLower === reviewDay) {
+        const lastReview = userData.lastWeeklyReview;
+        if (lastReview !== today) {
+            context += `\n**WEEKLY REVIEW AVAILABLE** — Today is ${dayName}, the user's review day, and no review has been generated yet this week. After the user logs a meal (especially dinner or their last meal of the day), naturally offer to do their weekly review. Example: "Since it's ${dayName}, want me to put together your weekly review?" If the user agrees, call triggerWeeklyReview. Do NOT auto-trigger it — wait for the user to say yes.\n`;
+        }
+    }
+
     if (biometrics.weight || biometrics.goalType) {
         context += `\nUser Biometrics:`;
         if (biometrics.weight) context += ` Weight: ${biometrics.weight} ${biometrics.weightUnit || 'lbs'}.`;
@@ -853,10 +865,17 @@ Respond with ONLY the progress sentence. No quotes, no labels.`;
     }
 };
 
+const invalidateContextCache = () => {
+    cachedContentNames.base = null;
+    cachedContentNames.onboarding = null;
+    getLogger().info('Context cache invalidated');
+};
+
 module.exports = {
     genAI,
     MODELS,
     processMessage,
     processImageMessage,
-    generateHomeGreeting
+    generateHomeGreeting,
+    invalidateContextCache
 };

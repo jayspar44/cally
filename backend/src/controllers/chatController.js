@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { db } = require('../services/firebase');
-const { processMessage, processImageMessage } = require('../services/geminiService');
+const { processMessage, processImageMessage, invalidateContextCache } = require('../services/geminiService');
 const { shouldTriggerReview, generateWeeklyReview } = require('../services/weeklyReviewService');
 const { safeTimezone } = require('../utils/dateUtils');
 
@@ -271,6 +271,9 @@ const triggerWeeklyReview = async (req, res) => {
             req.log.info({ action: 'chat.triggerWeeklyReview' }, 'Weekly review already generated today');
             return res.json({ alreadyGenerated: true });
         }
+
+        // Invalidate context cache so next chat picks up the new weekly focus
+        invalidateContextCache();
 
         req.log.info({
             action: 'chat.triggerWeeklyReview',

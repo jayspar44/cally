@@ -284,6 +284,10 @@ html.dark {
     @apply text-accent hover:underline font-medium;
   }
 
+  .markdown-body hr {
+    @apply my-3 border-border/30;
+  }
+
   .markdown-body code {
     @apply bg-surface border border-border px-1.5 py-0.5 rounded-md text-xs font-mono text-primary/80;
   }
