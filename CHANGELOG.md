@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.6](https://github.com/jayspar44/cally/compare/v0.4.5...v0.4.6) (2026-03-02)
+
+
+### Features
+
+* bypass duplicate review guard for manual trigger d9935bc
+* weekly review as agent tool, scannable format, and Home loading states 5399326
+
+
+### Bug Fixes
+
+* address code review blocking and high priority issues 74e4a70
+* address remaining code review issues 800a178
+
 ### [0.4.5](https://github.com/jayspar44/cally/compare/v0.4.4...v0.4.5) (2026-03-01)
 
 
