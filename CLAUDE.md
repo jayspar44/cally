@@ -10,7 +10,7 @@ AI-powered calorie tracking app with chat-first interface, photo recognition, an
 - **Frontend**: React 19 + Vite 7 + Tailwind CSS 4 + Capacitor 8
 - **Backend**: Node.js 22 + Express 5
 - **Database**: Firebase Firestore | **Auth**: Firebase Auth
-- **AI**: Gemini 3 Flash Preview (chat/text) + Gemini 3 Pro Preview (vision/complex)
+- **AI**: Gemini 3 Flash Preview (chat, vision, insights)
 - **Hosting**: Cloud Run (backend) + Firebase Hosting (frontend) | **CI/CD**: Cloud Build
 
 ## Project Structure
@@ -342,6 +342,7 @@ Auto-invoked skills (brainstorming, TDD, debugging, verification, etc.) activate
   - `services/`: Business logic, Firebase calls, Gemini AI
   - `agents/`: AI agent definitions with tools
 - **Logging**: Controllers use `req.log` (Pino), services use `require('../logger')`. Never `console.log`.
+- **Gemini calls**: Always use `temperature: 1.0` for all Gemini 3 calls. Always include `thinkingConfig` — use `'MEDIUM'` for conversational/tool-calling, `'LOW'` for short-form generation (greetings, summaries, reviews).
 
 ### Git Commits (Conventional Commits)
 

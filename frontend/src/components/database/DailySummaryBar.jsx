@@ -8,11 +8,11 @@ export default function DailySummaryBar({ summary, goals, progress }) {
     const pct = Math.min(100, progress?.calories || 0);
 
     return (
-        <div className="bg-surface rounded-2xl p-4 border border-border/50 shadow-sm">
+        <div className="card-base">
             <div className="flex items-baseline justify-between mb-2">
                 <div className="flex items-baseline gap-1.5">
-                    <span className="font-mono font-bold text-2xl text-primary">{totalCal}</span>
-                    <span className="font-sans text-xs text-primary/50 uppercase tracking-wider">cal</span>
+                    <span className="type-value text-2xl">{totalCal}</span>
+                    <span className="type-label">cal</span>
                 </div>
                 <div className="flex gap-3 text-xs font-mono">
                     <span className="text-protein font-bold">{Math.round(summary.totalProtein || 0)}g P</span>

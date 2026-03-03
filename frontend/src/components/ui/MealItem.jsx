@@ -9,28 +9,28 @@ export default function MealItem({ meal }) {
         <div className="group transition-colors hover:bg-primary/5">
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center p-6 text-left outline-none"
+                className="w-full flex items-center px-5 py-4 text-left outline-none"
             >
                 {/* Icon */}
                 <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center mr-4 transition-colors",
+                    "w-10 h-10 rounded-xl flex items-center justify-center mr-3 transition-colors",
                     "bg-primary/5 text-primary group-hover:bg-primary group-hover:text-white"
                 )}>
-                    <Utensils className="w-5 h-5" />
+                    <Utensils className="w-4 h-4" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
-                        <span className="font-serif font-bold text-lg text-primary capitalize">
+                        <span className="type-section-header capitalize">
                             {meal.meal}
                         </span>
-                        <span className="font-mono font-bold text-primary">
+                        <span className="type-value">
                             {Math.round(meal.totalCalories)}
                         </span>
                     </div>
                     <div className="flex justify-between items-center">
-                        <p className="font-sans text-sm text-primary/70 truncate pr-4">
+                        <p className="type-secondary truncate pr-4">
                             {meal.description || 'No description'}
                         </p>
                         <ChevronDown className={cn(
@@ -46,7 +46,7 @@ export default function MealItem({ meal }) {
                 "overflow-hidden transition-all duration-300 ease-in-out bg-primary/5",
                 expanded ? "max-h-[32rem] opacity-100" : "max-h-0 opacity-0"
             )}>
-                <div className="px-6 pb-6 pt-2 space-y-3">
+                <div className="px-5 pb-4 pt-2 space-y-3">
                     <div className="h-px w-full bg-border/50 mb-3" />
                     {meal.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-start text-sm">
@@ -54,7 +54,7 @@ export default function MealItem({ meal }) {
                                 <span className="font-mono text-primary/80 block">
                                     {item.name}
                                 </span>
-                                <span className="font-sans text-xs text-primary/65">
+                                <span className="type-caption">
                                     {item.quantity} {item.unit}
                                 </span>
                             </div>

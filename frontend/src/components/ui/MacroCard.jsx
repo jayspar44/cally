@@ -1,4 +1,4 @@
-export default function MacroCard({ label, current, progress, color }) {
+export default function MacroCard({ label, current, progress, color, compact = false }) {
     const colorMap = {
         protein: {
             ring: 'stroke-[var(--color-protein)]',
@@ -22,9 +22,9 @@ export default function MacroCard({ label, current, progress, color }) {
 
     const theme = colorMap[color] || colorMap.protein;
 
-    // Ring geometry
-    const innerRadius = 28;
-    const outerRadius = 33;
+    // Ring geometry — scale down when compact
+    const innerRadius = compact ? 20 : 28;
+    const outerRadius = compact ? 24 : 33;
     const innerCircumference = 2 * Math.PI * innerRadius;
     const outerCircumference = 2 * Math.PI * outerRadius;
 
@@ -37,27 +37,33 @@ export default function MacroCard({ label, current, progress, color }) {
     const innerDashoffset = innerCircumference - (visualProgress / 100) * innerCircumference;
     const outerDashoffset = outerCircumference - (excessProgress / 100) * outerCircumference;
 
+    const ringSize = compact ? 'w-14 h-14' : 'w-20 h-20';
+    const viewBox = compact ? '0 0 56 56' : '0 0 80 80';
+    const center = compact ? 28 : 40;
+    const strokeW = compact ? 4 : 5;
+    const outerStrokeW = compact ? 2 : 3;
+
     return (
-        <div className="flex flex-col items-center gap-3">
-            <div className="relative w-20 h-20">
-                <svg className={`w-full h-full transform -rotate-90${isOver ? ` ${theme.glow}` : ''}`} viewBox="0 0 80 80">
+        <div className={`flex flex-col items-center ${compact ? 'gap-2' : 'gap-3'}`}>
+            <div className={`relative ${ringSize}`}>
+                <svg className={`w-full h-full transform -rotate-90${isOver ? ` ${theme.glow}` : ''}`} viewBox={viewBox}>
                     {/* Background track */}
                     <circle
-                        cx="40"
-                        cy="40"
+                        cx={center}
+                        cy={center}
                         r={innerRadius}
                         stroke="currentColor"
-                        strokeWidth="5"
+                        strokeWidth={strokeW}
                         fill="none"
                         className={theme.bg}
                     />
                     {/* Inner ring — progress (full when over) */}
                     <circle
-                        cx="40"
-                        cy="40"
+                        cx={center}
+                        cy={center}
                         r={innerRadius}
                         stroke="currentColor"
-                        strokeWidth="5"
+                        strokeWidth={strokeW}
                         fill="none"
                         strokeLinecap="round"
                         className={theme.ring}
@@ -71,11 +77,11 @@ export default function MacroCard({ label, current, progress, color }) {
                     {isOver && (
                         <>
                             <circle
-                                cx="40"
-                                cy="40"
+                                cx={center}
+                                cy={center}
                                 r={outerRadius}
                                 stroke="currentColor"
-                                strokeWidth="3"
+                                strokeWidth={outerStrokeW}
                                 fill="none"
                                 strokeLinecap="round"
                                 className={theme.ring}
@@ -89,20 +95,22 @@ export default function MacroCard({ label, current, progress, color }) {
                     )}
                 </svg>
 
-                {/* Centered Percentage */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className={`font-mono font-bold text-sm ${theme.text}`}>
-                        {Math.round(rawProgress)}%
-                    </span>
-                </div>
+                {/* Centered Percentage — hidden in compact mode */}
+                {!compact && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <span className={`type-value text-sm ${theme.text}`}>
+                            {Math.round(rawProgress)}%
+                        </span>
+                    </div>
+                )}
             </div>
 
             {/* Label & Value */}
             <div className="text-center">
-                <div className={`font-mono font-bold text-lg leading-none mb-1 ${theme.text}`}>
+                <div className={`type-value leading-none mb-1 ${theme.text} ${compact ? 'text-base' : 'text-lg'}`}>
                     {Math.round(current)}g
                 </div>
-                <div className="font-sans font-medium text-primary/70 text-xs tracking-wide uppercase">
+                <div className="type-label">
                     {label}
                 </div>
             </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 
 const TIER_COLORS = {
@@ -45,7 +45,7 @@ function BadgeCard({ badge, earned, onClick }) {
 
             {/* Name */}
             <span className={cn(
-                "font-sans text-sm font-medium leading-tight",
+                "type-secondary leading-tight",
                 earned ? "text-primary" : "text-primary/50"
             )}>
                 {badge.name}
@@ -53,7 +53,7 @@ function BadgeCard({ badge, earned, onClick }) {
 
             {/* Status — pinned to bottom */}
             {earned && dateStr && (
-                <span className="font-mono text-sm text-primary/45 mt-auto">{dateStr}</span>
+                <span className="type-caption text-primary/45 mt-auto">{dateStr}</span>
             )}
             {!earned && badge.percentage != null && (
                 <div className="w-full mt-auto">
@@ -63,7 +63,7 @@ function BadgeCard({ badge, earned, onClick }) {
                             style={{ width: `${badge.percentage}%` }}
                         />
                     </div>
-                    <span className="font-mono text-sm text-primary/45 mt-0.5 block">
+                    <span className="type-value text-sm text-primary/45 mt-0.5 block">
                         {badge.current}/{badge.target}
                     </span>
                 </div>
@@ -117,7 +117,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                     </div>
 
                     {/* Name */}
-                    <h3 className="font-serif font-bold text-lg text-primary">{badge.name}</h3>
+                    <h3 className="type-section-header">{badge.name}</h3>
 
                     {/* Tier badge */}
                     {badge.tier && (
@@ -130,7 +130,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                     )}
 
                     {/* Description */}
-                    <p className="font-sans text-sm text-primary/70 leading-relaxed">
+                    <p className="type-secondary leading-relaxed">
                         {badge.description}
                     </p>
 
@@ -140,7 +140,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            <span className="font-mono text-sm font-medium">Unlocked {dateStr}</span>
+                            <span className="type-caption">Unlocked {dateStr}</span>
                         </div>
                     ) : badge.percentage != null ? (
                         <div className="w-full mt-1">
@@ -150,7 +150,7 @@ function BadgeDetailModal({ badge, earned, onClose }) {
                                     style={{ width: `${badge.percentage}%` }}
                                 />
                             </div>
-                            <span className="font-mono text-sm text-primary/50 mt-1.5 block">
+                            <span className="type-value text-sm text-primary/50 mt-1.5 block">
                                 {badge.current} / {badge.target} ({badge.percentage}%)
                             </span>
                         </div>
@@ -164,6 +164,22 @@ function BadgeDetailModal({ badge, earned, onClose }) {
 export default function BadgesSection({ badgeData, loading }) {
     const [selectedBadge, setSelectedBadge] = useState(null);
 
+    // Sort earned badges: most recent first
+    const sortedEarned = useMemo(() => {
+        const earned = badgeData?.earned || [];
+        return [...earned].sort((a, b) => {
+            const aTime = a.earnedAt ? new Date(a.earnedAt).getTime() : 0;
+            const bTime = b.earnedAt ? new Date(b.earnedAt).getTime() : 0;
+            return bTime - aTime;
+        });
+    }, [badgeData]);
+
+    // Sort in-progress badges: closest to completing first (highest percentage)
+    const sortedProgress = useMemo(() => {
+        const progress = badgeData?.progress || [];
+        return [...progress].sort((a, b) => (b.percentage || 0) - (a.percentage || 0));
+    }, [badgeData]);
+
     if (loading) {
         return (
             <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
@@ -174,38 +190,51 @@ export default function BadgesSection({ badgeData, loading }) {
         );
     }
 
-    const earned = badgeData?.earned || [];
-    const progress = badgeData?.progress || [];
-    const hasBadges = earned.length > 0 || progress.length > 0;
+    const hasBadges = sortedEarned.length > 0 || sortedProgress.length > 0;
 
     if (!hasBadges) {
         return (
             <div className="text-center py-8 bg-primary/[0.03] dark:bg-white/[0.03] rounded-2xl border border-dashed border-primary/15">
-                <p className="font-sans text-sm text-primary/50">Start logging to earn badges</p>
+                <p className="type-secondary">Start logging to earn badges</p>
             </div>
         );
     }
 
     return (
         <>
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
-                {earned.map(badge => (
-                    <BadgeCard
-                        key={badge.badgeId}
-                        badge={badge}
-                        earned
-                        onClick={() => setSelectedBadge({ badge, earned: true })}
-                    />
-                ))}
-                {progress.map(badge => (
-                    <BadgeCard
-                        key={badge.badgeId}
-                        badge={badge}
-                        earned={false}
-                        onClick={() => setSelectedBadge({ badge, earned: false })}
-                    />
-                ))}
-            </div>
+            {/* Earned row */}
+            {sortedEarned.length > 0 && (
+                <div className="space-y-2">
+                    <p className="type-label px-1">Earned ({sortedEarned.length})</p>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                        {sortedEarned.map(badge => (
+                            <BadgeCard
+                                key={badge.badgeId}
+                                badge={badge}
+                                earned
+                                onClick={() => setSelectedBadge({ badge, earned: true })}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* In Progress row */}
+            {sortedProgress.length > 0 && (
+                <div className="space-y-2">
+                    <p className="type-label px-1">In Progress ({sortedProgress.length})</p>
+                    <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                        {sortedProgress.map(badge => (
+                            <BadgeCard
+                                key={badge.badgeId}
+                                badge={badge}
+                                earned={false}
+                                onClick={() => setSelectedBadge({ badge, earned: false })}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <BadgeDetailModal
                 badge={selectedBadge?.badge}

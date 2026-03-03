@@ -5,7 +5,7 @@ export default function ChartInsight({ text, className }) {
 
     return (
         <p className={cn(
-            "text-sm text-primary/70 font-sans mt-3 px-1 leading-relaxed",
+            "type-secondary mt-3 px-1 leading-relaxed",
             className
         )}>
             {text}

@@ -59,7 +59,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm overflow-y-auto">
             <div className="bg-surface rounded-t-2xl sm:rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom sm:zoom-in duration-200 sm:m-4 max-h-[100dvh] sm:max-h-[calc(100dvh-2rem)] overflow-y-auto">
                 <div className="p-4 border-b border-border flex justify-between items-center">
-                    <h2 className="text-lg font-semibold text-primary">Edit Food Log</h2>
+                    <h2 className="type-section-header">Edit Food Log</h2>
                     <button onClick={onClose} className="text-primary/50 hover:text-primary/80">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -70,7 +70,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                 <form onSubmit={handleSubmit} className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] space-y-4">
                     {/* Name */}
                     <div>
-                        <label className="block text-sm font-medium text-primary/80 mb-1">Food Name</label>
+                        <label className="block type-label mb-1">Food Name</label>
                         <input
                             type="text"
                             name="name"
@@ -84,7 +84,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Quantity & Unit */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-primary/80 mb-1">Quantity</label>
+                            <label className="block type-label mb-1">Quantity</label>
                             <input
                                 type="number"
                                 step="0.1"
@@ -96,7 +96,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-primary/80 mb-1">Unit</label>
+                            <label className="block type-label mb-1">Unit</label>
                             <input
                                 type="text"
                                 name="unit"
@@ -111,7 +111,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Macros */}
                     <div className="grid grid-cols-4 gap-2">
                         <div>
-                            <label className="block text-xs font-medium text-primary/50 mb-1">Cals</label>
+                            <label className="block type-label mb-1">Cals</label>
                             <input
                                 type="number"
                                 name="calories"
@@ -121,7 +121,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-primary mb-1">Protein</label>
+                            <label className="block type-label text-protein mb-1">Protein</label>
                             <input
                                 type="number"
                                 name="protein"
@@ -131,7 +131,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-carbs mb-1">Carbs</label>
+                            <label className="block type-label text-carbs mb-1">Carbs</label>
                             <input
                                 type="number"
                                 name="carbs"
@@ -141,7 +141,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-fat mb-1">Fat</label>
+                            <label className="block type-label text-fat mb-1">Fat</label>
                             <input
                                 type="number"
                                 name="fat"
@@ -155,7 +155,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                     {/* Meta */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-primary/80 mb-1">Meal</label>
+                            <label className="block type-label mb-1">Meal</label>
                             <select
                                 name="meal"
                                 value={formData.meal}
@@ -169,7 +169,7 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-primary/80 mb-1">Date</label>
+                            <label className="block type-label mb-1">Date</label>
                             <input
                                 type="date"
                                 name="date"

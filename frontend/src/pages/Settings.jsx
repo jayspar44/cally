@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { api } from '../api/services';
-import { LogOut, Sun, User, Info, ChevronRight, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw } from 'lucide-react';
+import { LogOut, Sun, User, Info, ChevronRight, Trash2, Cpu, Database, Target, Scale, Calculator, MessageSquare, RotateCcw, CalendarDays } from 'lucide-react';
 import { getVersionString, getEnvironment, getBackendInfo, getBuildVersionCode } from '../utils/appConfig';
 import { cn } from '../utils/cn';
 
@@ -45,6 +45,8 @@ export default function Settings() {
 
     const [recommendedTargets, setRecommendedTargets] = useState(null);
     const [loadingRecommended, setLoadingRecommended] = useState(false);
+
+    const [savingReviewDay, setSavingReviewDay] = useState(false);
 
     useEffect(() => {
         if (settings) {
@@ -193,6 +195,21 @@ export default function Settings() {
         }
     };
 
+    const [triggeringReview, setTriggeringReview] = useState(false);
+    const handleTriggerWeeklyReview = async () => {
+        if (!confirm('Trigger a weekly review now? This will generate a review message in Chat.')) return;
+        setTriggeringReview(true);
+        try {
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            await api.triggerWeeklyReview(timezone, { force: true });
+            navigate('/chat', { state: { refreshHistory: true } });
+        } catch {
+            alert('Failed to trigger weekly review');
+        } finally {
+            setTriggeringReview(false);
+        }
+    };
+
     const handleResetTargets = async () => {
         if (!confirm('Reset nutrition targets to defaults (2000 cal, 50g protein, 250g carbs, 65g fat)?')) return;
         try {
@@ -200,6 +217,26 @@ export default function Settings() {
         } catch {
             alert('Failed to reset targets');
         }
+    };
+
+    const handleSaveReviewDay = async (day) => {
+        setSavingReviewDay(true);
+        try {
+            await updateProfileConfig({ settings: { weeklyReviewDay: day } });
+        } catch {
+            alert('Failed to save review day');
+        }
+        setSavingReviewDay(false);
+    };
+
+    const REVIEW_DAY_LABELS = {
+        sunday: 'Sunday',
+        monday: 'Monday',
+        tuesday: 'Tuesday',
+        wednesday: 'Wednesday',
+        thursday: 'Thursday',
+        friday: 'Friday',
+        saturday: 'Saturday',
     };
 
     const GENDER_LABELS = {
@@ -697,6 +734,30 @@ export default function Settings() {
 
                 <div className="h-px bg-border/50 my-2" />
 
+                <div className="flex items-center justify-between py-2">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary">
+                            <CalendarDays className="w-5 h-5" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="type-secondary font-medium">Weekly Review Day</span>
+                            <span className="type-caption">When Kalli sends your review</span>
+                        </div>
+                    </div>
+                    <select
+                        value={settings?.weeklyReviewDay || 'sunday'}
+                        onChange={(e) => handleSaveReviewDay(e.target.value)}
+                        disabled={savingReviewDay}
+                        className="px-3 py-1.5 text-sm bg-primary/5 rounded-lg outline-none font-mono text-primary focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
+                    >
+                        {Object.entries(REVIEW_DAY_LABELS).map(([value, label]) => (
+                            <option key={value} value={value}>{label}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="h-px bg-border/50 my-2" />
+
                 <button
                     onClick={() => setDeveloperMode(!developerMode)}
                     className="w-full flex items-center justify-between py-2 group"
@@ -770,6 +831,27 @@ export default function Settings() {
                                 <div className="flex flex-col items-start">
                                     <span className="font-sans text-sm font-medium">Reset Nutrition Targets</span>
                                     <span className="font-sans text-xs opacity-60">Revert to default 2000 cal / 50p / 250c / 65f</span>
+                                </div>
+                            </div>
+                            <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
+                        </button>
+
+                        <div className="h-px bg-border/50 my-2" />
+
+                        <button
+                            onClick={handleTriggerWeeklyReview}
+                            disabled={triggeringReview}
+                            className="w-full flex items-center justify-between py-2 group text-accent hover:text-accent/80 transition-colors disabled:opacity-50"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                                    {triggeringReview
+                                        ? <div className="w-5 h-5 border-2 border-accent/20 border-t-accent rounded-full animate-spin" />
+                                        : <MessageSquare className="w-5 h-5" />}
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="type-secondary font-medium">Trigger Weekly Review</span>
+                                    <span className="type-caption">Force generate a review in Chat</span>
                                 </div>
                             </div>
                             <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />

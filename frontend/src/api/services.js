@@ -79,16 +79,19 @@ export const api = {
 
     createFoodLog: async (data) => {
         const response = await client.post('/food/logs', data);
+        window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },
 
     updateFoodLog: async (id, data) => {
         const response = await client.put(`/food/logs/${id}`, data);
+        window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },
 
     deleteFoodLog: async (id) => {
         const response = await client.delete(`/food/logs/${id}`);
+        window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },
 
@@ -136,4 +139,8 @@ export const api = {
         const response = await client.get('/user/recommended-targets');
         return response.data;
     },
+
+    getHomeGreeting: (timezone) => client.get(`/home/greeting?timezone=${encodeURIComponent(timezone)}`).then(res => res.data),
+
+    triggerWeeklyReview: (timezone, { force = false } = {}) => client.post('/chat/weekly-review', { timezone, force }).then(res => res.data),
 };

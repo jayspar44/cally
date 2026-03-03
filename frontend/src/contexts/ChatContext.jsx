@@ -121,6 +121,11 @@ export const ChatProvider = ({ children }) => {
                 ];
             });
 
+            // Notify if food was logged/updated so Home greeting cache invalidates
+            if (response.foodLog || (response.toolsUsed || []).some(t => t === 'logFood' || t === 'updateFoodLog')) {
+                window.dispatchEvent(new CustomEvent('food-log-changed'));
+            }
+
             return response;
         } catch (err) {
             logger.error('Failed to send message:', err);

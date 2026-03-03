@@ -26,4 +26,15 @@ const getTodayStr = (timezone) => {
     return toDateStr();
 };
 
-module.exports = { parseLocalDate, toDateStr, getTodayStr };
+/** Validate a timezone string. Returns the timezone if valid, fallback otherwise. */
+const safeTimezone = (tz, fallback = 'America/New_York') => {
+    if (!tz || typeof tz !== 'string' || tz.length > 64) return fallback;
+    try {
+        Intl.DateTimeFormat(undefined, { timeZone: tz });
+        return tz;
+    } catch {
+        return fallback;
+    }
+};
+
+module.exports = { parseLocalDate, toDateStr, getTodayStr, safeTimezone };

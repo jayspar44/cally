@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import {
     BarChart, Bar, AreaChart, Area, XAxis, YAxis, ReferenceLine,
-    ResponsiveContainer, Cell, Tooltip
+    CartesianGrid, ResponsiveContainer, Cell, Tooltip
 } from 'recharts';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -23,9 +23,10 @@ const CustomTooltip = ({ active, payload, metric }) => {
     const config = METRIC_CONFIG[metric];
     const value = Math.round(data.displayValue || 0);
     return (
-        <div className="bg-primary text-white text-sm px-2.5 py-1.5 rounded-lg font-mono shadow-lg">
-            <span className="font-bold">{value}</span> {config.unit}
-            {data.label && <div className="opacity-70">{data.label}</div>}
+        <div className="bg-[#1C1D1D] backdrop-blur-sm px-3 py-2 rounded-xl shadow-lg border border-white/10">
+            <span className="font-mono font-bold text-sm text-white">{value}</span>
+            <span className="font-sans text-xs font-medium text-white/70 ml-1">{config.unit}</span>
+            {data.label && <div className="font-sans text-xs font-medium text-white/60 mt-0.5">{data.label}</div>}
         </div>
     );
 };
@@ -57,7 +58,7 @@ export default function TrendsChart({
             return monthlyData.days.map(day => ({
                 ...day,
                 displayValue: day[selectedMetric] || 0,
-                dayLabel: day.date.slice(8),
+                dayLabel: day.date,
                 label: formatDateDisplay(day.date, { month: 'short', day: 'numeric' }),
                 isToday: isTodayUtil(day.date),
                 hasData: day.tracked,
@@ -81,22 +82,40 @@ export default function TrendsChart({
         return Math.max(targetValue * 1.2, dataMax * 1.1) || 100;
     }, [chartData, targetValue]);
 
-    const insightText = useMemo(() => {
-        const tracked = chartData.filter(d => d.hasData);
-        if (tracked.length === 0) return null;
-        const avg = Math.round(tracked.reduce((s, d) => s + d.displayValue, 0) / tracked.length);
-        const diff = avg - targetValue;
-        const pct = targetValue > 0 ? Math.abs(Math.round((diff / targetValue) * 100)) : 0;
-        const rangeLabel = timeRange === '1W' ? 'week' : timeRange === '1M' ? '30-day' : '3-month';
+    // Annotations: personal best bar + goal-hit bars
+    const annotations = useMemo(() => {
+        if (!chartData?.length) return {};
+        const goalVal = targetValue;
 
-        if (targetValue > 0 && Math.abs(diff) <= targetValue * 0.05) {
-            return `Your ${rangeLabel} avg ${config.label.toLowerCase()} is ${avg}${config.unit} \u2014 right on target.`;
-        }
-        if (targetValue > 0) {
-            return `Your ${rangeLabel} avg ${config.label.toLowerCase()} is ${avg}${config.unit} \u2014 ${pct}% ${diff < 0 ? 'below' : 'above'} your ${targetValue}${config.unit} goal.`;
-        }
-        return `Your ${rangeLabel} avg ${config.label.toLowerCase()} is ${avg}${config.unit}.`;
-    }, [chartData, targetValue, config, timeRange]);
+        let bestIdx = -1;
+        let bestVal = 0;
+        const goalHits = new Set();
+
+        chartData.forEach((d, i) => {
+            const val = d.displayValue || 0;
+            if (val > bestVal && val > 0 && d.hasData) { bestVal = val; bestIdx = i; }
+            if (goalVal > 0 && val > 0 && d.hasData && Math.abs(val - goalVal) / goalVal <= 0.05) {
+                goalHits.add(i);
+            }
+        });
+
+        return { bestIdx, bestVal, goalHits };
+    }, [chartData, targetValue]);
+
+    const insightText = useMemo(() => {
+        if (!averages || !goals) return null;
+        const avg = averages[selectedMetric] || 0;
+        const goalKey = METRIC_CONFIG[selectedMetric].goalKey;
+        const goal = goals[goalKey] || 0;
+        if (!goal || !avg) return null;
+
+        const diff = avg - goal;
+        const absDiff = Math.abs(Math.round(diff));
+        const unit = selectedMetric === 'calories' ? 'cal' : 'g';
+        const direction = diff > 0 ? 'over' : 'under';
+
+        return `Averaging ${Math.round(avg)}${unit} \u2014 ${absDiff}${unit} ${direction} your ${Math.round(goal)}${unit} target`;
+    }, [averages, goals, selectedMetric]);
 
     const useAreaChart = timeRange === '3M';
     const xAxisInterval = timeRange === '1W' ? 0 : timeRange === '1M' ? 6 : 2;
@@ -105,7 +124,7 @@ export default function TrendsChart({
     return (
         <section className="bg-white/90 dark:bg-surface/90 backdrop-blur-xl rounded-[2rem] p-5 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.1)] border border-white/50 dark:border-border/30">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif font-bold text-lg text-primary">Trends</h3>
+                <h3 className="type-section-header">Trends</h3>
             </div>
 
             {/* Period Navigation */}
@@ -145,8 +164,8 @@ export default function TrendsChart({
             {/* Avg Stat Line */}
             {averages && (
                 <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5 mb-3 px-0.5">
-                    <span className="font-mono text-sm text-primary/50 uppercase">Avg {RANGE_LABELS[timeRange]}</span>
-                    <span className="font-mono font-bold text-lg text-primary">
+                    <span className="type-label">Avg {RANGE_LABELS[timeRange]}</span>
+                    <span className="type-value text-lg">
                         {Math.round(averages[selectedMetric] || 0).toLocaleString()}{config.unit}
                     </span>
                     {targetValue > 0 && (
@@ -180,10 +199,11 @@ export default function TrendsChart({
                             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                                 <defs>
                                     <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={config.color} stopOpacity={0.15} />
-                                        <stop offset="100%" stopColor={config.color} stopOpacity={0.02} />
+                                        <stop offset="0%" stopColor={config.color} stopOpacity={0.12} />
+                                        <stop offset="100%" stopColor={config.color} stopOpacity={0.01} />
                                     </linearGradient>
                                 </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-primary)" opacity={0.06} vertical={false} />
                                 <XAxis
                                     dataKey="dayLabel"
                                     tick={{ fontSize: 11, fill: 'var(--color-primary)', opacity: 0.6 }}
@@ -218,12 +238,14 @@ export default function TrendsChart({
                             </AreaChart>
                         ) : (
                             <BarChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-primary)" opacity={0.06} vertical={false} />
                                 <XAxis
                                     dataKey="dayLabel"
                                     tick={{ fontSize: 11, fill: 'var(--color-primary)', opacity: 0.6 }}
                                     tickLine={false}
                                     axisLine={false}
                                     interval={xAxisInterval}
+                                    tickFormatter={timeRange === '1M' ? v => v.slice(8) : undefined}
                                 />
                                 <YAxis
                                     domain={[0, maxValue]}
@@ -243,24 +265,30 @@ export default function TrendsChart({
                                     />
                                 )}
                                 <Bar dataKey="displayValue" radius={[6, 6, 0, 0]} maxBarSize={timeRange === '1M' ? 14 : 36}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell
-                                            key={index}
-                                            fill={
-                                                !entry.hasData ? 'transparent'
-                                                    : entry.isOver ? config.overColor
-                                                        : entry.isToday ? config.todayColor
-                                                            : config.color
-                                            }
-                                            opacity={entry.hasData ? 1 : 0.1}
-                                        />
-                                    ))}
+                                    {chartData.map((entry, index) => {
+                                        const isBest = annotations.bestIdx === index;
+                                        const isGoalHit = annotations.goalHits?.has(index);
+                                        return (
+                                            <Cell
+                                                key={index}
+                                                fill={
+                                                    !entry.hasData ? 'transparent'
+                                                        : entry.isOver ? config.overColor
+                                                            : entry.isToday ? config.todayColor
+                                                                : config.color
+                                                }
+                                                opacity={entry.hasData ? (isBest ? 1 : isGoalHit ? 0.95 : 0.85) : 0.1}
+                                                stroke={isBest ? config.todayColor : isGoalHit ? 'var(--color-chart-goal)' : 'none'}
+                                                strokeWidth={isBest || isGoalHit ? 2 : 0}
+                                            />
+                                        );
+                                    })}
                                 </Bar>
                             </BarChart>
                         )}
                     </ResponsiveContainer>
                 ) : (
-                    <div className="flex items-center justify-center h-full text-primary/30 font-sans text-sm">
+                    <div className="flex items-center justify-center h-full type-secondary">
                         Not enough data yet
                     </div>
                 )}

@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.6](https://github.com/jayspar44/cally/compare/v0.4.5...v0.4.6) (2026-03-02)
+
+
+### Features
+
+* bypass duplicate review guard for manual trigger d9935bc
+* weekly review as agent tool, scannable format, and Home loading states 5399326
+
+
+### Bug Fixes
+
+* address code review blocking and high priority issues 74e4a70
+* address remaining code review issues 800a178
+
+### [0.4.5](https://github.com/jayspar44/cally/compare/v0.4.4...v0.4.5) (2026-03-01)
+
+
+### Features
+
+* add adaptive macros, weekly focus, and smart CTA to Home page 6dc9ea9
+* add AI greeting and calorie pacing to Home page 21e9412
+* add chart annotations, macro trends, and refine AI prompts 931bff6
+* add home greeting API service 4cd9c83
+* add home greeting route, controller, and AI generation 970b672
+* add type scale and card utility classes to design system e7e1457
+* add weekly review day setting to Settings page 3aad6a5
+* implement weekly review generation service and endpoints 0470a69
+* redesign insights page with progress bars, streak clarity, and AI prompt improvements 9b34e2a
+* reorder Insights sections and enhance streak banner b25327f
+* trigger weekly review from Chat page and verify focus flow 9f24190
+
+
+### Bug Fixes
+
+* add nutritionSource to manual food log creation 9266e00
+* add rate limiting to greeting endpoint and fix weeklyFocus access 59d9551
+* improve error handling for tool iteration limit and timezone sync cbf4047
+* use logger instead of console.error for greeting fetch 4bb65b2
+
 ### [0.4.4](https://github.com/jayspar44/cally/compare/v0.4.3...v0.4.4) (2026-02-25)
 
 

@@ -6,7 +6,7 @@ import { parseLocalDate, toDateStr } from '../utils/dateUtils';
 import { BarChart3, Plus } from 'lucide-react';
 import KalliInsightCard from '../components/insights/KalliInsightCard';
 import TrendsChart from '../components/insights/TrendsChart';
-import MacroDonutChart from '../components/insights/MacroDonutChart';
+import MacroTrends from '../components/insights/MacroTrends';
 import StreakBanner from '../components/insights/StreakBanner';
 import BadgesSection from '../components/insights/BadgesSection';
 
@@ -201,6 +201,14 @@ export default function Insights() {
     const periodLabel = useMemo(() => formatPeriodLabel(activeData?.startDate, activeData?.endDate), [activeData]);
     const periodStart = useMemo(() => computePeriodStart(timeRange, periodOffset), [timeRange, periodOffset]);
 
+    // Compute next streak badge to earn (consistency category only)
+    const nextBadge = useMemo(() => {
+        if (!badgeData?.progress?.length) return null;
+        const streakBadges = badgeData.progress.filter(b => b.percentage < 100 && b.category === 'consistency');
+        if (!streakBadges.length) return null;
+        return streakBadges.sort((a, b) => b.percentage - a.percentage)[0];
+    }, [badgeData]);
+
     if (loadingData && !weeklyData) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
@@ -219,8 +227,8 @@ export default function Insights() {
                 <div className="w-16 h-16 bg-accent/10 rounded-[1.75rem] flex items-center justify-center mb-5">
                     <BarChart3 className="w-8 h-8 text-accent" />
                 </div>
-                <h2 className="font-serif font-black text-2xl text-primary mb-2 text-center">No insights yet</h2>
-                <p className="font-sans text-primary/60 text-sm text-center max-w-xs leading-snug mb-6">
+                <h2 className="type-page-title mb-2 text-center">No insights yet</h2>
+                <p className="type-secondary text-center max-w-xs leading-snug mb-6">
                     Log your first meal and your trends, averages, and achievements will show up here.
                 </p>
                 <button
@@ -261,7 +269,7 @@ export default function Insights() {
                 </div>
             )}
 
-            {/* Kalli's Insight (adapts to time range) */}
+            {/* AI Insight (adapts to selected time range) */}
             <KalliInsightCard timeRange={timeRange} periodStart={periodStart} />
 
             {/* Trends Chart with Metric Switcher */}
@@ -281,10 +289,18 @@ export default function Insights() {
                 periodLabel={periodLabel}
             />
 
-            {/* Macro Donut Chart */}
-            <MacroDonutChart
+            {/* Macro Breakdown (progress bars) */}
+            <MacroTrends
                 averages={averages}
                 goals={goals}
+                prevAverages={prevAverages}
+            />
+
+            {/* Streak Banner */}
+            <StreakBanner
+                stats={badgeData?.stats}
+                loading={loadingBadges}
+                nextBadge={nextBadge}
             />
 
             {/* Divider */}
@@ -292,12 +308,7 @@ export default function Insights() {
 
             {/* Achievements Section (decoupled from timeRange) */}
             <div className="space-y-3">
-                <h3 className="font-serif font-bold text-lg text-primary px-1">Achievements</h3>
-
-                <StreakBanner
-                    stats={badgeData?.stats}
-                    loading={loadingBadges}
-                />
+                <h3 className="type-section-header px-1">Achievements</h3>
 
                 <BadgesSection
                     badgeData={badgeData}

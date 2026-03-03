@@ -124,6 +124,7 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 - **Situational coaching**: When user mentions context (traveling, busy day, eating out), adapt advice accordingly
 - **Progressive follow-ups**: End responses with relevant questions when appropriate, but don't force it every time
 - **General conversation**: When the user isn't logging food — just chatting, asking questions, seeking advice — respond naturally like a knowledgeable friend. No tool calls needed for general nutrition questions, meal planning chat, or motivational conversation
+- **Weekly review**: On the user's designated review day, context will tell you when a review is available. After logging a meal (especially dinner/last meal), naturally offer to generate their weekly review. If they agree, call \`triggerWeeklyReview\`. The tool returns the full review text — present it conversationally. Don't force it — one gentle offer per session is enough
 
 ## Personalized Advice (when biometrics available in context)
 - Reference user's weight and goal type in recommendations
@@ -321,7 +322,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             ? {
                 maxOutputTokens: 8192,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'LOW' },
+                thinkingConfig: { thinkingLevel: 'MEDIUM' },
                 cachedContent: cacheName
             }
             : {
@@ -329,7 +330,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 maxOutputTokens: 8192,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'LOW' }
+                thinkingConfig: { thinkingLevel: 'MEDIUM' }
             };
 
         const payload = {
@@ -457,7 +458,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
             ? {
                 maxOutputTokens: 4096,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'LOW' },
+                thinkingConfig: { thinkingLevel: 'MEDIUM' },
                 cachedContent: cacheName
             }
             : {
@@ -465,7 +466,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 maxOutputTokens: 4096,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'LOW' }
+                thinkingConfig: { thinkingLevel: 'MEDIUM' }
             };
 
         const payload = {
@@ -582,26 +583,37 @@ const getDayLogs = async (userId, dateStr) => {
 };
 
 const getRecentDayLogs = async (userId, timezone, days = 3) => {
-    const now = new Date();
-    const dates = [];
-    for (let i = 1; i <= days; i++) {
-        const d = new Date(now);
-        if (timezone) {
-            const todayStr = now.toLocaleDateString('en-CA', { timeZone: timezone });
-            const base = parseLocalDate(todayStr);
-            base.setDate(base.getDate() - i);
-            dates.push(toDateStr(base));
-        } else {
-            d.setDate(d.getDate() - i);
-            dates.push(toDateStr(d));
-        }
+    const todayStr = timezone
+        ? new Date().toLocaleDateString('en-CA', { timeZone: timezone })
+        : toDateStr(new Date());
+    const base = parseLocalDate(todayStr);
+    const end = new Date(base);
+    end.setDate(end.getDate() - 1);
+    const start = new Date(base);
+    start.setDate(start.getDate() - days);
+    const startDate = toDateStr(start);
+    const endDate = toDateStr(end);
+
+    // Single range query instead of N individual queries
+    const snapshot = await db.collection('users').doc(userId)
+        .collection('foodLogs')
+        .where('date', '>=', startDate)
+        .where('date', '<=', endDate)
+        .limit(200)
+        .get();
+
+    if (snapshot.empty) return null;
+
+    // Group logs by date
+    const byDate = {};
+    for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const d = data.date;
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(data);
     }
 
-    const allLogs = await Promise.all(dates.map(date => getDayLogs(userId, date)));
-    const daysWithData = allLogs.filter(logs => logs.length > 0);
-
-    if (daysWithData.length === 0) return null;
-
+    const daysWithData = Object.values(byDate);
     const totals = daysWithData.map(sumLogs);
     const count = totals.length;
     return {
@@ -644,8 +656,9 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
 
     let goals, todayLogs, yesterdayLogs, recentAvg;
     try {
+        const userSettings = (userProfile || {}).settings || {};
         [goals, todayLogs, yesterdayLogs, recentAvg] = await Promise.all([
-            getGoalsForDate(userId, today),
+            getGoalsForDate(userId, today, userSettings),
             getDayLogs(userId, today),
             getDayLogs(userId, yesterday),
             getRecentDayLogs(userId, userTimezone, 3),
@@ -696,6 +709,17 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
         context += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein, ${recentAvg.avgCarbs}g carbs, ${recentAvg.avgFat}g fat\n`;
     }
 
+    // Weekly review awareness
+    const settings = userData.settings || {};
+    const reviewDay = settings.weeklyReviewDay || 'sunday';
+    const currentDayLower = dayName.toLowerCase();
+    if (currentDayLower === reviewDay) {
+        const lastReview = userData.lastWeeklyReview;
+        if (lastReview !== today) {
+            context += `\n**WEEKLY REVIEW AVAILABLE** — Today is ${dayName}, the user's review day, and no review has been generated yet this week. After the user logs a meal (especially dinner or their last meal of the day), naturally offer to do their weekly review. Example: "Since it's ${dayName}, want me to put together your weekly review?" If the user agrees, call triggerWeeklyReview. Do NOT auto-trigger it — wait for the user to say yes.\n`;
+        }
+    }
+
     if (biometrics.weight || biometrics.goalType) {
         context += `\nUser Biometrics:`;
         if (biometrics.weight) context += ` Weight: ${biometrics.weight} ${biometrics.weightUnit || 'lbs'}.`;
@@ -715,7 +739,147 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
     return { context, needsOnboarding };
 };
 
+const generateHomeGreeting = async (userId, timezone) => {
+    const logger = getLogger();
+    const tz = timezone || 'America/New_York';
+    const today = getTodayStr(tz);
+
+    try {
+        // 1. Get user doc for settings, weeklyFocus, and firstName
+        const userDoc = await db.collection('users').doc(userId).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+        const firstName = userData.firstName || '';
+        const userSettings = userData.settings || {};
+        const weeklyFocus = userData.weeklyFocus || null;
+
+        // 2. Get goals, today's logs, and recent averages in parallel
+        const [goals, todayLogs, recentAvg] = await Promise.all([
+            getGoalsForDate(userId, today, userSettings),
+            getDayLogs(userId, today),
+            getRecentDayLogs(userId, tz, 5),
+        ]);
+
+        // 3. Compute summaries
+        const todaySummary = sumLogs(todayLogs);
+        const todayFormatted = formatLogsByMeal(todayLogs, 'Logged today');
+
+        // 4. Determine time of day
+        const now = new Date();
+        const timeStr = now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+        const hour = parseInt(now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false }), 10);
+        let timeOfDay;
+        if (hour < 12) timeOfDay = 'morning';
+        else if (hour < 17) timeOfDay = 'afternoon';
+        else if (hour < 21) timeOfDay = 'evening';
+        else timeOfDay = 'late night';
+
+        // 5. Determine which meals are logged
+        const loggedMeals = new Set(todayLogs.map(l => l.meal));
+        const allMeals = ['breakfast', 'lunch', 'dinner'];
+        const missingMeals = allMeals.filter(m => !loggedMeals.has(m));
+
+        // 6. Compute remaining macros
+        const remaining = {
+            calories: goals.targetCalories - todaySummary.calories,
+            protein: goals.targetProtein - todaySummary.protein,
+            carbs: goals.targetCarbs - todaySummary.carbs,
+            fat: goals.targetFat - todaySummary.fat,
+        };
+
+        // 7. Build greeting prompt
+        let greetingPrompt = `You are Kalli, a warm and knowledgeable AI nutrition coach. Generate a personalized 1-2 sentence greeting for the user's home screen.
+
+RULES:
+- Be specific — reference actual data, not generic platitudes
+- If a macro (especially protein) is notably off-track, mention it briefly
+- If it's late and nothing is logged, gently nudge without being pushy
+- If on track, acknowledge briefly and suggest what to aim for next
+- No emojis. Maximum 1 exclamation mark. Warm but concise tone.
+- Vary your openings — don't always start with "Hey!" or the user's name. Mix it up: use observations, time references, or jump straight into the insight.
+- 1-2 sentences ONLY. Max ~40 words.
+- Do NOT use the user's name in every greeting — use it sparingly (maybe 1 in 4 times).
+
+CONTEXT:
+Today: ${today} (${new Date().toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' })})
+Time: ${timeStr} (${timeOfDay})
+${firstName ? `User's name: ${firstName}` : ''}
+Daily goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein, ${goals.targetCarbs}g carbs, ${goals.targetFat}g fat
+Today's progress (${todaySummary.count} items): ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat
+Remaining: ${remaining.calories} cal, ${remaining.protein}g protein, ${remaining.carbs}g carbs, ${remaining.fat}g fat
+Meals logged: ${loggedMeals.size > 0 ? [...loggedMeals].join(', ') : 'none yet'}
+Missing meals: ${missingMeals.length > 0 ? missingMeals.join(', ') : 'all logged'}
+IMPORTANT: Today's log is STILL IN PROGRESS — the user hasn't finished eating for the day. Do NOT compare today's partial totals to full-day targets or previous full days as if today is complete.`;
+
+        if (todayFormatted) {
+            greetingPrompt += `\n${todayFormatted}`;
+        }
+
+        if (recentAvg) {
+            greetingPrompt += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein`;
+        }
+
+        const focusLabel = weeklyFocus ? (weeklyFocus.label || (typeof weeklyFocus === 'string' ? weeklyFocus : null)) : null;
+        if (focusLabel) {
+            greetingPrompt += `\nActive weekly focus: "${focusLabel}"`;
+            greetingPrompt += `\n\nRespond with the greeting text, then on a new line write FOCUS_PROGRESS: followed by ONE short sentence (max 12 words) evaluating progress on the weekly focus. Be specific.`;
+        } else {
+            greetingPrompt += `\n\nRespond with ONLY the greeting text. No quotes, no labels, no preamble.`;
+        }
+
+        // 8. Call Gemini Flash for greeting (+ focus progress if applicable)
+        const greetingResult = await genAI.models.generateContent({
+            model: MODELS.flash,
+            contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
+            config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }
+        });
+
+        const fullText = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+
+        // 9. Parse greeting and optional focus progress from single response
+        let greeting = fullText;
+        let focusProgress = null;
+        const activeFocus = focusLabel;
+
+        if (focusLabel) {
+            const focusMatch = fullText.match(/FOCUS_PROGRESS:\s*(.+)/i);
+            if (focusMatch) {
+                focusProgress = focusMatch[1].trim();
+                greeting = fullText.replace(/\n?FOCUS_PROGRESS:\s*.+/i, '').trim();
+            }
+        }
+
+        return { greeting, focusProgress, activeFocus };
+    } catch (error) {
+        logger.error({ err: error, userId }, 'Failed to generate home greeting');
+        throw error;
+    }
+};
+
+const invalidateContextCache = () => {
+    cachedContentNames.base = null;
+    cachedContentNames.onboarding = null;
+    getLogger().info('Context cache invalidated');
+};
+
+/**
+ * Generate an AI insight summary from a prompt string.
+ * Used by the insights controller for weekly/monthly/quarterly summaries.
+ */
+const generateInsightSummary = async (prompt) => {
+    const result = await genAI.models.generateContent({
+        model: MODELS.flash,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }
+    });
+    return result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+};
+
 module.exports = {
+    genAI,
+    MODELS,
     processMessage,
-    processImageMessage
+    processImageMessage,
+    generateHomeGreeting,
+    generateInsightSummary,
+    invalidateContextCache
 };

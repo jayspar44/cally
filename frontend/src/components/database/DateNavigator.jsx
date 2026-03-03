@@ -36,7 +36,7 @@ export default function DateNavigator({ selectedDate, onDateChange }) {
             <div className="text-center">
                 <button
                     onClick={() => dateInputRef.current?.showPicker?.()}
-                    className="font-serif font-bold text-lg text-primary hover:text-accent transition-colors"
+                    className="type-section-header hover:text-accent transition-colors"
                 >
                     {displayDate}
                 </button>

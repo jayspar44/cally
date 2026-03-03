@@ -1,9 +1,7 @@
 const { db } = require('../services/firebase');
 const { toDateStr, parseLocalDate, getTodayStr } = require('../utils/dateUtils');
 const { getGoalsForDate, snapshotGoals, getUserSettings } = require('../services/goalsService');
-const { GoogleGenAI } = require('@google/genai');
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const { generateInsightSummary } = require('../services/geminiService');
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -589,60 +587,94 @@ const getAISummary = async (req, res) => {
         const avgCarbs = Math.round(totalCarbs / daysTracked);
         const avgFat = Math.round(totalFat / daysTracked);
 
-        // Build per-day summary for weekly prompt
+        // Build per-day summary (raw data for the AI to find patterns in)
         const dailyBreakdown = Object.keys(byDate).sort().map(date => {
             const dayName = parseLocalDate(date).toLocaleDateString('en-US', { weekday: 'short' });
-            const dayFoods = logs.filter(l => l.date === date).map(l => l.name);
-            const uniqueFoods = [...new Set(dayFoods)].slice(0, 4).join(', ');
-            return `${dayName} ${date}: ${Math.round(byDate[date].calories)} cal — ${uniqueFoods}`;
+            const d = byDate[date];
+            return `${dayName} ${date}: ${Math.round(d.calories)} cal, ${Math.round(d.protein)}g prot, ${Math.round(d.carbs)}g carb, ${Math.round(d.fat)}g fat`;
         }).join('\n');
 
-        const RANGE_PROMPTS = {
-            '1W': `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized weekly insight. Focus on ACUTE adjustments. Reference specific days by name (e.g. 'Tuesday's pizza') — NEVER say 'yesterday' or 'today' since the user may read this days later. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+        const FORMAT_RULES = `FORMAT: Exactly 2-3 bullet points, each starting with "- ".
+Each bullet MUST identify a TREND, PATTERN, or COMPARISON across days — not describe what happened on a single day.
+NEVER write generic encouragement like "Great job" or "Keep it up."
+NEVER narrate a day-by-day recap or walk through each day sequentially.
+Use the daily data below to FIND patterns, don't REPEAT it back.
+BAD: "- On Monday you had 1831 calories and on Tuesday you had 902 calories" (this is a recap, not a trend)
+BAD: "- You're doing well with your nutrition goals" (generic)
+GOOD: "- Your calorie intake swings by 900+ cal day-to-day — more consistency would help you stay on track"
+GOOD: "- You're hitting 94% of your protein goal despite being under on total calories — that protein-first approach is working"
+GOOD: "- You've hit your calorie target 5 of the last 7 days, missing on Wednesday and Saturday"`;
 
-Today: ${todayStr}
-Period: ${startStr} to ${endStr} (this week)
+        const now = new Date();
+        const currentTimeStr = now.toLocaleString('en-US', { timeZone: settings.timezone || 'America/New_York', hour: 'numeric', minute: '2-digit', hour12: true });
+        const todayIsInPeriod = todayStr >= startStr && todayStr <= endStr;
+        const todayNote = todayIsInPeriod
+            ? `\nIMPORTANT: Today is ${todayStr} and it's currently ${currentTimeStr}. If today appears in the daily data, that day is STILL IN PROGRESS — the user hasn't finished eating yet. Do NOT compare today's partial numbers against completed days or treat today as a low day.`
+            : '';
+
+        const RANGE_PROMPTS = {
+            '1W': `You are Kalli, a friendly AI nutrition coach. Look at the daily data below and identify PATTERNS and TRENDS — consistency vs swings, macro imbalances, goal-hit rate, meal gaps. Synthesize across days; do NOT walk through each day. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations.
+
+${FORMAT_RULES}
+
+Today: ${todayStr} (${currentTimeStr})
+Period: ${startStr} to ${endStr}
 Days tracked: ${daysTracked}/${totalDaysInPeriod}
-Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
-Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
-Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
-Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
-Total items logged: ${logs.length}
+Goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein, ${goals.targetCarbs}g carbs, ${goals.targetFat}g fat
+Averages: ${avgCalories} cal, ${avgProtein}g protein, ${avgCarbs}g carbs, ${avgFat}g fat
 Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
 
-Daily breakdown:
-${dailyBreakdown}
+Daily data (use to find patterns, NOT to recap):
+${dailyBreakdown}${todayNote}
 
-Keep it to 2-3 sentences max. Focus on one positive observation and one actionable suggestion.`,
+One positive pattern and one actionable suggestion.`,
 
             '1M': (() => {
                 const sortedDates = Object.keys(byDate).sort();
                 const firstLogDate = sortedDates[0] || startStr;
                 const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
-                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized monthly insight. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+                // Compute gap days for accuracy
+                const allDatesInPeriod = [];
+                const ps = parseLocalDate(startStr);
+                const pe = parseLocalDate(endStr);
+                for (let dd = new Date(ps); dd <= pe; dd.setDate(dd.getDate() + 1)) {
+                    allDatesInPeriod.push(toDateStr(dd));
+                }
+                const gapDays = allDatesInPeriod.filter(d => !byDate[d] || byDate[d].calories === 0);
+                const gapInfo = gapDays.length > 0
+                    ? `Gap days (no logs): ${gapDays.map(d => parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })).join(', ')}`
+                    : 'No gap days — logged every day';
 
-Today: ${todayStr}
+                return `You are Kalli, a friendly AI nutrition coach. Write personalized monthly patterns. Focus on WEEKLY PATTERNS — weekday vs weekend consistency, recurring gaps, building habits. Be warm, specific, and actionable. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+NEVER claim the user logged "X days straight" or "X consecutive days" unless the gap days list below is empty. "Days tracked" means total days with logs, NOT consecutive days.
+
+${FORMAT_RULES}
+
+Today: ${todayStr} (${currentTimeStr})
 Period: ${startStr} to ${endStr} (last 30 days)
 First log date in period: ${firstLogDate}
 Last log date in period: ${lastLogDate}
 Days tracked: ${daysTracked}/${totalDaysInPeriod}
+${gapInfo}
 Avg daily calories: ${avgCalories} (goal: ${goals.targetCalories})
 Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
 Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
 Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
-Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
+Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}${todayNote}
 
-Keep it to 2-3 sentences max. Focus on pattern-level observations.`;
+Focus on pattern-level observations.`;
             })(),
 
             '3M': (() => {
                 const sortedDates = Object.keys(byDate).sort();
                 const firstLogDate = sortedDates[0] || startStr;
                 const lastLogDate = sortedDates[sortedDates.length - 1] || endStr;
-                return `You are Kalli, a friendly AI nutrition coach. Write a 2-3 sentence personalized quarterly insight. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
+                return `You are Kalli, a friendly AI nutrition coach. Write personalized quarterly patterns. Focus on LONG-TERM TRAJECTORY — progress over time, trends in the right direction, big-picture wins. Be warm, encouraging, and forward-looking. Use contractions and casual tone, no filler affirmations. If the first log date is well after the period start, the user started tracking partway through — evaluate consistency only from their first log date forward. Do NOT call tracking 'sporadic' or suggest logging more if they've been consistent since starting.
 
-Today: ${todayStr}
+${FORMAT_RULES}
+
+Today: ${todayStr} (${currentTimeStr})
 Period: ${startStr} to ${endStr} (last 3 months)
 First log date in period: ${firstLogDate}
 Last log date in period: ${lastLogDate}
@@ -652,21 +684,15 @@ Avg daily protein: ${avgProtein}g (goal: ${goals.targetProtein}g)
 Avg daily carbs: ${avgCarbs}g (goal: ${goals.targetCarbs}g)
 Avg daily fat: ${avgFat}g (goal: ${goals.targetFat}g)
 Total items logged: ${logs.length}
-Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}
+Top foods: ${[...new Set(logs.map(l => l.name))].slice(0, 8).join(', ')}${todayNote}
 
-Keep it to 2-3 sentences max. Focus on progress trajectory and long-term wins.`;
+Focus on progress trajectory and long-term wins.`;
             })()
         };
 
         const prompt = RANGE_PROMPTS[range];
 
-        const result = await genAI.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { temperature: 0.8 }
-        });
-
-        const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+        const insight = await generateInsightSummary(prompt);
 
         // Cache the result with data fingerprint for invalidation
         await cacheRef.set({

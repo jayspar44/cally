@@ -4,14 +4,15 @@ const router = express.Router();
 const pkg = require('../../package.json');
 const { verifyToken } = require('../controllers/authController');
 const { updateProfile, getProfile, getRecommendedTargets, getBadges } = require('../controllers/userController');
-const { sendMessage, getHistory, clearHistory, deleteMessage } = require('../controllers/chatController');
+const { sendMessage, getHistory, clearHistory, deleteMessage, checkWeeklyReview, triggerWeeklyReview } = require('../controllers/chatController');
 const { getLogs, getLog, createLog, updateLog, deleteLog } = require('../controllers/foodController');
 const { getDailySummary, getWeeklyTrends, getMonthlyTrends, getQuarterlyTrends, getAISummary } = require('../controllers/insightsController');
+const homeController = require('../controllers/homeController');
 
 const aiRateLimit = rateLimit({
     windowMs: 60 * 1000,
     max: 10,
-    keyGenerator: (req) => req.user?.uid || req.ip,
+    keyGenerator: (req) => req.user?.uid || 'anonymous',
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many AI requests, please try again in a minute.' }
@@ -33,10 +34,15 @@ router.get('/user/profile', getProfile);
 router.get('/user/recommended-targets', getRecommendedTargets);
 router.get('/user/badges', getBadges);
 
+// Home
+router.get('/home/greeting', aiRateLimit, homeController.getGreeting);
+
 router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);
 router.delete('/chat/history', clearHistory);
 router.delete('/chat/message/:id', deleteMessage);
+router.get('/chat/weekly-review/check', aiRateLimit, checkWeeklyReview);
+router.post('/chat/weekly-review', aiRateLimit, triggerWeeklyReview);
 
 router.get('/food/logs', getLogs);
 router.get('/food/logs/:id', getLog);
