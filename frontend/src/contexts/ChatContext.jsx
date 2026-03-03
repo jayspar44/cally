@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { api } from '../api/services';
 import { logger } from '../utils/logger';
+import { invalidateGreetingCache } from '../utils/greetingCache';
 
 const ChatContext = createContext();
 
@@ -123,6 +124,7 @@ export const ChatProvider = ({ children }) => {
 
             // Notify if food was logged/updated so Home greeting cache invalidates
             if (response.foodLog || (response.toolsUsed || []).some(t => t === 'logFood' || t === 'updateFoodLog')) {
+                invalidateGreetingCache();
                 window.dispatchEvent(new CustomEvent('food-log-changed'));
             }
 

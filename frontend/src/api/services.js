@@ -1,6 +1,7 @@
 import axios from 'axios';
 import client from './client';
 import { logger } from '../utils/logger';
+import { invalidateGreetingCache } from '../utils/greetingCache';
 
 const publicClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -79,18 +80,21 @@ export const api = {
 
     createFoodLog: async (data) => {
         const response = await client.post('/food/logs', data);
+        invalidateGreetingCache();
         window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },
 
     updateFoodLog: async (id, data) => {
         const response = await client.put(`/food/logs/${id}`, data);
+        invalidateGreetingCache();
         window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },
 
     deleteFoodLog: async (id) => {
         const response = await client.delete(`/food/logs/${id}`);
+        invalidateGreetingCache();
         window.dispatchEvent(new CustomEvent('food-log-changed'));
         return response.data;
     },

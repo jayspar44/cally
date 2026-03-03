@@ -6,16 +6,9 @@ import { toDateStr } from '../utils/dateUtils';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { Sparkles, Plus, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { getGreetingCache, setGreetingCache, invalidateGreetingCache, GREETING_TTL } from '../utils/greetingCache';
 import MacroCard from '../components/ui/MacroCard';
 import MealItem from '../components/ui/MealItem';
-
-// Module-level greeting cache (survives component remounts)
-const GREETING_TTL = 30 * 60 * 1000; // 30 minutes
-let greetingCache = { data: null, timestamp: 0 };
-
-export function invalidateGreetingCache() {
-  greetingCache = { data: null, timestamp: 0 };
-}
 
 const getPacingText = (currentCalories, targetCalories) => {
   const now = new Date();
@@ -54,14 +47,15 @@ export default function Home() {
   const needsOnboarding = !profileLoading && (!biometrics || !biometrics.weight);
   const [dailySummary, setDailySummary] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [greeting, setGreeting] = useState(greetingCache.data);
-  const [greetingLoading, setGreetingLoading] = useState(!greetingCache.data);
+  const [greeting, setGreeting] = useState(getGreetingCache().data);
+  const [greetingLoading, setGreetingLoading] = useState(!getGreetingCache().data);
   const greetingFetched = useRef(false);
 
   const fetchGreeting = useCallback((force = false) => {
     const now = Date.now();
-    if (!force && greetingCache.data && (now - greetingCache.timestamp) < GREETING_TTL) {
-      setGreeting(greetingCache.data);
+    const cache = getGreetingCache();
+    if (!force && cache.data && (now - cache.timestamp) < GREETING_TTL) {
+      setGreeting(cache.data);
       setGreetingLoading(false);
       return;
     }
@@ -70,7 +64,7 @@ export default function Home() {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     api.getHomeGreeting(timezone)
       .then(data => {
-        greetingCache = { data, timestamp: Date.now() };
+        setGreetingCache(data);
         setGreeting(data);
       })
       .catch(err => logger.error('Greeting fetch failed:', err))
