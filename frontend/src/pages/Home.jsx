@@ -17,12 +17,10 @@ export function invalidateGreetingCache() {
   greetingCache = { data: null, timestamp: 0 };
 }
 
-// Invalidate cache on food changes even when Home is unmounted (registered once at module load)
-window.addEventListener('food-log-changed', invalidateGreetingCache);
-
 const getPacingText = (currentCalories, targetCalories) => {
   const now = new Date();
   const hour = now.getHours();
+  if (hour < 7 || hour >= 23) return null;
   const wakingHoursElapsed = Math.max(0, Math.min(16, hour - 7));
   const expectedByNow = Math.round((wakingHoursElapsed / 16) * targetCalories);
 
@@ -100,11 +98,19 @@ export default function Home() {
     fetchGreeting();
   }, [fetchGreeting]);
 
-  // Refetch greeting when food changes (cache already invalidated by module-level listener)
+  // Refetch greeting when food changes (debounced to avoid rapid-fire calls)
   useEffect(() => {
-    const onFoodChange = () => fetchGreeting(true);
+    let debounceTimer;
+    const onFoodChange = () => {
+      invalidateGreetingCache();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchGreeting(true), 2000);
+    };
     window.addEventListener('food-log-changed', onFoodChange);
-    return () => window.removeEventListener('food-log-changed', onFoodChange);
+    return () => {
+      window.removeEventListener('food-log-changed', onFoodChange);
+      clearTimeout(debounceTimer);
+    };
   }, [fetchGreeting]);
 
   if (loading) {

@@ -821,41 +821,31 @@ IMPORTANT: Today's log is STILL IN PROGRESS — the user hasn't finished eating 
         const focusLabel = weeklyFocus ? (weeklyFocus.label || (typeof weeklyFocus === 'string' ? weeklyFocus : null)) : null;
         if (focusLabel) {
             greetingPrompt += `\nActive weekly focus: "${focusLabel}"`;
+            greetingPrompt += `\n\nRespond with the greeting text, then on a new line write FOCUS_PROGRESS: followed by ONE short sentence (max 12 words) evaluating progress on the weekly focus. Be specific.`;
+        } else {
+            greetingPrompt += `\n\nRespond with ONLY the greeting text. No quotes, no labels, no preamble.`;
         }
 
-        greetingPrompt += `\n\nRespond with ONLY the greeting text. No quotes, no labels, no preamble.`;
-
-        // 8. Call Gemini Flash for greeting
+        // 8. Call Gemini Flash for greeting (+ focus progress if applicable)
         const greetingResult = await genAI.models.generateContent({
             model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
             config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }
         });
 
-        const greeting = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+        const fullText = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
 
-        // 9. If weeklyFocus exists, evaluate progress with a second lightweight call
+        // 9. Parse greeting and optional focus progress from single response
+        let greeting = fullText;
         let focusProgress = null;
         const activeFocus = focusLabel;
 
         if (focusLabel) {
-            const focusPrompt = `You are Kalli, a nutrition coach. Given the user's weekly focus and today's data, write ONE short sentence (max 12 words) evaluating their progress on this focus. Be specific and encouraging if warranted, honest if not.
-
-Weekly focus: "${focusLabel}"
-Today's progress: ${todaySummary.calories} cal, ${todaySummary.protein}g protein, ${todaySummary.carbs}g carbs, ${todaySummary.fat}g fat (${todaySummary.count} items)
-Goals: ${goals.targetCalories} cal, ${goals.targetProtein}g protein
-${recentAvg ? `Recent ${recentAvg.days}-day avg: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein` : ''}
-Time of day: ${timeOfDay}
-
-Respond with ONLY the progress sentence. No quotes, no labels.`;
-
-            const focusResult = await genAI.models.generateContent({
-                model: MODELS.flash,
-                contents: [{ role: 'user', parts: [{ text: focusPrompt }] }],
-                config: { temperature: 1.0, maxOutputTokens: 512, thinkingConfig: { thinkingLevel: 'LOW' } }
-            });
-
-            focusProgress = focusResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || null;
+            const focusMatch = fullText.match(/FOCUS_PROGRESS:\s*(.+)/i);
+            if (focusMatch) {
+                focusProgress = focusMatch[1].trim();
+                greeting = fullText.replace(/\n?FOCUS_PROGRESS:\s*.+/i, '').trim();
+            }
         }
 
         return { greeting, focusProgress, activeFocus };

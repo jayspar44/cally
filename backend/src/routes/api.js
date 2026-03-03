@@ -41,7 +41,7 @@ router.post('/chat/message', sendMessage);
 router.get('/chat/history', getHistory);
 router.delete('/chat/history', clearHistory);
 router.delete('/chat/message/:id', deleteMessage);
-router.get('/chat/weekly-review/check', checkWeeklyReview);
+router.get('/chat/weekly-review/check', aiRateLimit, checkWeeklyReview);
 router.post('/chat/weekly-review', aiRateLimit, triggerWeeklyReview);
 
 router.get('/food/logs', getLogs);

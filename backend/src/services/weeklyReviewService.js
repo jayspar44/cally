@@ -77,7 +77,7 @@ const generateWeeklyReview = async (userId, timezone = 'America/New_York', { for
         if (force) {
             const snap = await userDocRef.get();
             userData = snap.exists ? snap.data() : {};
-            await userDocRef.update({ lastWeeklyReview: today });
+            await userDocRef.set({ lastWeeklyReview: today }, { merge: true });
         } else {
             try {
                 await db.runTransaction(async (txn) => {
