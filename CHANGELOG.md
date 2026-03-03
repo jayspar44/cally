@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.7](https://github.com/jayspar44/cally/compare/v0.4.6...v0.4.7) (2026-03-03)
+
+
+### Bug Fixes
+
+* address code review issues from PR [#10](undefined/undefined/undefined/issues/10) a1346e7
+* invalidate greeting cache when food logged from Chat efb1d66
+
 ### [0.4.6](https://github.com/jayspar44/cally/compare/v0.4.5...v0.4.6) (2026-03-02)
 
 
