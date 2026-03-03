@@ -861,11 +861,25 @@ const invalidateContextCache = () => {
     getLogger().info('Context cache invalidated');
 };
 
+/**
+ * Generate an AI insight summary from a prompt string.
+ * Used by the insights controller for weekly/monthly/quarterly summaries.
+ */
+const generateInsightSummary = async (prompt) => {
+    const result = await genAI.models.generateContent({
+        model: MODELS.flash,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }
+    });
+    return result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+};
+
 module.exports = {
     genAI,
     MODELS,
     processMessage,
     processImageMessage,
     generateHomeGreeting,
+    generateInsightSummary,
     invalidateContextCache
 };

@@ -1,9 +1,7 @@
 const { db } = require('../services/firebase');
 const { toDateStr, parseLocalDate, getTodayStr } = require('../utils/dateUtils');
 const { getGoalsForDate, snapshotGoals, getUserSettings } = require('../services/goalsService');
-const { GoogleGenAI } = require('@google/genai');
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const { generateInsightSummary } = require('../services/geminiService');
 
 const MEAL_ORDER = { 'breakfast': 1, 'lunch': 2, 'dinner': 3, 'snack': 4 };
 
@@ -694,13 +692,7 @@ Focus on progress trajectory and long-term wins.`;
 
         const prompt = RANGE_PROMPTS[range];
 
-        const result = await genAI.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }
-        });
-
-        const insight = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
+        const insight = await generateInsightSummary(prompt);
 
         // Cache the result with data fingerprint for invalidation
         await cacheRef.set({

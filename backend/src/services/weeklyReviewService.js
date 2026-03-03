@@ -128,10 +128,10 @@ const generateWeeklyReview = async (userId, timezone = 'America/New_York', { for
             getLogsForRange(userId, prevWeekStart, prevWeekEnd),
         ]);
 
-        // 4. Compute this week's stats
-        const thisWeekByDay = {};
-        for (const date of thisWeekDates) {
-            thisWeekByDay[date] = thisWeekLogs.filter(l => l.date === date);
+        // 4. Compute this week's stats (single-pass grouping)
+        const thisWeekByDay = Object.fromEntries(thisWeekDates.map(d => [d, []]));
+        for (const log of thisWeekLogs) {
+            if (thisWeekByDay[log.date]) thisWeekByDay[log.date].push(log);
         }
 
         const daysTracked = Object.values(thisWeekByDay).filter(logs => logs.length > 0).length;
@@ -161,10 +161,10 @@ const generateWeeklyReview = async (userId, timezone = 'America/New_York', { for
             .slice(0, 5)
             .map(([name, count]) => `${name} (${count}x)`);
 
-        // 5. Compute previous week's stats
-        const prevWeekByDay = {};
-        for (const date of prevWeekDates) {
-            prevWeekByDay[date] = prevWeekLogs.filter(l => l.date === date);
+        // 5. Compute previous week's stats (single-pass grouping)
+        const prevWeekByDay = Object.fromEntries(prevWeekDates.map(d => [d, []]));
+        for (const log of prevWeekLogs) {
+            if (prevWeekByDay[log.date]) prevWeekByDay[log.date].push(log);
         }
         const prevDaysTracked = Object.values(prevWeekByDay).filter(logs => logs.length > 0).length;
         const prevWeekTotal = sumLogs(prevWeekLogs);
