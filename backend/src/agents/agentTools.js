@@ -986,6 +986,14 @@ const updateUserProfile = async (args, userId, userTimezone) => {
 
     await db.collection('users').doc(userId).set(updateData, { merge: true });
 
+    // Invalidate context cache so next chat picks up updated biometrics/goals
+    try {
+        const { invalidateContextCache } = require('../services/geminiService');
+        invalidateContextCache();
+    } catch (err) {
+        getLogger().warn({ err }, 'Failed to invalidate context cache after profile update');
+    }
+
     getLogger().info({
         action: 'tool.updateUserProfile',
         userId,
