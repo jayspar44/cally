@@ -52,7 +52,7 @@ app.use(helmet());
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: process.env.NODE_ENV === 'development' ? 500 : 200,
-    keyGenerator: (req) => req.ip,
+    keyGenerator: rateLimit.ipKeyGenerator,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' }
