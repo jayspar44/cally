@@ -14,7 +14,10 @@ const MODELS = {
 // --- Context caching: system instruction + tools ---
 // Two variants: base prompt and base + onboarding addendum
 // TTL: 24 hours. Lazy-initialized on first request.
-const MAX_TOOL_ITERATIONS = 10;
+const RESEARCH_TOOL_CAP = 15;
+const MAX_TOTAL_ITERATIONS = 25;
+const RESEARCH_TOOLS = new Set(['lookupNutrition', 'searchFoodLogs', 'getUserGoals']);
+const ACTION_TOOLS = ['logFood', 'getDailySummary', 'updateFoodLog', 'deleteFoodLog', 'updateUserProfile', 'triggerWeeklyReview'];
 const CACHE_TTL = '86400s';
 const cachedContentNames = { base: null, onboarding: null };
 
@@ -283,6 +286,62 @@ const buildChatHistory = (messages) => {
     }));
 };
 
+const getBudgetMessage = (researchCalls, totalIterations) => {
+    if (researchCalls >= RESEARCH_TOOL_CAP) {
+        return 'Research limit reached. Only action tools (logFood, updateFoodLog, deleteFoodLog, getDailySummary) are available. Proceed with the data you have.';
+    }
+    if (totalIterations >= 20) {
+        return `You've used ${totalIterations} of ${MAX_TOTAL_ITERATIONS} total tool calls. Wrap up and respond to the user.`;
+    }
+    if (researchCalls >= 13) {
+        return `${RESEARCH_TOOL_CAP - researchCalls} research call(s) remaining. Use logFood now with your best estimates for any remaining items.`;
+    }
+    if (researchCalls >= 10) {
+        return `You've used ${researchCalls} of ${RESEARCH_TOOL_CAP} research tool calls. Prioritize logging with the data you have.`;
+    }
+    return null;
+};
+
+const getEffectiveConfig = (baseConfig, researchCalls, totalIterations) => {
+    if (totalIterations >= MAX_TOTAL_ITERATIONS) {
+        return {
+            ...baseConfig,
+            toolConfig: { functionCallingConfig: { mode: 'NONE' } }
+        };
+    }
+    if (researchCalls >= RESEARCH_TOOL_CAP) {
+        return {
+            ...baseConfig,
+            toolConfig: {
+                functionCallingConfig: {
+                    mode: 'AUTO',
+                    allowedFunctionNames: ACTION_TOOLS
+                }
+            }
+        };
+    }
+    return baseConfig;
+};
+
+const buildFallbackResponse = (responseText, foodLog, loopExhausted) => {
+    if (responseText) return responseText;
+
+    if (foodLog && foodLog.items?.length > 0) {
+        const itemNames = foodLog.items.map(i => i.name).join(', ');
+        const cal = Math.round(foodLog.totalCalories || 0);
+        if (loopExhausted) {
+            return `I logged ${itemNames} (${cal} cal) but hit my processing limit. Let me know if anything's missing.`;
+        }
+        return `Done! I logged ${itemNames} (${cal} cal total).`;
+    }
+
+    if (loopExhausted) {
+        return "I couldn't complete this request — try breaking it into smaller messages.";
+    }
+
+    return "Sorry, I had trouble generating a response. Could you try that again?";
+};
+
 const processMessage = async (message, chatHistory, userProfile, userId, userTimezone, idempotencyKey) => {
     try {
         const modelName = MODELS.flash;
@@ -346,20 +405,39 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         let responseText = getResponseText(result);
         let functionCalls = getFunctionCalls(result);
         const lookupCache = new Map();
+        const completedActions = [];
 
-        let toolIterations = 0;
-        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
-            toolIterations++;
+        let researchCalls = 0;
+        let totalIterations = 0;
+
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+            totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
+
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    completedActions.push({
+                        tool: 'logFood',
+                        items: toolResult.data.items?.map(i => i.name) || [],
+                        totalCalories: toolResult.data.totalCalories,
+                        meal: toolResult.data.meal,
+                        date: toolResult.data.date
+                    });
+                }
+
+                if (!toolResult.success && completedActions.length > 0) {
+                    toolResult.previouslyCompleted = completedActions;
+                    toolResult.guidance = 'These items were already logged successfully. Do not re-log them.';
                 }
 
                 functionResponses.push({
@@ -368,12 +446,17 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 });
             }
 
+            const budgetMsg = getBudgetMessage(researchCalls, totalIterations);
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
-                    response: fr.response
+                    response: budgetMsg
+                        ? { ...fr.response, _budgetWarning: budgetMsg }
+                        : fr.response
                 }
             }));
+
+            const effectiveConfig = getEffectiveConfig(config, researchCalls, totalIterations);
 
             result = await genAI.models.generateContent({
                 model: modelName,
@@ -382,20 +465,21 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config
+                config: effectiveConfig
             });
 
             responseText = getResponseText(result);
             functionCalls = getFunctionCalls(result);
         }
 
-        if (toolIterations >= MAX_TOOL_ITERATIONS) {
-            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations');
-            // Append fallback message to inform user of incomplete response
-            if (responseText && !responseText.includes('reached processing limit')) {
-                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
-            }
+        const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
+
+        if (loopExhausted) {
+            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
+
+        responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
 
         return {
             text: responseText,
@@ -482,20 +566,39 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         let responseText = getImgResponseText(result);
         let functionCalls = getImgFunctionCalls(result);
         const lookupCache = new Map();
+        const completedActions = [];
 
-        let toolIterations = 0;
-        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
-            toolIterations++;
+        let researchCalls = 0;
+        let totalIterations = 0;
+
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+            totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
+
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo', lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    completedActions.push({
+                        tool: 'logFood',
+                        items: toolResult.data.items?.map(i => i.name) || [],
+                        totalCalories: toolResult.data.totalCalories,
+                        meal: toolResult.data.meal,
+                        date: toolResult.data.date
+                    });
+                }
+
+                if (!toolResult.success && completedActions.length > 0) {
+                    toolResult.previouslyCompleted = completedActions;
+                    toolResult.guidance = 'These items were already logged successfully. Do not re-log them.';
                 }
 
                 functionResponses.push({
@@ -504,12 +607,17 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 });
             }
 
+            const budgetMsg = getBudgetMessage(researchCalls, totalIterations);
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
-                    response: fr.response
+                    response: budgetMsg
+                        ? { ...fr.response, _budgetWarning: budgetMsg }
+                        : fr.response
                 }
             }));
+
+            const effectiveConfig = getEffectiveConfig(imgConfig, researchCalls, totalIterations);
 
             result = await genAI.models.generateContent({
                 model: modelName,
@@ -518,20 +626,21 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config: imgConfig
+                config: effectiveConfig
             });
 
             responseText = getImgResponseText(result);
             functionCalls = getImgFunctionCalls(result);
         }
 
-        if (toolIterations >= MAX_TOOL_ITERATIONS) {
-            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations (image)');
-            // Append fallback message to inform user of incomplete response
-            if (responseText && !responseText.includes('reached processing limit')) {
-                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
-            }
+        const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
+
+        if (loopExhausted) {
+            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
+
+        responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
 
         return {
             text: responseText,
