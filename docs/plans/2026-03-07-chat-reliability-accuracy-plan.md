@@ -729,37 +729,53 @@ git commit -m "feat: update system prompt with tool efficiency, search/lookup cl
 - Modify: `backend/src/services/geminiService.js:833` (home greeting thinkingLevel)
 - Modify: `backend/src/controllers/chatController.js:60` (chat history limit)
 
-**Step 1: Unify image maxOutputTokens to 8192**
+**Step 1: Update chat text config — HIGH thinking + 16384 tokens**
 
-Find both `maxOutputTokens: 4096` occurrences in the image config (~lines 459 and 466). Change both to `maxOutputTokens: 8192`.
+In `processMessage`, find the config objects (~lines 321-334). Change both cached and uncached variants:
+- `maxOutputTokens: 8192` → `maxOutputTokens: 16384`
+- `thinkingConfig: { thinkingLevel: 'MEDIUM' }` → `thinkingConfig: { thinkingLevel: 'HIGH' }`
 
-**Step 2: Change home greeting thinkingLevel to MINIMAL**
+**Step 2: Update chat image config — HIGH thinking + 16384 tokens**
 
-Find line 833: `thinkingConfig: { thinkingLevel: 'LOW' }` in generateHomeGreeting. Change to:
+In `processImageMessage`, find both `imgConfig` variants (~lines 457-470). Change both:
+- `maxOutputTokens: 4096` → `maxOutputTokens: 16384`
+- `thinkingConfig: { thinkingLevel: 'MEDIUM' }` → `thinkingConfig: { thinkingLevel: 'HIGH' }`
+
+**Step 3: Change home greeting — MINIMAL thinking + 4096 tokens**
+
+Find line 833: `config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }` in generateHomeGreeting. Change to:
 
 ```javascript
-thinkingConfig: { thinkingLevel: 'MINIMAL' }
+config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MINIMAL' } }
 ```
 
-**Step 3: Add explicit thinkingLevel to weekly review**
+**Step 4: Update insights summary — MEDIUM thinking + 4096 tokens**
 
-Find the weekly review Gemini call. Search for `generateWeeklyReview` or the weekly review generation call in `weeklyReviewService.js`. Add `thinkingConfig: { thinkingLevel: 'MEDIUM' }` to its config if not already present.
+Find line 872: `config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }` in generateInsightSummary. Change to:
 
-Run: `grep -n 'thinkingConfig\|generateContent' backend/src/services/weeklyReviewService.js` to find the exact location.
+```javascript
+config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MEDIUM' } }
+```
 
-**Step 4: Increase chat history limit from 20 to 30**
+**Step 5: Add explicit thinkingLevel to weekly review — MEDIUM + 4096 tokens**
+
+Find the weekly review Gemini call. Search for `generateWeeklyReview` or the weekly review generation call in `weeklyReviewService.js`. Set `thinkingConfig: { thinkingLevel: 'MEDIUM' }` and `maxOutputTokens: 4096` in its config.
+
+Run: `grep -n 'thinkingConfig\|generateContent\|maxOutputTokens' backend/src/services/weeklyReviewService.js` to find the exact location.
+
+**Step 6: Increase chat history limit from 20 to 30**
 
 In `backend/src/controllers/chatController.js` line 60, change `.limit(20)` to `.limit(30)`.
 
-**Step 5: Verify the server starts**
+**Step 7: Verify the server starts**
 
 Run: `cd backend && npm run dev:backend` (start and verify, then kill)
 
-**Step 6: Commit**
+**Step 8: Commit**
 
 ```bash
 git add backend/src/services/geminiService.js backend/src/controllers/chatController.js backend/src/services/weeklyReviewService.js
-git commit -m "fix: unify maxOutputTokens, set MINIMAL greeting thinking, increase chat history to 30"
+git commit -m "feat: HIGH thinking for chat, MINIMAL for greeting, MEDIUM for insights/review, increase tokens and history"
 ```
 
 ---

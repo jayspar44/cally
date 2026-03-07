@@ -152,14 +152,19 @@ No "above" check — calories above macro sum has legitimate explanations (alcoh
 
 ### 6. Gemini Configuration Fixes
 
-**File**: `geminiService.js`
+**File**: `geminiService.js`, `chatController.js`
 
-| Change | Current | New |
-|---|---|---|
-| Image maxOutputTokens | 4096 | 8192 (unified with text) |
-| Weekly review thinkingLevel | Not specified (defaults to HIGH) | Explicit MEDIUM |
-| Home greeting thinkingLevel | LOW | MINIMAL (fastest response) |
-| Chat history limit | 20 messages | 30 messages |
+| Path | thinkingLevel (current) | thinkingLevel (new) | maxOutputTokens (current) | maxOutputTokens (new) |
+|---|---|---|---|---|
+| Chat text | MEDIUM | **HIGH** | 8192 | **16384** |
+| Chat image | MEDIUM | **HIGH** | 4096 | **16384** |
+| Home greeting | LOW | **MINIMAL** | 1024 | **4096** |
+| Insights summary | LOW | **MEDIUM** | (unset) | **4096** |
+| Weekly review | (unset, defaults HIGH) | **MEDIUM** | 2048 | **4096** |
+
+Chat history limit: 20 messages → **30 messages** (`chatController.js`)
+
+**Note:** Update CLAUDE.md Gemini convention from "use `'MEDIUM'` for conversational/tool-calling" to "use `'HIGH'` for conversational/tool-calling".
 
 ### 7. Context Cache Invalidation
 
