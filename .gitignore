@@ -115,6 +115,7 @@ ios/
 
 
 # Playwright plugin (screenshots, traces)
+.playwright-mcp/
 page-*.png
 page-*.jpeg
 playwright-report/
