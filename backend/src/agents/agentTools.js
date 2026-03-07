@@ -5,10 +5,48 @@ const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
 const { checkBadgeEligibility } = require('../services/badgeService');
 const { getLogger } = require('../logger');
-const { getTodayStr } = require('../utils/dateUtils');
+const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils');
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
+
+// --- Token-overlap scoring (Jaccard similarity) ---
+const scoreTokenMatch = (searchName, candidateName) => {
+    const searchTokens = new Set(searchName.toLowerCase().split(/\s+/).filter(Boolean));
+    const candidateTokens = new Set(candidateName.toLowerCase().split(/\s+/).filter(Boolean));
+    if (searchTokens.size === 0 || candidateTokens.size === 0) return 0;
+    const allTokens = new Set([...searchTokens, ...candidateTokens]);
+    const matching = [...searchTokens].filter(t => candidateTokens.has(t));
+    return matching.length / allTokens.size;
+};
+
+const computeCompositeScore = (tokenScore, createdAt, frequencyCount, maxFrequency) => {
+    // Recency: 1.0 if today, linear decay to 0.0 at 90 days ago
+    const daysAgo = createdAt
+        ? (Date.now() - (createdAt.toDate?.()?.getTime?.() || createdAt)) / (1000 * 60 * 60 * 24)
+        : 90;
+    const recencyScore = Math.max(0, 1 - (daysAgo / 90));
+
+    // Frequency: normalized against the most frequent item in candidates
+    const frequencyScore = maxFrequency > 0 ? frequencyCount / maxFrequency : 0;
+
+    return (tokenScore * 0.7) + (recencyScore * 0.15) + (frequencyScore * 0.15);
+};
+
+const validateNutrients = (item) => {
+    const warnings = [];
+    if (item.calories < 0 || item.calories > 3000) warnings.push(`${item.name}: calories (${item.calories}) outside expected range 0-3000`);
+    if (item.protein < 0 || item.protein > 300) warnings.push(`${item.name}: protein (${item.protein}g) outside expected range 0-300g`);
+    if (item.carbs < 0 || item.carbs > 500) warnings.push(`${item.name}: carbs (${item.carbs}g) outside expected range 0-500g`);
+    if (item.fat < 0 || item.fat > 200) warnings.push(`${item.name}: fat (${item.fat}g) outside expected range 0-200g`);
+
+    // Calories below macro sum by more than 10% is physically impossible
+    const macroSum = (item.protein * 4) + (item.carbs * 4) + (item.fat * 9);
+    if (macroSum > 0 && item.calories < macroSum * 0.9) {
+        warnings.push(`${item.name}: stated ${item.calories} cal but macros suggest ~${Math.round(macroSum)} cal. Values were saved but may need correction.`);
+    }
+    return warnings;
+};
 
 const toolDeclarations = [
     {
@@ -122,7 +160,7 @@ const toolDeclarations = [
     },
     {
         name: 'searchFoodLogs',
-        description: 'Search for past food logs to get their IDs. Use this BEFORE updateFoodLog when the user wants to change a previous entry.',
+        description: 'Search past food logs. Returns full nutrition data for each match. Use daysBack to search across multiple days (e.g., daysBack: 7 for the last week). Use this BEFORE updateFoodLog/deleteFoodLog to find logIds, or when the user explicitly references a past meal to re-log.',
         parameters: {
             type: 'object',
             properties: {
@@ -133,6 +171,10 @@ const toolDeclarations = [
                 date: {
                     type: 'string',
                     description: 'Date to search in YYYY-MM-DD format (defaults to today)'
+                },
+                daysBack: {
+                    type: 'number',
+                    description: 'Number of days back to search (0 = today only). Defaults to 0. Max 30.'
                 }
             },
             required: ['query']
@@ -371,6 +413,16 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     // Continue with non-duplicate items only
     items = newItems;
 
+    // Nutrient validation — warn but always save
+    const nutrientWarnings = [];
+    for (const item of items) {
+        const itemWarnings = validateNutrients(item);
+        nutrientWarnings.push(...itemWarnings);
+    }
+    if (nutrientWarnings.length > 0) {
+        getLogger().warn({ action: 'tool.logFood.nutrientValidation', warnings: nutrientWarnings }, 'Nutrient validation warnings');
+    }
+
     const batch = db.batch();
     const createdIds = [];
     const lookupCache = options.lookupCache;
@@ -475,6 +527,10 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
         result.message += ` New badge${newBadges.length > 1 ? 's' : ''} earned: ${newBadges.map(b => `${b.icon} ${b.name}`).join(', ')}!`;
     }
 
+    if (nutrientWarnings.length > 0) {
+        result.warnings = nutrientWarnings;
+    }
+
     return result;
 };
 
@@ -492,12 +548,12 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 foodLogsRef
                     .where('nutritionSource', 'in', ['usda', 'nutrition_label', 'user_input'])
                     .orderBy('createdAt', 'desc')
-                    .limit(10)
+                    .limit(50)
                     .get(),
                 foodLogsRef
                     .where('nutrientsCorrected', '==', true)
                     .orderBy('createdAt', 'desc')
-                    .limit(10)
+                    .limit(50)
                     .get()
             ]);
 
@@ -513,16 +569,35 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 }
             }
 
-            // Filter by name match (case-insensitive substring)
+            // Score candidates using token-overlap + recency + frequency
             const lowerFood = foodName.toLowerCase();
-            const matches = candidates.filter(c =>
-                c.name && c.name.toLowerCase().includes(lowerFood)
-            );
+
+            // Count frequency per normalized name
+            const frequencyCounts = {};
+            for (const c of candidates) {
+                const key = c.name?.toLowerCase().trim() || '';
+                frequencyCounts[key] = (frequencyCounts[key] || 0) + 1;
+            }
+            const maxFrequency = Math.max(...Object.values(frequencyCounts), 1);
+
+            const scored = candidates
+                .filter(c => c.name)
+                .map(c => {
+                    const tokenScore = scoreTokenMatch(lowerFood, c.name);
+                    const freqKey = c.name.toLowerCase().trim();
+                    const composite = computeCompositeScore(tokenScore, c.createdAt, frequencyCounts[freqKey] || 1, maxFrequency);
+                    return { ...c, tokenScore, composite };
+                })
+                .filter(c => c.tokenScore >= 0.4)
+                .sort((a, b) => b.composite - a.composite);
+
+            const matches = scored;
 
             if (matches.length > 0) {
                 const best = matches[0];
                 getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'user_history',
-                    matchedName: best.name, corrected: best.nutrientsCorrected || false
+                    matchedName: best.name, corrected: best.nutrientsCorrected || false,
+                    score: best.composite?.toFixed(3), tokenScore: best.tokenScore?.toFixed(3)
                 }, 'Nutrition lookup: user_history match');
                 if (lookupCache) lookupCache.set(cacheKey, { source: 'user_history', matchedName: best.name });
                 return {
@@ -599,65 +674,84 @@ const lookupNutrition = async (args, userId, options = {}) => {
 };
 
 const searchFoodLogs = async (args, userId, userTimezone) => {
-    let { query, date } = args;
+    let { query, date, daysBack } = args;
 
     if (!date) {
         date = getTodayStr(userTimezone);
     }
 
+    // Cap daysBack at 30
+    daysBack = Math.min(Math.max(daysBack || 0, 0), 30);
+
     try {
-        const snapshot = await db.collection('users').doc(userId)
-            .collection('foodLogs')
-            .where('date', '==', date)
-            .get();
+        let snapshot;
+        const logsRef = db.collection('users').doc(userId).collection('foodLogs');
+
+        if (daysBack > 0) {
+            const endDate = date;
+            const startDateObj = parseLocalDate(date);
+            startDateObj.setDate(startDateObj.getDate() - daysBack);
+            const startDate = toDateStr(startDateObj);
+
+            snapshot = await logsRef
+                .where('date', '>=', startDate)
+                .where('date', '<=', endDate)
+                .get();
+        } else {
+            snapshot = await logsRef
+                .where('date', '==', date)
+                .get();
+        }
 
         if (snapshot.empty) {
-            return { success: true, count: 0, matches: [], message: `No food logs found for ${date}` };
+            return { success: true, data: { count: 0, matches: [], message: `No food logs found${daysBack > 0 ? ` in the last ${daysBack} days` : ` for ${date}`}` } };
         }
 
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const mapMatch = (m) => ({
+            id: m.id,
+            name: m.name,
+            meal: m.meal,
+            date: m.date,
+            quantity: m.quantity,
+            unit: m.unit,
+            calories: m.calories,
+            protein: m.protein,
+            carbs: m.carbs,
+            fat: m.fat,
+            nutritionSource: m.nutritionSource,
+            corrected: m.nutrientsCorrected || m.corrected || false,
+            time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
+        });
+
         if (!query) {
             return {
                 success: true,
                 data: {
                     count: logs.length,
-                    date,
-                    matches: logs.map(m => ({
-                        id: m.id,
-                        name: m.name,
-                        meal: m.meal,
-                        quantity: m.quantity,
-                        unit: m.unit,
-                        calories: m.calories,
-                        time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
-                    }))
+                    date: daysBack > 0 ? undefined : date,
+                    matches: logs.map(mapMatch)
                 }
             };
         }
 
-        const lowerQuery = query.toLowerCase();
-
-        const matches = logs.filter(log => {
-            const nameMatch = log.name?.toLowerCase().includes(lowerQuery);
-            const msgMatch = log.originalMessage?.toLowerCase().includes(lowerQuery);
-            const mealMatch = log.meal?.toLowerCase().includes(lowerQuery);
-            return nameMatch || msgMatch || mealMatch;
-        });
+        // Score and rank all logs by token overlap — no threshold, return all ranked
+        const scored = logs
+            .map(log => {
+                const nameScore = log.name ? scoreTokenMatch(query, log.name) : 0;
+                const mealScore = log.meal ? scoreTokenMatch(query, log.meal) : 0;
+                const score = Math.max(nameScore, mealScore);
+                return { ...log, score };
+            })
+            .sort((a, b) => b.score - a.score);
 
         return {
             success: true,
             data: {
-                count: matches.length,
-                date,
-                matches: matches.map(m => ({
-                    id: m.id,
-                    name: m.name,
-                    meal: m.meal,
-                    quantity: m.quantity,
-                    unit: m.unit,
-                    calories: m.calories,
-                    time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
-                }))
+                count: scored.length,
+                date: daysBack > 0 ? undefined : date,
+                matches: scored.map(mapMatch)
             }
         };
     } catch (error) {
