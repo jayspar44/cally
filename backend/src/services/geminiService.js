@@ -387,17 +387,17 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         const cacheName = await getOrCreateCache(needsOnboarding);
         const config = cacheName
             ? {
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'MEDIUM' },
+                thinkingConfig: { thinkingLevel: 'HIGH' },
                 cachedContent: cacheName
             }
             : {
                 systemInstruction,
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'MEDIUM' }
+                thinkingConfig: { thinkingLevel: 'HIGH' }
             };
 
         const payload = {
@@ -548,17 +548,17 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         const cacheName = await getOrCreateCache(needsOnboarding);
         const imgConfig = cacheName
             ? {
-                maxOutputTokens: 4096,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'MEDIUM' },
+                thinkingConfig: { thinkingLevel: 'HIGH' },
                 cachedContent: cacheName
             }
             : {
                 systemInstruction,
-                maxOutputTokens: 4096,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'MEDIUM' }
+                thinkingConfig: { thinkingLevel: 'HIGH' }
             };
 
         const payload = {
@@ -947,7 +947,7 @@ IMPORTANT: Today's log is STILL IN PROGRESS — the user hasn't finished eating 
         const greetingResult = await genAI.models.generateContent({
             model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
-            config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }
+            config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MINIMAL' } }
         });
 
         const fullText = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
@@ -986,7 +986,7 @@ const generateInsightSummary = async (prompt) => {
     const result = await genAI.models.generateContent({
         model: MODELS.flash,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }
+        config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MEDIUM' } }
     });
     return result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
 };

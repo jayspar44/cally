@@ -57,7 +57,7 @@ const sendMessage = async (req, res) => {
 
         const historySnapshot = await chatHistoryRef
             .orderBy('timestamp', 'desc')
-            .limit(20)
+            .limit(30)
             .get();
 
         const chatHistory = historySnapshot.docs
