@@ -72,7 +72,7 @@ const searchFoods = async (query, limit = 5) => {
     try {
         return await doSearch(query);
     } catch (error) {
-        if (error.status === 500 || error.status === 504) {
+        if (error.status === 500 || error.status === 503 || error.status === 504) {
             const simplified = query
                 .replace(/\d+\/?\d*\s*(cups?|oz|tbsp|tsp|g|ml|lbs?|pieces?|slices?|servings?)\b/gi, '')
                 .replace(/\d+\/\d+/g, '')
