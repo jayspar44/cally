@@ -647,12 +647,12 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 foodLogsRef
                     .where('nutritionSource', 'in', ['usda', 'nutrition_label', 'user_input'])
                     .orderBy('createdAt', 'desc')
-                    .limit(25)
+                    .limit(50)
                     .get(),
                 foodLogsRef
                     .where('nutrientsCorrected', '==', true)
                     .orderBy('createdAt', 'desc')
-                    .limit(25)
+                    .limit(50)
                     .get()
             ]);
 
