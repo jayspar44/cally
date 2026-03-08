@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { toDateStr } from '../../utils/dateUtils';
+import { useUserPreferences } from '../../contexts/UserPreferencesContext';
 
 export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initialData }) {
+    const { developerMode } = useUserPreferences();
     const [formData, setFormData] = useState({
         name: '',
         quantity: '',
@@ -179,6 +181,15 @@ export default function FoodEditModal({ isOpen, onClose, onSave, onDelete, initi
                             />
                         </div>
                     </div>
+
+                    {/* Dev Info */}
+                    {developerMode && initialData && (
+                        <div className="text-xs text-muted font-mono bg-background rounded-lg px-3 py-2 space-y-0.5">
+                            <div>nutritionSource: <span className="text-primary">{initialData.nutritionSource ?? 'n/a'}</span></div>
+                            <div>corrected: <span className="text-primary">{String(initialData.corrected ?? 'n/a')}</span></div>
+                            <div>nutrientsCorrected: <span className="text-primary">{String(initialData.nutrientsCorrected ?? 'n/a')}</span></div>
+                        </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex gap-3 pt-2">

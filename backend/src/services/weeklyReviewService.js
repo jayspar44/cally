@@ -228,7 +228,7 @@ RULES:
         const result = await genAI.models.generateContent({
             model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { temperature: 1.0, maxOutputTokens: 2048, thinkingConfig: { thinkingLevel: 'LOW' } }
+            config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MEDIUM' } }
         });
 
         const reviewText = result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';

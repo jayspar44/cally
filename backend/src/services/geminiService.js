@@ -14,7 +14,9 @@ const MODELS = {
 // --- Context caching: system instruction + tools ---
 // Two variants: base prompt and base + onboarding addendum
 // TTL: 24 hours. Lazy-initialized on first request.
-const MAX_TOOL_ITERATIONS = 10;
+const RESEARCH_TOOL_CAP = 15;
+const MAX_TOTAL_ITERATIONS = 25;
+const RESEARCH_TOOLS = new Set(['lookupNutrition', 'searchFoodLogs', 'getUserGoals']);
 const CACHE_TTL = '86400s';
 const cachedContentNames = { base: null, onboarding: null };
 
@@ -126,6 +128,12 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 - **General conversation**: When the user isn't logging food — just chatting, asking questions, seeking advice — respond naturally like a knowledgeable friend. No tool calls needed for general nutrition questions, meal planning chat, or motivational conversation
 - **Weekly review**: On the user's designated review day, context will tell you when a review is available. After logging a meal (especially dinner/last meal), naturally offer to generate their weekly review. If they agree, call \`triggerWeeklyReview\`. The tool returns the full review text — present it conversationally. Don't force it — one gentle offer per session is enough
 
+## Tool Call Efficiency
+- You have a budget of 15 research tool calls (lookupNutrition, searchFoodLogs, getUserGoals) per message. Action tools (logFood, getDailySummary, updateFoodLog, deleteFoodLog) are always available and don't count against this limit.
+- When logging a multi-item meal, you can call lookupNutrition for each item simultaneously in the same turn — you don't have to wait for one result before calling the next.
+- If you're running low on research calls, proceed with logFood using your best estimates rather than searching more.
+- If lookupNutrition returns no match for an item, use ai_estimate and move on. Do not rephrase and retry the same food.
+
 ## Personalized Advice (when biometrics available in context)
 - Reference user's weight and goal type in recommendations
 - Protein guidance by goal: ~0.7–0.8g/lb for weight loss, ~0.5–0.6g/lb maintenance, ~0.8–1.0g/lb muscle gain
@@ -143,6 +151,7 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 - **logFood format**: Always use the \`items\` array parameter. Never use flat args or alternative keys like \`foods\` or \`foodItems\`.
 - **NEVER claim you have logged, are logging, or will log food unless you actually call the logFood tool in the same response.** If you haven't called logFood, do NOT say "I've logged that" — the user will see no confirmation card and think the app is broken. Either call the tool or tell the user what you plan to log and ask for confirmation first.
 - Be precise with nutrition estimates. **Default to calling lookupNutrition** for any food you're about to log — it provides USDA-verified data. Only skip it for truly trivial items (plain water, black coffee, a single banana). Never use ai_estimate when lookupNutrition could give you real data.
+- lookupNutrition already checks your past corrected entries and authoritative logs before querying USDA — you do not need to call searchFoodLogs first to verify. Only use searchFoodLogs when you need a logId (for updates/deletes) or when the user explicitly references a past meal to re-log.
 
 ## Hypothetical vs Actual Meals
 - **Only log food the user has ALREADY eaten.** Never log hypothetical, planned, or future meals.
@@ -151,6 +160,7 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 - **"I'll have" / "I'm going to have" / "I'm planning on"** → future intent, acknowledge and offer to log later ("Sounds good — let me know when you've had it and I'll log it")
 - **"What should I have?" / "Can I have X?"** → questions/advice, respond conversationally
 - When discussing meal plans or daily strategies, NEVER auto-log foods mentioned — only log when the user explicitly tells you they ATE something.
+- **Deleted items**: If items you previously logged appear missing from the current daily summary, do NOT re-add them. The user may have deleted them via the app. Only re-log when the user explicitly asks (e.g., "add those back", "re-log my lunch"). You SHOULD mention the discrepancy briefly ("Looks like your lunch was removed — want me to add it back?") but NEVER call logFood without explicit confirmation.
 
 - If unsure about a food, ask for clarification rather than guessing wrong
 - Format nutrition info clearly using **Markdown only** (bold, lists, headers). Never use HTML tags like \`<details>\`, \`<summary>\`, \`<table>\`, etc.
@@ -161,12 +171,13 @@ const BASE_SYSTEM_PROMPT = `You are Kalli, an expert AI nutrition coach and comp
 Set \`nutritionSource\` in \`logFood\` based on where the numbers ACTUALLY came from:
 - **"nutrition_label"** — You extracted values from a photo of a nutrition/ingredients label
 - **"user_input"** — The user explicitly told you the macros/calories (e.g. "it was 350 cals")
-- **"user_history"** — lookupNutrition returned \`source: "user_history"\`
+- **"user_history"** — lookupNutrition returned a match from your past logs. Use the \`nutritionSource\` value returned by lookupNutrition directly — do not override it.
 - **"usda"** — lookupNutrition returned \`success: true\` with \`source: "usda"\`
+- **"google_search"** — lookupNutrition returned \`success: true\` with \`source: "google_search"\`
 - **"common_foods"** — lookupNutrition returned \`success: true\` with \`source: "common_foods"\`
 - **"ai_estimate"** — lookupNutrition returned \`success: false\` (or was not called), so you estimated from your own knowledge
 
-**Source priority** (highest to lowest): nutrition_label > user_input > user_history > usda > common_foods > ai_estimate
+**Source priority** (highest to lowest): nutrition_label > user_input > user_history > usda > google_search > common_foods > ai_estimate
 
 **CRITICAL**: If lookupNutrition returned \`success: false\` for a food, you MUST use "ai_estimate" for that item — never "usda" or "common_foods".
 
@@ -199,6 +210,7 @@ Always call lookupNutrition before falling back to ai_estimate. The only excepti
     1. Use \`searchFoodLogs\` with the appropriate date to find the referenced meal
     2. Use the same nutrition values from the previous log (adjusting quantity if specified)
     3. Log as a new entry for today with the matched nutrition data
+- When the user references a past meal ("same as yesterday", "what I had last Tuesday", "leftovers"), use searchFoodLogs with the appropriate startDate to find it. The results include full nutrition data — copy those values directly into logFood. Do NOT call lookupNutrition for items you already found via searchFoodLogs.
 - When the user says they want to **correct** or **change** something:
     1. Proactively use \`searchFoodLogs\` to find potential matches
     2. Show the user what you found and confirm which item to update
@@ -283,6 +295,47 @@ const buildChatHistory = (messages) => {
     }));
 };
 
+const getBudgetMessage = (researchCalls, totalIterations) => {
+    if (researchCalls >= RESEARCH_TOOL_CAP) {
+        return 'Research limit reached. Only action tools (logFood, updateFoodLog, deleteFoodLog, getDailySummary) are available. Proceed with the data you have.';
+    }
+    if (totalIterations >= 20) {
+        return `You've used ${totalIterations} of ${MAX_TOTAL_ITERATIONS} total tool calls. Wrap up and respond to the user.`;
+    }
+    if (researchCalls >= 13) {
+        return `${RESEARCH_TOOL_CAP - researchCalls} research call(s) remaining. Use logFood now with your best estimates for any remaining items.`;
+    }
+    if (researchCalls >= 10) {
+        return `You've used ${researchCalls} of ${RESEARCH_TOOL_CAP} research tool calls. Prioritize logging with the data you have.`;
+    }
+    return null;
+};
+
+const shouldBlockResearchTool = (toolName, researchCalls, totalIterations) => {
+    if (totalIterations >= MAX_TOTAL_ITERATIONS) return true;
+    if (researchCalls >= RESEARCH_TOOL_CAP && RESEARCH_TOOLS.has(toolName)) return true;
+    return false;
+};
+
+const buildFallbackResponse = (responseText, foodLog, loopExhausted) => {
+    if (responseText) return responseText;
+
+    if (foodLog && foodLog.items?.length > 0) {
+        const itemNames = foodLog.items.map(i => i.name).join(', ');
+        const cal = Math.round(foodLog.totalCalories || 0);
+        if (loopExhausted) {
+            return `I logged ${itemNames} (${cal} cal) but hit my processing limit. Let me know if anything's missing.`;
+        }
+        return `Done! I logged ${itemNames} (${cal} cal total).`;
+    }
+
+    if (loopExhausted) {
+        return "I couldn't complete this request — try breaking it into smaller messages.";
+    }
+
+    return "Sorry, I had trouble generating a response. Could you try that again?";
+};
+
 const processMessage = async (message, chatHistory, userProfile, userId, userTimezone, idempotencyKey) => {
     try {
         const modelName = MODELS.flash;
@@ -320,17 +373,17 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         const cacheName = await getOrCreateCache(needsOnboarding);
         const config = cacheName
             ? {
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'MEDIUM' },
+                thinkingConfig: { thinkingLevel: 'HIGH' },
                 cachedContent: cacheName
             }
             : {
                 systemInstruction,
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'MEDIUM' }
+                thinkingConfig: { thinkingLevel: 'HIGH' }
             };
 
         const payload = {
@@ -346,20 +399,48 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         let responseText = getResponseText(result);
         let functionCalls = getFunctionCalls(result);
         const lookupCache = new Map();
+        const completedActions = [];
 
-        let toolIterations = 0;
-        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
-            toolIterations++;
+        let researchCalls = 0;
+        let totalIterations = 0;
+
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+            totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
+                // Block research tools when budget is exhausted
+                if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
+                    getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: `Research budget exhausted. Use logFood with your best estimates or respond to the user.` }
+                    });
+                    continue;
+                }
+
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    completedActions.push({
+                        tool: 'logFood',
+                        items: toolResult.data.items?.map(i => i.name) || [],
+                        totalCalories: toolResult.data.totalCalories,
+                        meal: toolResult.data.meal,
+                        date: toolResult.data.date
+                    });
+                }
+
+                if (!toolResult.success && completedActions.length > 0) {
+                    toolResult.previouslyCompleted = completedActions;
+                    toolResult.guidance = 'These items were already logged successfully. Do not re-log them.';
                 }
 
                 functionResponses.push({
@@ -368,10 +449,13 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 });
             }
 
+            const budgetMsg = getBudgetMessage(researchCalls, totalIterations);
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
-                    response: fr.response
+                    response: budgetMsg
+                        ? { ...fr.response, _budgetWarning: budgetMsg }
+                        : fr.response
                 }
             }));
 
@@ -389,13 +473,14 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             functionCalls = getFunctionCalls(result);
         }
 
-        if (toolIterations >= MAX_TOOL_ITERATIONS) {
-            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations');
-            // Append fallback message to inform user of incomplete response
-            if (responseText && !responseText.includes('reached processing limit')) {
-                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
-            }
+        const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
+
+        if (loopExhausted) {
+            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
+
+        responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
 
         return {
             text: responseText,
@@ -456,17 +541,17 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         const cacheName = await getOrCreateCache(needsOnboarding);
         const imgConfig = cacheName
             ? {
-                maxOutputTokens: 4096,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
-                thinkingConfig: { thinkingLevel: 'MEDIUM' },
+                thinkingConfig: { thinkingLevel: 'HIGH' },
                 cachedContent: cacheName
             }
             : {
                 systemInstruction,
-                maxOutputTokens: 4096,
+                maxOutputTokens: 16384,
                 temperature: 1.0,
                 tools: [{ functionDeclarations: toolDeclarations }],
-                thinkingConfig: { thinkingLevel: 'MEDIUM' }
+                thinkingConfig: { thinkingLevel: 'HIGH' }
             };
 
         const payload = {
@@ -482,20 +567,48 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         let responseText = getImgResponseText(result);
         let functionCalls = getImgFunctionCalls(result);
         const lookupCache = new Map();
+        const completedActions = [];
 
-        let toolIterations = 0;
-        while (functionCalls.length > 0 && toolIterations < MAX_TOOL_ITERATIONS) {
-            toolIterations++;
+        let researchCalls = 0;
+        let totalIterations = 0;
+
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+            totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                getLogger().info({ tool: call.name, iteration: toolIterations }, 'Executing tool');
+                // Block research tools when budget is exhausted
+                if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
+                    getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: `Research budget exhausted. Use logFood with your best estimates or respond to the user.` }
+                    });
+                    continue;
+                }
+
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo', lookupCache });
 
                 if (call.name === 'logFood' && toolResult.success) {
                     foodLog = mergeFoodLogs(foodLog, toolResult.data);
+                    completedActions.push({
+                        tool: 'logFood',
+                        items: toolResult.data.items?.map(i => i.name) || [],
+                        totalCalories: toolResult.data.totalCalories,
+                        meal: toolResult.data.meal,
+                        date: toolResult.data.date
+                    });
+                }
+
+                if (!toolResult.success && completedActions.length > 0) {
+                    toolResult.previouslyCompleted = completedActions;
+                    toolResult.guidance = 'These items were already logged successfully. Do not re-log them.';
                 }
 
                 functionResponses.push({
@@ -504,10 +617,13 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 });
             }
 
+            const budgetMsg = getBudgetMessage(researchCalls, totalIterations);
             const toolResponseParts = functionResponses.map(fr => ({
                 functionResponse: {
                     name: fr.name,
-                    response: fr.response
+                    response: budgetMsg
+                        ? { ...fr.response, _budgetWarning: budgetMsg }
+                        : fr.response
                 }
             }));
 
@@ -525,13 +641,14 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
             functionCalls = getImgFunctionCalls(result);
         }
 
-        if (toolIterations >= MAX_TOOL_ITERATIONS) {
-            getLogger().warn({ toolIterations, toolsUsed }, 'Tool-calling loop hit max iterations (image)');
-            // Append fallback message to inform user of incomplete response
-            if (responseText && !responseText.includes('reached processing limit')) {
-                responseText += '\n\n(Note: I reached my processing limit for this request. If something seems incomplete, please let me know and I can continue.)';
-            }
+        const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
+
+        if (loopExhausted) {
+            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
+
+        responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
 
         return {
             text: responseText,
@@ -830,7 +947,7 @@ IMPORTANT: Today's log is STILL IN PROGRESS — the user hasn't finished eating 
         const greetingResult = await genAI.models.generateContent({
             model: MODELS.flash,
             contents: [{ role: 'user', parts: [{ text: greetingPrompt }] }],
-            config: { temperature: 1.0, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'LOW' } }
+            config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MINIMAL' } }
         });
 
         const fullText = greetingResult.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
@@ -869,7 +986,7 @@ const generateInsightSummary = async (prompt) => {
     const result = await genAI.models.generateContent({
         model: MODELS.flash,
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { temperature: 1.0, thinkingConfig: { thinkingLevel: 'LOW' } }
+        config: { temperature: 1.0, maxOutputTokens: 4096, thinkingConfig: { thinkingLevel: 'MEDIUM' } }
     });
     return result.candidates?.[0]?.content?.parts?.find(p => p.text)?.text?.trim() || '';
 };

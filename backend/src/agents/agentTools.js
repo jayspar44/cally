@@ -1,14 +1,95 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
+const { GoogleGenAI } = require('@google/genai');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
 const { checkBadgeEligibility } = require('../services/badgeService');
 const { getLogger } = require('../logger');
-const { getTodayStr } = require('../utils/dateUtils');
+const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils');
+
+const searchGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const SEARCH_MODEL = 'gemini-3-flash-preview';
+
+// --- Google Search rate limiting (global + per-user) ---
+const GOOGLE_SEARCH_GLOBAL_DAILY_CAP = 500;
+const GOOGLE_SEARCH_USER_DAILY_CAP = 20;
+let googleSearchGlobalCount = 0;
+let googleSearchGlobalResetDate = new Date().toDateString();
+const googleSearchUserCounts = new Map(); // userId -> { count, resetDate }
+
+const checkGoogleSearchBudget = (userId) => {
+    const today = new Date().toDateString();
+    // Reset global counter on new day
+    if (googleSearchGlobalResetDate !== today) {
+        googleSearchGlobalCount = 0;
+        googleSearchGlobalResetDate = today;
+        googleSearchUserCounts.clear();
+    }
+    // Check global cap
+    if (googleSearchGlobalCount >= GOOGLE_SEARCH_GLOBAL_DAILY_CAP) return false;
+    // Check per-user cap
+    const userEntry = googleSearchUserCounts.get(userId);
+    if (userEntry && userEntry.resetDate === today && userEntry.count >= GOOGLE_SEARCH_USER_DAILY_CAP) return false;
+    return true;
+};
+
+const incrementGoogleSearchCount = (userId) => {
+    googleSearchGlobalCount++;
+    const today = new Date().toDateString();
+    const userEntry = googleSearchUserCounts.get(userId);
+    if (!userEntry || userEntry.resetDate !== today) {
+        googleSearchUserCounts.set(userId, { count: 1, resetDate: today });
+    } else {
+        userEntry.count++;
+    }
+};
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
+
+// --- Token-overlap scoring (Jaccard similarity) ---
+const scoreTokenMatch = (searchName, candidateName) => {
+    const searchTokens = new Set(searchName.toLowerCase().split(/\s+/).filter(Boolean));
+    const candidateTokens = new Set(candidateName.toLowerCase().split(/\s+/).filter(Boolean));
+    if (searchTokens.size === 0 || candidateTokens.size === 0) return 0;
+    const allTokens = new Set([...searchTokens, ...candidateTokens]);
+    const matching = [...searchTokens].filter(t => candidateTokens.has(t));
+    return matching.length / allTokens.size;
+};
+
+const computeCompositeScore = (tokenScore, createdAt, frequencyCount, maxFrequency) => {
+    // Recency: 1.0 if today, linear decay to 0.0 at 90 days ago
+    const daysAgo = createdAt
+        ? (Date.now() - (createdAt.toDate?.()?.getTime?.() || createdAt)) / (1000 * 60 * 60 * 24)
+        : 90;
+    const recencyScore = Math.max(0, Math.min(1, 1 - (daysAgo / 90)));
+
+    // Frequency: normalized against the most frequent item in candidates
+    const frequencyScore = maxFrequency > 0 ? frequencyCount / maxFrequency : 0;
+
+    return (tokenScore * 0.7) + (recencyScore * 0.15) + (frequencyScore * 0.15);
+};
+
+const validateNutrients = (item) => {
+    const warnings = [];
+    const cal = Number(item.calories) || 0;
+    const pro = Number(item.protein) || 0;
+    const carb = Number(item.carbs) || 0;
+    const f = Number(item.fat) || 0;
+
+    if (cal < 0 || cal > 3000) warnings.push(`${item.name}: calories (${cal}) outside expected range 0-3000`);
+    if (pro < 0 || pro > 300) warnings.push(`${item.name}: protein (${pro}g) outside expected range 0-300g`);
+    if (carb < 0 || carb > 500) warnings.push(`${item.name}: carbs (${carb}g) outside expected range 0-500g`);
+    if (f < 0 || f > 200) warnings.push(`${item.name}: fat (${f}g) outside expected range 0-200g`);
+
+    // Calories below macro sum by more than 10% is physically impossible
+    const macroSum = (pro * 4) + (carb * 4) + (f * 9);
+    if (macroSum > 0 && cal < macroSum * 0.9) {
+        warnings.push(`${item.name}: stated ${cal} cal but macros suggest ~${Math.round(macroSum)} cal. Values were saved but may need correction.`);
+    }
+    return warnings;
+};
 
 const toolDeclarations = [
     {
@@ -122,17 +203,21 @@ const toolDeclarations = [
     },
     {
         name: 'searchFoodLogs',
-        description: 'Search for past food logs to get their IDs. Use this BEFORE updateFoodLog when the user wants to change a previous entry.',
+        description: 'Search past food logs. Returns full nutrition data. Searches the last 2 days by default. Use `date` for a specific end date, `startDate` for a custom range start. Use this BEFORE updateFoodLog/deleteFoodLog to find logIds, or when the user references a past meal.',
         parameters: {
             type: 'object',
             properties: {
                 query: {
                     type: 'string',
-                    description: 'Search term (e.g., "coffee", "breakfast", "sandwich")'
+                    description: 'Search term (e.g., "coffee", "breakfast", "tuna")'
                 },
                 date: {
                     type: 'string',
-                    description: 'Date to search in YYYY-MM-DD format (defaults to today)'
+                    description: 'End date in YYYY-MM-DD format (defaults to today)'
+                },
+                startDate: {
+                    type: 'string',
+                    description: 'Start date for range search in YYYY-MM-DD format. Defaults to 2 days before date.'
                 }
             },
             required: ['query']
@@ -371,6 +456,16 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     // Continue with non-duplicate items only
     items = newItems;
 
+    // Nutrient validation — warn but always save
+    const nutrientWarnings = [];
+    for (const item of items) {
+        const itemWarnings = validateNutrients(item);
+        nutrientWarnings.push(...itemWarnings);
+    }
+    if (nutrientWarnings.length > 0) {
+        getLogger().warn({ action: 'tool.logFood.nutrientValidation', warnings: nutrientWarnings }, 'Nutrient validation warnings');
+    }
+
     const batch = db.batch();
     const createdIds = [];
     const lookupCache = options.lookupCache;
@@ -378,10 +473,25 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     for (const item of items) {
         const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
 
-        // Resolve nutritionSource from lookup cache if available (exact match only)
+        // Resolve nutritionSource from lookup cache — try exact match, then fuzzy
         let resolvedNutritionSource = nutritionSource || 'ai_estimate';
         if (lookupCache && lookupCache.size > 0) {
-            const cacheEntry = lookupCache.get(item.name.toLowerCase().trim());
+            const itemKey = item.name.toLowerCase().trim();
+            let cacheEntry = lookupCache.get(itemKey);
+
+            // Fuzzy match: find best token-scored cache key if exact match fails
+            if (!cacheEntry) {
+                let bestScore = 0;
+                for (const [key, value] of lookupCache.entries()) {
+                    const score = scoreTokenMatch(itemKey, key);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        cacheEntry = value;
+                    }
+                }
+                if (bestScore < 0.4) cacheEntry = null;
+            }
+
             if (cacheEntry) {
                 if (cacheEntry.source !== resolvedNutritionSource) {
                     getLogger().info({
@@ -409,6 +519,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
             source: options.source || 'chat',
             nutritionSource: resolvedNutritionSource,
             corrected: false,
+            nutrientsCorrected: false,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             ...(idempotencyKey ? { idempotencyKey } : {})
@@ -460,7 +571,10 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
                 carbs: item.carbs,
                 fat: item.fat,
                 meal: item.meal,
-                date: item.date
+                date: item.date,
+                nutritionSource: item.nutritionSource,
+                corrected: item.corrected,
+                nutrientsCorrected: item.nutrientsCorrected
             })),
             count: createdIds.length,
             totalCalories: Math.round(totals.calories),
@@ -475,7 +589,55 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
         result.message += ` New badge${newBadges.length > 1 ? 's' : ''} earned: ${newBadges.map(b => `${b.icon} ${b.name}`).join(', ')}!`;
     }
 
+    if (nutrientWarnings.length > 0) {
+        result.warnings = nutrientWarnings;
+    }
+
     return result;
+};
+
+// --- Google Search grounded nutrition lookup (fallback when USDA fails) ---
+const googleSearchNutrition = async (foodName) => {
+    getLogger().info({ action: 'tool.googleSearchNutrition', foodName }, 'Google Search: attempting nutrition lookup');
+    try {
+        const result = await searchGenAI.models.generateContent({
+            model: SEARCH_MODEL,
+            contents: `What are the nutrition facts for "${foodName}"? Return ONLY a JSON object with these exact keys: name (product name), calories, protein, carbs, fat, quantity (number), unit (serving unit). Use per-serving values. No markdown, no explanation, just the JSON object.`,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 1.0,
+                maxOutputTokens: 2048,
+                thinkingConfig: { thinkingLevel: 'MINIMAL' },
+            }
+        });
+
+        const text = result.text?.trim();
+        if (!text) return null;
+
+        // Extract JSON object from response (handles markdown fences, surrounding text)
+        const jsonMatch = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+        const parsed = JSON.parse(jsonMatch[0]);
+
+        // Validate required fields
+        if (!parsed.name || parsed.calories == null) {
+            getLogger().warn({ action: 'tool.googleSearchNutrition', foodName, parsed }, 'Google Search: incomplete response');
+            return null;
+        }
+
+        return {
+            name: parsed.name,
+            calories: Math.round(Number(parsed.calories) || 0),
+            protein: Math.round((Number(parsed.protein) || 0) * 10) / 10,
+            carbs: Math.round((Number(parsed.carbs) || 0) * 10) / 10,
+            fat: Math.round((Number(parsed.fat) || 0) * 10) / 10,
+            quantity: parsed.quantity || 1,
+            unit: parsed.unit || 'serving'
+        };
+    } catch (err) {
+        getLogger().warn({ err, foodName }, 'Google Search nutrition lookup failed');
+        return null;
+    }
 };
 
 const lookupNutrition = async (args, userId, options = {}) => {
@@ -492,12 +654,12 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 foodLogsRef
                     .where('nutritionSource', 'in', ['usda', 'nutrition_label', 'user_input'])
                     .orderBy('createdAt', 'desc')
-                    .limit(10)
+                    .limit(50)
                     .get(),
                 foodLogsRef
                     .where('nutrientsCorrected', '==', true)
                     .orderBy('createdAt', 'desc')
-                    .limit(10)
+                    .limit(50)
                     .get()
             ]);
 
@@ -513,21 +675,46 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 }
             }
 
-            // Filter by name match (case-insensitive substring)
+            // Score candidates using token-overlap + recency + frequency
             const lowerFood = foodName.toLowerCase();
-            const matches = candidates.filter(c =>
-                c.name && c.name.toLowerCase().includes(lowerFood)
-            );
+
+            // Count frequency per normalized name
+            const frequencyCounts = {};
+            for (const c of candidates) {
+                const key = c.name?.toLowerCase().trim() || '';
+                frequencyCounts[key] = (frequencyCounts[key] || 0) + 1;
+            }
+            const maxFrequency = Math.max(...Object.values(frequencyCounts), 1);
+
+            const scored = candidates
+                .filter(c => c.name)
+                .map(c => {
+                    const tokenScore = scoreTokenMatch(lowerFood, c.name);
+                    const freqKey = c.name.toLowerCase().trim();
+                    const composite = computeCompositeScore(tokenScore, c.createdAt, frequencyCounts[freqKey] || 1, maxFrequency);
+                    return { ...c, tokenScore, composite };
+                })
+                .filter(c => c.tokenScore >= 0.4)
+                .sort((a, b) => b.composite - a.composite);
+
+            const matches = scored;
 
             if (matches.length > 0) {
                 const best = matches[0];
-                getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'user_history',
-                    matchedName: best.name, corrected: best.nutrientsCorrected || false
-                }, 'Nutrition lookup: user_history match');
-                if (lookupCache) lookupCache.set(cacheKey, { source: 'user_history', matchedName: best.name });
+                const resolvedSource = best.nutrientsCorrected
+                    ? 'user_input'
+                    : (best.nutritionSource || 'user_history');
+                getLogger().info({ action: 'tool.lookupNutrition', foodName, source: resolvedSource,
+                    matchedName: best.name, corrected: best.nutrientsCorrected || false,
+                    score: best.composite?.toFixed(3), tokenScore: best.tokenScore?.toFixed(3)
+                }, 'Nutrition lookup: user history match');
+                if (lookupCache) {
+                    lookupCache.set(cacheKey, { source: resolvedSource, matchedName: best.name });
+                    lookupCache.set(best.name.toLowerCase().trim(), { source: resolvedSource, matchedName: best.name });
+                }
                 return {
                     success: true,
-                    source: 'user_history',
+                    source: resolvedSource,
                     data: {
                         name: best.name,
                         calories: best.calories,
@@ -559,28 +746,72 @@ const lookupNutrition = async (args, userId, options = {}) => {
         }
     }
 
-    // 2. USDA — most authoritative external source
-    const usdaResults = await searchFoods(foodName, 3);
+    // 2. USDA — most authoritative external source (with token scoring filter)
+    const MIN_USDA_SCORE = 0.6;
+    const usdaResults = await searchFoods(foodName, 5);
     if (usdaResults.length > 0) {
-        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'usda',
-            matchedName: usdaResults[0].name, resultCount: usdaResults.length
-        }, 'Nutrition lookup: USDA match');
-        if (lookupCache) lookupCache.set(cacheKey, { source: 'usda', matchedName: usdaResults[0].name });
+        const scoredUsda = usdaResults
+            .map(r => ({ ...r, tokenScore: scoreTokenMatch(foodName, r.name) }))
+            .filter(r => r.tokenScore >= MIN_USDA_SCORE)
+            .sort((a, b) => b.tokenScore - a.tokenScore);
+
+        if (scoredUsda.length > 0) {
+            const best = scoredUsda[0];
+            getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'usda',
+                matchedName: best.name, tokenScore: best.tokenScore.toFixed(3),
+                resultCount: scoredUsda.length, filteredOut: usdaResults.length - scoredUsda.length
+            }, 'Nutrition lookup: USDA match');
+            if (lookupCache) {
+                lookupCache.set(cacheKey, { source: 'usda', matchedName: best.name });
+                lookupCache.set(best.name.toLowerCase().trim(), { source: 'usda', matchedName: best.name });
+            }
+            return {
+                success: true,
+                source: 'usda',
+                data: best,
+                alternatives: scoredUsda.slice(1, 3)
+            };
+        } else {
+            getLogger().info({ action: 'tool.lookupNutrition', foodName,
+                bestUsdaName: usdaResults[0].name,
+                bestUsdaScore: scoreTokenMatch(foodName, usdaResults[0].name).toFixed(3)
+            }, 'Nutrition lookup: USDA results filtered out (low relevance)');
+        }
+    }
+
+    // 3. Google Search grounded fallback (rate-limited)
+    let googleResult = null;
+    if (checkGoogleSearchBudget(userId)) {
+        googleResult = await googleSearchNutrition(foodName);
+        if (googleResult) incrementGoogleSearchCount(userId);
+    } else {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, globalCount: googleSearchGlobalCount }, 'Google Search: skipped (daily cap reached)');
+    }
+    if (googleResult) {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'google_search',
+            matchedName: googleResult.name
+        }, 'Nutrition lookup: Google Search match');
+        if (lookupCache) {
+            lookupCache.set(cacheKey, { source: 'google_search', matchedName: googleResult.name });
+            lookupCache.set(googleResult.name.toLowerCase().trim(), { source: 'google_search', matchedName: googleResult.name });
+        }
         return {
             success: true,
-            source: 'usda',
-            data: usdaResults[0],
-            alternatives: usdaResults.slice(1)
+            source: 'google_search',
+            data: googleResult
         };
     }
 
-    // 3. Common foods fallback
+    // 4. Common foods fallback
     const quickResult = quickLookup(foodName);
     if (quickResult) {
         getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'common_foods',
             matchedName: quickResult.name
         }, 'Nutrition lookup: common_foods match');
-        if (lookupCache) lookupCache.set(cacheKey, { source: 'common_foods', matchedName: quickResult.name });
+        if (lookupCache) {
+            lookupCache.set(cacheKey, { source: 'common_foods', matchedName: quickResult.name });
+            lookupCache.set(quickResult.name.toLowerCase().trim(), { source: 'common_foods', matchedName: quickResult.name });
+        }
         return {
             success: true,
             source: 'common_foods',
@@ -599,65 +830,96 @@ const lookupNutrition = async (args, userId, options = {}) => {
 };
 
 const searchFoodLogs = async (args, userId, userTimezone) => {
-    let { query, date } = args;
+    let { query, date, startDate } = args;
 
     if (!date) {
         date = getTodayStr(userTimezone);
     }
 
+    // Backward compat: convert legacy daysBack to startDate
+    if (args.daysBack != null && !startDate) {
+        const daysBack = Math.min(Math.max(args.daysBack, 0), 30);
+        const start = parseLocalDate(date);
+        start.setDate(start.getDate() - daysBack);
+        startDate = toDateStr(start);
+    }
+
+    // Default: last 3 calendar days (today, yesterday, day before)
+    if (!startDate) {
+        const defaultStart = parseLocalDate(date);
+        defaultStart.setDate(defaultStart.getDate() - 2);
+        startDate = toDateStr(defaultStart);
+    }
+
+    // Cap at 30 days
+    const diffDays = (parseLocalDate(date) - parseLocalDate(startDate)) / 86400000;
+    if (diffDays > 30) {
+        const capped = parseLocalDate(date);
+        capped.setDate(capped.getDate() - 30);
+        startDate = toDateStr(capped);
+    }
+
     try {
-        const snapshot = await db.collection('users').doc(userId)
-            .collection('foodLogs')
-            .where('date', '==', date)
+        const logsRef = db.collection('users').doc(userId).collection('foodLogs');
+        const snapshot = await logsRef
+            .where('date', '>=', startDate)
+            .where('date', '<=', date)
+            .limit(200)
             .get();
 
         if (snapshot.empty) {
-            return { success: true, count: 0, matches: [], message: `No food logs found for ${date}` };
+            return { success: true, data: { count: 0, matches: [], message: `No matching food logs found from ${startDate} to ${date}` } };
         }
 
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const mapMatch = (m) => ({
+            id: m.id,
+            name: m.name,
+            meal: m.meal,
+            date: m.date,
+            quantity: m.quantity,
+            unit: m.unit,
+            calories: m.calories,
+            protein: m.protein,
+            carbs: m.carbs,
+            fat: m.fat,
+            nutritionSource: m.nutritionSource,
+            corrected: m.nutrientsCorrected || m.corrected || false,
+            time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
+        });
+
         if (!query) {
             return {
                 success: true,
                 data: {
                     count: logs.length,
-                    date,
-                    matches: logs.map(m => ({
-                        id: m.id,
-                        name: m.name,
-                        meal: m.meal,
-                        quantity: m.quantity,
-                        unit: m.unit,
-                        calories: m.calories,
-                        time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
-                    }))
+                    startDate,
+                    endDate: date,
+                    matches: logs.map(mapMatch)
                 }
             };
         }
 
-        const lowerQuery = query.toLowerCase();
-
-        const matches = logs.filter(log => {
-            const nameMatch = log.name?.toLowerCase().includes(lowerQuery);
-            const msgMatch = log.originalMessage?.toLowerCase().includes(lowerQuery);
-            const mealMatch = log.meal?.toLowerCase().includes(lowerQuery);
-            return nameMatch || msgMatch || mealMatch;
-        });
+        // Score and rank logs by token overlap, filter out irrelevant results
+        const MIN_SEARCH_SCORE = 0.2;
+        const scored = logs
+            .map(log => {
+                const nameScore = log.name ? scoreTokenMatch(query, log.name) : 0;
+                const mealScore = log.meal ? scoreTokenMatch(query, log.meal) : 0;
+                const score = Math.max(nameScore, mealScore);
+                return { ...log, score };
+            })
+            .filter(log => log.score >= MIN_SEARCH_SCORE)
+            .sort((a, b) => b.score - a.score);
 
         return {
             success: true,
             data: {
-                count: matches.length,
-                date,
-                matches: matches.map(m => ({
-                    id: m.id,
-                    name: m.name,
-                    meal: m.meal,
-                    quantity: m.quantity,
-                    unit: m.unit,
-                    calories: m.calories,
-                    time: m.createdAt?.toDate?.()?.toLocaleTimeString() || 'N/A'
-                }))
+                count: scored.length,
+                startDate,
+                endDate: date,
+                matches: scored.map(mapMatch)
             }
         };
     } catch (error) {
@@ -891,6 +1153,14 @@ const updateUserProfile = async (args, userId, userTimezone) => {
     }
 
     await db.collection('users').doc(userId).set(updateData, { merge: true });
+
+    // Invalidate context cache so next chat picks up updated biometrics/goals
+    try {
+        const { invalidateContextCache } = require('../services/geminiService');
+        invalidateContextCache();
+    } catch (err) {
+        getLogger().warn({ err }, 'Failed to invalidate context cache after profile update');
+    }
 
     getLogger().info({
         action: 'tool.updateUserProfile',

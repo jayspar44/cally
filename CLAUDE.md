@@ -342,7 +342,7 @@ Auto-invoked skills (brainstorming, TDD, debugging, verification, etc.) activate
   - `services/`: Business logic, Firebase calls, Gemini AI
   - `agents/`: AI agent definitions with tools
 - **Logging**: Controllers use `req.log` (Pino), services use `require('../logger')`. Never `console.log`.
-- **Gemini calls**: Always use `temperature: 1.0` for all Gemini 3 calls. Always include `thinkingConfig` — use `'MEDIUM'` for conversational/tool-calling, `'LOW'` for short-form generation (greetings, summaries, reviews).
+- **Gemini calls**: Always use `temperature: 1.0` for all Gemini 3 calls. Always include `thinkingConfig` — use `'HIGH'` for conversational/tool-calling, `'MEDIUM'` for analytical generation (insights, reviews), `'MINIMAL'` for short-form generation (greetings).
 
 ### Git Commits (Conventional Commits)
 

@@ -45,9 +45,8 @@ const mapFoodResult = (food) => ({
 });
 
 const searchFoods = async (query, limit = 5) => {
-    try {
-        // Sanitize: strip parentheses (cause USDA 400 when unmatched)
-        const sanitizedQuery = query.replace(/[()]/g, '');
+    const doSearch = async (searchQuery) => {
+        const sanitizedQuery = searchQuery.replace(/[()]/g, '');
 
         const response = await fetch(`${USDA_API_BASE}/foods/search?api_key=${USDA_API_KEY}`, {
             method: 'POST',
@@ -61,12 +60,36 @@ const searchFoods = async (query, limit = 5) => {
 
         if (!response.ok) {
             const errorBody = await response.text().catch(() => '');
-            throw new Error(`USDA API error: ${response.status} - ${errorBody}`);
+            const error = new Error(`USDA API error: ${response.status} - ${errorBody}`);
+            error.status = response.status;
+            throw error;
         }
 
         const data = await response.json();
         return (data.foods || []).map(mapFoodResult);
+    };
+
+    try {
+        return await doSearch(query);
     } catch (error) {
+        if (error.status === 500 || error.status === 503 || error.status === 504) {
+            const simplified = query
+                .replace(/\d+\/?\d*\s*(cups?|oz|tbsp|tsp|g|ml|lbs?|pieces?|slices?|servings?)\b/gi, '')
+                .replace(/\d+\/\d+/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (simplified && simplified !== query) {
+                logger.info({ originalQuery: query, simplifiedQuery: simplified }, 'USDA retry with simplified query');
+                try {
+                    return await doSearch(simplified);
+                } catch (retryError) {
+                    logger.error({ err: retryError, query: simplified }, 'USDA retry also failed');
+                    return [];
+                }
+            }
+        }
+
         logger.error({ err: error, query }, 'USDA search failed');
         return [];
     }
