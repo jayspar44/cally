@@ -73,15 +73,20 @@ const computeCompositeScore = (tokenScore, createdAt, frequencyCount, maxFrequen
 
 const validateNutrients = (item) => {
     const warnings = [];
-    if (item.calories < 0 || item.calories > 3000) warnings.push(`${item.name}: calories (${item.calories}) outside expected range 0-3000`);
-    if (item.protein < 0 || item.protein > 300) warnings.push(`${item.name}: protein (${item.protein}g) outside expected range 0-300g`);
-    if (item.carbs < 0 || item.carbs > 500) warnings.push(`${item.name}: carbs (${item.carbs}g) outside expected range 0-500g`);
-    if (item.fat < 0 || item.fat > 200) warnings.push(`${item.name}: fat (${item.fat}g) outside expected range 0-200g`);
+    const cal = Number(item.calories) || 0;
+    const pro = Number(item.protein) || 0;
+    const carb = Number(item.carbs) || 0;
+    const f = Number(item.fat) || 0;
+
+    if (cal < 0 || cal > 3000) warnings.push(`${item.name}: calories (${cal}) outside expected range 0-3000`);
+    if (pro < 0 || pro > 300) warnings.push(`${item.name}: protein (${pro}g) outside expected range 0-300g`);
+    if (carb < 0 || carb > 500) warnings.push(`${item.name}: carbs (${carb}g) outside expected range 0-500g`);
+    if (f < 0 || f > 200) warnings.push(`${item.name}: fat (${f}g) outside expected range 0-200g`);
 
     // Calories below macro sum by more than 10% is physically impossible
-    const macroSum = (item.protein * 4) + (item.carbs * 4) + (item.fat * 9);
-    if (macroSum > 0 && item.calories < macroSum * 0.9) {
-        warnings.push(`${item.name}: stated ${item.calories} cal but macros suggest ~${Math.round(macroSum)} cal. Values were saved but may need correction.`);
+    const macroSum = (pro * 4) + (carb * 4) + (f * 9);
+    if (macroSum > 0 && cal < macroSum * 0.9) {
+        warnings.push(`${item.name}: stated ${cal} cal but macros suggest ~${Math.round(macroSum)} cal. Values were saved but may need correction.`);
     }
     return warnings;
 };
@@ -602,15 +607,17 @@ const googleSearchNutrition = async (foodName) => {
                 tools: [{ googleSearch: {} }],
                 temperature: 1.0,
                 maxOutputTokens: 2048,
+                thinkingConfig: { thinkingLevel: 'MINIMAL' },
             }
         });
 
         const text = result.text?.trim();
         if (!text) return null;
 
-        // Parse JSON from response (strip markdown fences if present)
-        const jsonStr = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-        const parsed = JSON.parse(jsonStr);
+        // Extract JSON object from response (handles markdown fences, surrounding text)
+        const jsonMatch = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').match(/\{[\s\S]*\}/);
+        if (!jsonMatch) return null;
+        const parsed = JSON.parse(jsonMatch[0]);
 
         // Validate required fields
         if (!parsed.name || parsed.calories == null) {
