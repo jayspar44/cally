@@ -409,10 +409,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                if (RESEARCH_TOOLS.has(call.name)) {
-                    researchCalls++;
-                }
-
                 // Block research tools when budget is exhausted
                 if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
                     getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
@@ -423,6 +419,9 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     continue;
                 }
 
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
                 getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
@@ -578,10 +577,6 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
             const functionResponses = [];
 
             for (const call of functionCalls) {
-                if (RESEARCH_TOOLS.has(call.name)) {
-                    researchCalls++;
-                }
-
                 // Block research tools when budget is exhausted
                 if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
                     getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
@@ -592,6 +587,9 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     continue;
                 }
 
+                if (RESEARCH_TOOLS.has(call.name)) {
+                    researchCalls++;
+                }
                 getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 

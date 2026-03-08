@@ -11,6 +11,40 @@ const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils')
 const searchGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const SEARCH_MODEL = 'gemini-3-flash-preview';
 
+// --- Google Search rate limiting (global + per-user) ---
+const GOOGLE_SEARCH_GLOBAL_DAILY_CAP = 500;
+const GOOGLE_SEARCH_USER_DAILY_CAP = 20;
+let googleSearchGlobalCount = 0;
+let googleSearchGlobalResetDate = new Date().toDateString();
+const googleSearchUserCounts = new Map(); // userId -> { count, resetDate }
+
+const checkGoogleSearchBudget = (userId) => {
+    const today = new Date().toDateString();
+    // Reset global counter on new day
+    if (googleSearchGlobalResetDate !== today) {
+        googleSearchGlobalCount = 0;
+        googleSearchGlobalResetDate = today;
+        googleSearchUserCounts.clear();
+    }
+    // Check global cap
+    if (googleSearchGlobalCount >= GOOGLE_SEARCH_GLOBAL_DAILY_CAP) return false;
+    // Check per-user cap
+    const userEntry = googleSearchUserCounts.get(userId);
+    if (userEntry && userEntry.resetDate === today && userEntry.count >= GOOGLE_SEARCH_USER_DAILY_CAP) return false;
+    return true;
+};
+
+const incrementGoogleSearchCount = (userId) => {
+    googleSearchGlobalCount++;
+    const today = new Date().toDateString();
+    const userEntry = googleSearchUserCounts.get(userId);
+    if (!userEntry || userEntry.resetDate !== today) {
+        googleSearchUserCounts.set(userId, { count: 1, resetDate: today });
+    } else {
+        userEntry.count++;
+    }
+};
+
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
 
@@ -29,7 +63,7 @@ const computeCompositeScore = (tokenScore, createdAt, frequencyCount, maxFrequen
     const daysAgo = createdAt
         ? (Date.now() - (createdAt.toDate?.()?.getTime?.() || createdAt)) / (1000 * 60 * 60 * 24)
         : 90;
-    const recencyScore = Math.max(0, 1 - (daysAgo / 90));
+    const recencyScore = Math.max(0, Math.min(1, 1 - (daysAgo / 90)));
 
     // Frequency: normalized against the most frequent item in candidates
     const frequencyScore = maxFrequency > 0 ? frequencyCount / maxFrequency : 0;
@@ -613,12 +647,12 @@ const lookupNutrition = async (args, userId, options = {}) => {
                 foodLogsRef
                     .where('nutritionSource', 'in', ['usda', 'nutrition_label', 'user_input'])
                     .orderBy('createdAt', 'desc')
-                    .limit(50)
+                    .limit(25)
                     .get(),
                 foodLogsRef
                     .where('nutrientsCorrected', '==', true)
                     .orderBy('createdAt', 'desc')
-                    .limit(50)
+                    .limit(25)
                     .get()
             ]);
 
@@ -738,8 +772,14 @@ const lookupNutrition = async (args, userId, options = {}) => {
         }
     }
 
-    // 3. Google Search grounded fallback
-    const googleResult = await googleSearchNutrition(foodName);
+    // 3. Google Search grounded fallback (rate-limited)
+    let googleResult = null;
+    if (checkGoogleSearchBudget(userId)) {
+        googleResult = await googleSearchNutrition(foodName);
+        if (googleResult) incrementGoogleSearchCount(userId);
+    } else {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, globalCount: googleSearchGlobalCount }, 'Google Search: skipped (daily cap reached)');
+    }
     if (googleResult) {
         getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'google_search',
             matchedName: googleResult.name
@@ -797,7 +837,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
         startDate = toDateStr(start);
     }
 
-    // Default: last 2 days (today + yesterday)
+    // Default: last 3 calendar days (today, yesterday, day before)
     if (!startDate) {
         const defaultStart = parseLocalDate(date);
         defaultStart.setDate(defaultStart.getDate() - 2);
@@ -817,6 +857,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
         const snapshot = await logsRef
             .where('date', '>=', startDate)
             .where('date', '<=', date)
+            .limit(200)
             .get();
 
         if (snapshot.empty) {
