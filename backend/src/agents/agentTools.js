@@ -1,11 +1,15 @@
 const { db } = require('../services/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
+const { GoogleGenAI } = require('@google/genai');
 const { searchFoods, quickLookup } = require('../services/nutritionService');
 const { getGoalsForDate, getUserSettings, snapshotGoals } = require('../services/goalsService');
 const { calculateRecommendedTargets } = require('../services/nutritionCalculator');
 const { checkBadgeEligibility } = require('../services/badgeService');
 const { getLogger } = require('../logger');
 const { getTodayStr, parseLocalDate, toDateStr } = require('../utils/dateUtils');
+
+const searchGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const SEARCH_MODEL = 'gemini-3-flash-preview';
 
 const VALID_MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
 const ALLOWED_UPDATE_KEYS = ['name', 'quantity', 'unit', 'calories', 'protein', 'carbs', 'fat', 'meal', 'date'];
@@ -160,21 +164,21 @@ const toolDeclarations = [
     },
     {
         name: 'searchFoodLogs',
-        description: 'Search past food logs. Returns full nutrition data for each match. Use daysBack to search across multiple days (e.g., daysBack: 7 for the last week). Use this BEFORE updateFoodLog/deleteFoodLog to find logIds, or when the user explicitly references a past meal to re-log.',
+        description: 'Search past food logs. Returns full nutrition data. Searches the last 2 days by default. Use `date` for a specific end date, `startDate` for a custom range start. Use this BEFORE updateFoodLog/deleteFoodLog to find logIds, or when the user references a past meal.',
         parameters: {
             type: 'object',
             properties: {
                 query: {
                     type: 'string',
-                    description: 'Search term (e.g., "coffee", "breakfast", "sandwich")'
+                    description: 'Search term (e.g., "coffee", "breakfast", "tuna")'
                 },
                 date: {
                     type: 'string',
-                    description: 'Date to search in YYYY-MM-DD format (defaults to today)'
+                    description: 'End date in YYYY-MM-DD format (defaults to today)'
                 },
-                daysBack: {
-                    type: 'number',
-                    description: 'Number of days back to search (0 = today only). Defaults to 0. Max 30.'
+                startDate: {
+                    type: 'string',
+                    description: 'Start date for range search in YYYY-MM-DD format. Defaults to 2 days before date.'
                 }
             },
             required: ['query']
@@ -430,10 +434,25 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     for (const item of items) {
         const docRef = db.collection('users').doc(userId).collection('foodLogs').doc();
 
-        // Resolve nutritionSource from lookup cache if available (exact match only)
+        // Resolve nutritionSource from lookup cache — try exact match, then fuzzy
         let resolvedNutritionSource = nutritionSource || 'ai_estimate';
         if (lookupCache && lookupCache.size > 0) {
-            const cacheEntry = lookupCache.get(item.name.toLowerCase().trim());
+            const itemKey = item.name.toLowerCase().trim();
+            let cacheEntry = lookupCache.get(itemKey);
+
+            // Fuzzy match: find best token-scored cache key if exact match fails
+            if (!cacheEntry) {
+                let bestScore = 0;
+                for (const [key, value] of lookupCache.entries()) {
+                    const score = scoreTokenMatch(itemKey, key);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        cacheEntry = value;
+                    }
+                }
+                if (bestScore < 0.4) cacheEntry = null;
+            }
+
             if (cacheEntry) {
                 if (cacheEntry.source !== resolvedNutritionSource) {
                     getLogger().info({
@@ -461,6 +480,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
             source: options.source || 'chat',
             nutritionSource: resolvedNutritionSource,
             corrected: false,
+            nutrientsCorrected: false,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             ...(idempotencyKey ? { idempotencyKey } : {})
@@ -512,7 +532,10 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
                 carbs: item.carbs,
                 fat: item.fat,
                 meal: item.meal,
-                date: item.date
+                date: item.date,
+                nutritionSource: item.nutritionSource,
+                corrected: item.corrected,
+                nutrientsCorrected: item.nutrientsCorrected
             })),
             count: createdIds.length,
             totalCalories: Math.round(totals.calories),
@@ -532,6 +555,48 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
     }
 
     return result;
+};
+
+// --- Google Search grounded nutrition lookup (fallback when USDA fails) ---
+const googleSearchNutrition = async (foodName) => {
+    getLogger().info({ action: 'tool.googleSearchNutrition', foodName }, 'Google Search: attempting nutrition lookup');
+    try {
+        const result = await searchGenAI.models.generateContent({
+            model: SEARCH_MODEL,
+            contents: `What are the nutrition facts for "${foodName}"? Return ONLY a JSON object with these exact keys: name (product name), calories, protein, carbs, fat, quantity (number), unit (serving unit). Use per-serving values. No markdown, no explanation, just the JSON object.`,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 1.0,
+                maxOutputTokens: 2048,
+            }
+        });
+
+        const text = result.text?.trim();
+        if (!text) return null;
+
+        // Parse JSON from response (strip markdown fences if present)
+        const jsonStr = text.replace(/^```json?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+        const parsed = JSON.parse(jsonStr);
+
+        // Validate required fields
+        if (!parsed.name || parsed.calories == null) {
+            getLogger().warn({ action: 'tool.googleSearchNutrition', foodName, parsed }, 'Google Search: incomplete response');
+            return null;
+        }
+
+        return {
+            name: parsed.name,
+            calories: Math.round(Number(parsed.calories) || 0),
+            protein: Math.round((Number(parsed.protein) || 0) * 10) / 10,
+            carbs: Math.round((Number(parsed.carbs) || 0) * 10) / 10,
+            fat: Math.round((Number(parsed.fat) || 0) * 10) / 10,
+            quantity: parsed.quantity || 1,
+            unit: parsed.unit || 'serving'
+        };
+    } catch (err) {
+        getLogger().warn({ err, foodName }, 'Google Search nutrition lookup failed');
+        return null;
+    }
 };
 
 const lookupNutrition = async (args, userId, options = {}) => {
@@ -595,14 +660,20 @@ const lookupNutrition = async (args, userId, options = {}) => {
 
             if (matches.length > 0) {
                 const best = matches[0];
-                getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'user_history',
+                const resolvedSource = best.nutrientsCorrected
+                    ? 'user_input'
+                    : (best.nutritionSource || 'user_history');
+                getLogger().info({ action: 'tool.lookupNutrition', foodName, source: resolvedSource,
                     matchedName: best.name, corrected: best.nutrientsCorrected || false,
                     score: best.composite?.toFixed(3), tokenScore: best.tokenScore?.toFixed(3)
-                }, 'Nutrition lookup: user_history match');
-                if (lookupCache) lookupCache.set(cacheKey, { source: 'user_history', matchedName: best.name });
+                }, 'Nutrition lookup: user history match');
+                if (lookupCache) {
+                    lookupCache.set(cacheKey, { source: resolvedSource, matchedName: best.name });
+                    lookupCache.set(best.name.toLowerCase().trim(), { source: resolvedSource, matchedName: best.name });
+                }
                 return {
                     success: true,
-                    source: 'user_history',
+                    source: resolvedSource,
                     data: {
                         name: best.name,
                         calories: best.calories,
@@ -634,28 +705,66 @@ const lookupNutrition = async (args, userId, options = {}) => {
         }
     }
 
-    // 2. USDA — most authoritative external source
-    const usdaResults = await searchFoods(foodName, 3);
+    // 2. USDA — most authoritative external source (with token scoring filter)
+    const MIN_USDA_SCORE = 0.6;
+    const usdaResults = await searchFoods(foodName, 5);
     if (usdaResults.length > 0) {
-        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'usda',
-            matchedName: usdaResults[0].name, resultCount: usdaResults.length
-        }, 'Nutrition lookup: USDA match');
-        if (lookupCache) lookupCache.set(cacheKey, { source: 'usda', matchedName: usdaResults[0].name });
+        const scoredUsda = usdaResults
+            .map(r => ({ ...r, tokenScore: scoreTokenMatch(foodName, r.name) }))
+            .filter(r => r.tokenScore >= MIN_USDA_SCORE)
+            .sort((a, b) => b.tokenScore - a.tokenScore);
+
+        if (scoredUsda.length > 0) {
+            const best = scoredUsda[0];
+            getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'usda',
+                matchedName: best.name, tokenScore: best.tokenScore.toFixed(3),
+                resultCount: scoredUsda.length, filteredOut: usdaResults.length - scoredUsda.length
+            }, 'Nutrition lookup: USDA match');
+            if (lookupCache) {
+                lookupCache.set(cacheKey, { source: 'usda', matchedName: best.name });
+                lookupCache.set(best.name.toLowerCase().trim(), { source: 'usda', matchedName: best.name });
+            }
+            return {
+                success: true,
+                source: 'usda',
+                data: best,
+                alternatives: scoredUsda.slice(1, 3)
+            };
+        } else {
+            getLogger().info({ action: 'tool.lookupNutrition', foodName,
+                bestUsdaName: usdaResults[0].name,
+                bestUsdaScore: scoreTokenMatch(foodName, usdaResults[0].name).toFixed(3)
+            }, 'Nutrition lookup: USDA results filtered out (low relevance)');
+        }
+    }
+
+    // 3. Google Search grounded fallback
+    const googleResult = await googleSearchNutrition(foodName);
+    if (googleResult) {
+        getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'google_search',
+            matchedName: googleResult.name
+        }, 'Nutrition lookup: Google Search match');
+        if (lookupCache) {
+            lookupCache.set(cacheKey, { source: 'google_search', matchedName: googleResult.name });
+            lookupCache.set(googleResult.name.toLowerCase().trim(), { source: 'google_search', matchedName: googleResult.name });
+        }
         return {
             success: true,
-            source: 'usda',
-            data: usdaResults[0],
-            alternatives: usdaResults.slice(1)
+            source: 'google_search',
+            data: googleResult
         };
     }
 
-    // 3. Common foods fallback
+    // 4. Common foods fallback
     const quickResult = quickLookup(foodName);
     if (quickResult) {
         getLogger().info({ action: 'tool.lookupNutrition', foodName, source: 'common_foods',
             matchedName: quickResult.name
         }, 'Nutrition lookup: common_foods match');
-        if (lookupCache) lookupCache.set(cacheKey, { source: 'common_foods', matchedName: quickResult.name });
+        if (lookupCache) {
+            lookupCache.set(cacheKey, { source: 'common_foods', matchedName: quickResult.name });
+            lookupCache.set(quickResult.name.toLowerCase().trim(), { source: 'common_foods', matchedName: quickResult.name });
+        }
         return {
             success: true,
             source: 'common_foods',
@@ -674,37 +783,44 @@ const lookupNutrition = async (args, userId, options = {}) => {
 };
 
 const searchFoodLogs = async (args, userId, userTimezone) => {
-    let { query, date, daysBack } = args;
+    let { query, date, startDate } = args;
 
     if (!date) {
         date = getTodayStr(userTimezone);
     }
 
-    // Cap daysBack at 30
-    daysBack = Math.min(Math.max(daysBack || 0, 0), 30);
+    // Backward compat: convert legacy daysBack to startDate
+    if (args.daysBack != null && !startDate) {
+        const daysBack = Math.min(Math.max(args.daysBack, 0), 30);
+        const start = parseLocalDate(date);
+        start.setDate(start.getDate() - daysBack);
+        startDate = toDateStr(start);
+    }
+
+    // Default: last 2 days (today + yesterday)
+    if (!startDate) {
+        const defaultStart = parseLocalDate(date);
+        defaultStart.setDate(defaultStart.getDate() - 2);
+        startDate = toDateStr(defaultStart);
+    }
+
+    // Cap at 30 days
+    const diffDays = (parseLocalDate(date) - parseLocalDate(startDate)) / 86400000;
+    if (diffDays > 30) {
+        const capped = parseLocalDate(date);
+        capped.setDate(capped.getDate() - 30);
+        startDate = toDateStr(capped);
+    }
 
     try {
-        let snapshot;
         const logsRef = db.collection('users').doc(userId).collection('foodLogs');
-
-        if (daysBack > 0) {
-            const endDate = date;
-            const startDateObj = parseLocalDate(date);
-            startDateObj.setDate(startDateObj.getDate() - daysBack);
-            const startDate = toDateStr(startDateObj);
-
-            snapshot = await logsRef
-                .where('date', '>=', startDate)
-                .where('date', '<=', endDate)
-                .get();
-        } else {
-            snapshot = await logsRef
-                .where('date', '==', date)
-                .get();
-        }
+        const snapshot = await logsRef
+            .where('date', '>=', startDate)
+            .where('date', '<=', date)
+            .get();
 
         if (snapshot.empty) {
-            return { success: true, data: { count: 0, matches: [], message: `No food logs found${daysBack > 0 ? ` in the last ${daysBack} days` : ` for ${date}`}` } };
+            return { success: true, data: { count: 0, matches: [], message: `No matching food logs found from ${startDate} to ${date}` } };
         }
 
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -730,7 +846,8 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
                 success: true,
                 data: {
                     count: logs.length,
-                    date: daysBack > 0 ? undefined : date,
+                    startDate,
+                    endDate: date,
                     matches: logs.map(mapMatch)
                 }
             };
@@ -752,7 +869,8 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
             success: true,
             data: {
                 count: scored.length,
-                date: daysBack > 0 ? undefined : date,
+                startDate,
+                endDate: date,
                 matches: scored.map(mapMatch)
             }
         };
