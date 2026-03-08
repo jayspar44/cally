@@ -17,6 +17,10 @@ const shouldTriggerReview = async (userId, timezone = 'America/New_York') => {
         const userData = userDoc.exists ? userDoc.data() : {};
         const reviewDay = userData.settings?.weeklyReviewDay || 'sunday';
 
+        if (reviewDay === 'off') {
+            return false;
+        }
+
         // Get current day of week in user's timezone
         const now = new Date();
         const dayName = now.toLocaleString('en-US', { timeZone: tz, weekday: 'long' }).toLowerCase();
@@ -28,6 +32,12 @@ const shouldTriggerReview = async (userId, timezone = 'America/New_York') => {
         // Check if already reviewed today
         const today = getTodayStr(tz);
         if (userData.lastWeeklyReview === today) {
+            return false;
+        }
+
+        // Only trigger after 6 PM in user's timezone (no point reviewing before dinner)
+        const currentHour = parseInt(now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false }), 10);
+        if (currentHour < 18) {
             return false;
         }
 

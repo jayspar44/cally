@@ -16,6 +16,7 @@ const MODELS = {
 // TTL: 24 hours. Lazy-initialized on first request.
 const RESEARCH_TOOL_CAP = 15;
 const MAX_TOTAL_ITERATIONS = 25;
+const MAX_TOTAL_TOOL_CALLS = 40;
 const RESEARCH_TOOLS = new Set(['lookupNutrition', 'searchFoodLogs', 'getUserGoals']);
 const CACHE_TTL = '86400s';
 const cachedContentNames = { base: null, onboarding: null };
@@ -403,12 +404,22 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
 
         let researchCalls = 0;
         let totalIterations = 0;
+        let totalToolCalls = 0;
 
-        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS && totalToolCalls < MAX_TOTAL_TOOL_CALLS) {
             totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
+                // Hard cap on total tool calls
+                if (totalToolCalls >= MAX_TOTAL_TOOL_CALLS) {
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: 'Tool call budget exhausted. Respond to the user now with what you have.' }
+                    });
+                    continue;
+                }
+
                 // Block research tools when budget is exhausted
                 if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
                     getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
@@ -419,10 +430,11 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     continue;
                 }
 
+                totalToolCalls++;
                 if (RESEARCH_TOOLS.has(call.name)) {
                     researchCalls++;
                 }
-                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, totalToolCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { lookupCache });
@@ -474,10 +486,11 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
         }
 
         const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            totalToolCalls >= MAX_TOTAL_TOOL_CALLS ||
             (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
 
         if (loopExhausted) {
-            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
+            getLogger().warn({ totalIterations, totalToolCalls, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
 
         responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
@@ -571,12 +584,22 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
 
         let researchCalls = 0;
         let totalIterations = 0;
+        let totalToolCalls = 0;
 
-        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS) {
+        while (functionCalls.length > 0 && totalIterations < MAX_TOTAL_ITERATIONS && totalToolCalls < MAX_TOTAL_TOOL_CALLS) {
             totalIterations++;
             const functionResponses = [];
 
             for (const call of functionCalls) {
+                // Hard cap on total tool calls
+                if (totalToolCalls >= MAX_TOTAL_TOOL_CALLS) {
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: 'Tool call budget exhausted. Respond to the user now with what you have.' }
+                    });
+                    continue;
+                }
+
                 // Block research tools when budget is exhausted
                 if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
                     getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
@@ -587,10 +610,11 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     continue;
                 }
 
+                totalToolCalls++;
                 if (RESEARCH_TOOLS.has(call.name)) {
                     researchCalls++;
                 }
-                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
+                getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, totalToolCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
                 const toolResult = await executeTool(call.name, call.args, userId, userTimezone, idempotencyKey, { source: 'photo', lookupCache });
@@ -642,10 +666,11 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
         }
 
         const loopExhausted = totalIterations >= MAX_TOTAL_ITERATIONS ||
+            totalToolCalls >= MAX_TOTAL_TOOL_CALLS ||
             (researchCalls >= RESEARCH_TOOL_CAP && functionCalls.length > 0);
 
         if (loopExhausted) {
-            getLogger().warn({ totalIterations, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
+            getLogger().warn({ totalIterations, totalToolCalls, researchCalls, toolsUsed }, 'Tool-calling loop exhausted');
         }
 
         responseText = buildFallbackResponse(responseText, foodLog, loopExhausted);
@@ -826,14 +851,15 @@ const buildEnhancedContext = async (userId, userTimezone, userProfile) => {
         context += `\nRecent ${recentAvg.days}-day averages: ${recentAvg.avgCalories} cal, ${recentAvg.avgProtein}g protein, ${recentAvg.avgCarbs}g carbs, ${recentAvg.avgFat}g fat\n`;
     }
 
-    // Weekly review awareness
+    // Weekly review awareness — only after 6 PM on review day
     const settings = userData.settings || {};
     const reviewDay = settings.weeklyReviewDay || 'sunday';
     const currentDayLower = dayName.toLowerCase();
-    if (currentDayLower === reviewDay) {
+    if (reviewDay !== 'off' && currentDayLower === reviewDay) {
         const lastReview = userData.lastWeeklyReview;
-        if (lastReview !== today) {
-            context += `\n**WEEKLY REVIEW AVAILABLE** — Today is ${dayName}, the user's review day, and no review has been generated yet this week. After the user logs a meal (especially dinner or their last meal of the day), naturally offer to do their weekly review. Example: "Since it's ${dayName}, want me to put together your weekly review?" If the user agrees, call triggerWeeklyReview. Do NOT auto-trigger it — wait for the user to say yes.\n`;
+        const currentHour = parseInt(now.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', hour12: false }), 10);
+        if (lastReview !== today && currentHour >= 18) {
+            context += `\n**WEEKLY REVIEW AVAILABLE** — Today is ${dayName}, the user's review day, and no review has been generated yet this week. After the user logs a meal (especially dinner or their last meal of the day), naturally offer to do their weekly review. Example: "Since it's ${dayName}, want me to put together your weekly review?" If the user agrees, call triggerWeeklyReview. Do NOT auto-trigger it — wait for the user to say yes. Only mention this ONCE — if the user ignores the offer or changes the subject, do not bring it up again in this conversation.\n`;
         }
     }
 

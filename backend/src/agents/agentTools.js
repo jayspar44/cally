@@ -394,7 +394,7 @@ const logFood = async (args, userId, userTimezone, idempotencyKey, options = {})
             return {
                 success: true,
                 deduplicated: true,
-                message: `Already logged ${existingDocs.length} item(s) for this request.`,
+                message: `These ${existingDocs.length} item(s) were ALREADY SUCCESSFULLY LOGGED. Do NOT call logFood again for these items — they are saved. Respond to the user.`,
                 data: {
                     date: existingDocs[0].date,
                     meal: existingDocs[0].meal,

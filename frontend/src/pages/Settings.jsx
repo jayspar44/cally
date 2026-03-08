@@ -230,6 +230,7 @@ export default function Settings() {
     };
 
     const REVIEW_DAY_LABELS = {
+        off: 'Off',
         sunday: 'Sunday',
         monday: 'Monday',
         tuesday: 'Tuesday',
