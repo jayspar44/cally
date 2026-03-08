@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/jayspar44/cally/compare/v0.4.7...v0.5.0) (2026-03-08)
+
+
+### Features
+
+* add Google Search nutrition fallback, USDA token scoring, and lookup fixes afd2cbd
+* add token scoring, nutrition matching, searchFoodLogs improvements, and nutrient validation 6547a43
+* add USDA retry with simplified query on 500/504 errors 1a80f0b
+* redesign tool-calling loop with research cap, budget awareness, and fallback responses 4620a1a
+* update gemini thinking levels, token limits, and chat history 6baceb7
+* update system prompt with tool efficiency, search/lookup clarity, and conflict resolution 7f6a626
+
+
+### Bug Fixes
+
+* add minimum token score threshold (0.2) to searchFoodLogs 4a73b17
+* add thinkingConfig to Google Search, harden JSON parsing and validateNutrients dc842a0
+* add USDA 503 to retry conditions (observed in testing) e521eaa
+* address code review issues from PR [#11](undefined/undefined/undefined/issues/11) 8a498f4
+* block research tools at execution layer instead of toolConfig 3a366e0
+* invalidate context cache when user updates profile 18afc37
+* resolve express-rate-limit IPv6 validation warnings dc03a46
+* restore Firestore lookupNutrition limits to 50 715c49d
+
 ### [0.4.7](https://github.com/jayspar44/cally/compare/v0.4.6...v0.4.7) (2026-03-03)
 
 
