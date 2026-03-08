@@ -310,25 +310,10 @@ const getBudgetMessage = (researchCalls, totalIterations) => {
     return null;
 };
 
-const getEffectiveConfig = (baseConfig, researchCalls, totalIterations) => {
-    if (totalIterations >= MAX_TOTAL_ITERATIONS) {
-        return {
-            ...baseConfig,
-            toolConfig: { functionCallingConfig: { mode: 'NONE' } }
-        };
-    }
-    if (researchCalls >= RESEARCH_TOOL_CAP) {
-        return {
-            ...baseConfig,
-            toolConfig: {
-                functionCallingConfig: {
-                    mode: 'AUTO',
-                    allowedFunctionNames: ACTION_TOOLS
-                }
-            }
-        };
-    }
-    return baseConfig;
+const shouldBlockResearchTool = (toolName, researchCalls, totalIterations) => {
+    if (totalIterations >= MAX_TOTAL_ITERATIONS) return true;
+    if (researchCalls >= RESEARCH_TOOL_CAP && RESEARCH_TOOLS.has(toolName)) return true;
+    return false;
 };
 
 const buildFallbackResponse = (responseText, foodLog, loopExhausted) => {
@@ -427,6 +412,16 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     researchCalls++;
                 }
 
+                // Block research tools when budget is exhausted
+                if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
+                    getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: `Research budget exhausted. Use logFood with your best estimates or respond to the user.` }
+                    });
+                    continue;
+                }
+
                 getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
@@ -464,8 +459,6 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                 }
             }));
 
-            const effectiveConfig = getEffectiveConfig(config, researchCalls, totalIterations);
-
             result = await genAI.models.generateContent({
                 model: modelName,
                 contents: [
@@ -473,7 +466,7 @@ const processMessage = async (message, chatHistory, userProfile, userId, userTim
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config: effectiveConfig
+                config
             });
 
             responseText = getResponseText(result);
@@ -588,6 +581,16 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     researchCalls++;
                 }
 
+                // Block research tools when budget is exhausted
+                if (shouldBlockResearchTool(call.name, researchCalls, totalIterations)) {
+                    getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls, blocked: true }, 'Tool blocked by budget');
+                    functionResponses.push({
+                        name: call.name,
+                        response: { success: false, blocked: true, error: `Research budget exhausted. Use logFood with your best estimates or respond to the user.` }
+                    });
+                    continue;
+                }
+
                 getLogger().info({ tool: call.name, iteration: totalIterations, researchCalls }, 'Executing tool');
                 toolsUsed.push(call.name);
 
@@ -625,8 +628,6 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                 }
             }));
 
-            const effectiveConfig = getEffectiveConfig(imgConfig, researchCalls, totalIterations);
-
             result = await genAI.models.generateContent({
                 model: modelName,
                 contents: [
@@ -634,7 +635,7 @@ const processImageMessage = async (message, images, chatHistory, userProfile, us
                     { role: 'model', parts: result.candidates[0].content.parts },
                     { role: 'user', parts: toolResponseParts }
                 ],
-                config: effectiveConfig
+                config: imgConfig
             });
 
             responseText = getImgResponseText(result);
