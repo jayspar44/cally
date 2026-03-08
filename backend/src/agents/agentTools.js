@@ -736,7 +736,8 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
             };
         }
 
-        // Score and rank all logs by token overlap — no threshold, return all ranked
+        // Score and rank logs by token overlap, filter out irrelevant results
+        const MIN_SEARCH_SCORE = 0.2;
         const scored = logs
             .map(log => {
                 const nameScore = log.name ? scoreTokenMatch(query, log.name) : 0;
@@ -744,6 +745,7 @@ const searchFoodLogs = async (args, userId, userTimezone) => {
                 const score = Math.max(nameScore, mealScore);
                 return { ...log, score };
             })
+            .filter(log => log.score >= MIN_SEARCH_SCORE)
             .sort((a, b) => b.score - a.score);
 
         return {
